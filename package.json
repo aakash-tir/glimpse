@@ -8,11 +8,40 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
+    "build:win": "electron-vite build && electron-builder --win",
     "preview": "electron-vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit"
+  },
+  "build": {
+    "appId": "com.aakash.glimpse",
+    "productName": "Glimpse",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*",
+      "package.json",
+      "!**/*.{md,map}",
+      "!**/.{git,vscode,idea}/**"
+    ],
+    "asar": true,
+    "win": {
+      "target": "nsis",
+      "icon": "app-icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "Glimpse",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "uninstallDisplayName": "Glimpse",
+      "artifactName": "Glimpse Setup.exe"
+    }
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
@@ -34,6 +63,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.5.0",
     "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
     "electron-vite": "^2.3.0",
     "eslint": "^9.17.0",
     "eslint-config-prettier": "^9.1.0",
