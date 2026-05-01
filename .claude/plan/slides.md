@@ -1,0 +1,111 @@
+# Slides
+
+The window content is organized as a deck of slides. Slides are navigated by arrow buttons; transitions are 350 ms ease-in-out cube rotations. Slides loop in the click direction (no reverse-spin on wrap).
+
+## Slide indicator
+
+Centered along the bottom edge of the window: a row of small dots, one per currently-active slide. The active slide's dot is larger. **Dot color is adaptive** — light dots on dark slide backgrounds, dark dots on the (light-mode) Settings slide.
+
+## Navigation
+
+- Left and right arrow buttons on the panel edges (only these two — no other navigation, no keyboard).
+- Cube animation rotates **in the direction of the arrow click**. **350 ms ease-in-out.**
+- Slides loop in the click direction (no reverse-spin on wrap).
+
+## Dynamic slide count
+
+Dot count grows / shrinks as the moon-phase toggle changes or events become active / inactive. **The currently-viewed slide does not shift** when others appear / disappear — the user stays on whatever they were looking at.
+
+## Loading state (window mode)
+
+When the window is opened before the first successful fetch, slides display **muted-grey skeleton placeholders** shaped like the real content (tiles, cards), with a **subtle horizontal sweep shimmer** repeating every ~1.5 s. Skeletons replace themselves with real content as data arrives.
+
+---
+
+## Slide 1 — Today (hourly)
+
+- **Each hour shows:** time (in user's 12 h / 24 h format) · condition icon (day/night variant) · temperature · precipitation %.
+- **Range:** rolling next 24 hours, **starting at the next full hour** from now.
+- **Layout:** horizontal scroll inside the slide; **6 hours visible at a time**, **snap-to-page** (each scroll step advances 6 hours).
+- **Scroll affordance:** 24 px gradient fade on the right edge whenever there's more content to scroll to (and on the left edge once the user has scrolled past the start). Fades disappear at the boundary.
+- **Background:** default dark glass.
+
+## Slide 2 — Next 7 days
+
+- **Each daily row:** day label · condition icon · high / low · precipitation %.
+- **Day labels:** "Today" in row 1, then weekday abbreviations (Mon, Tue, …) for the rest.
+- **Range:** today + next 6 days.
+- **Layout:** horizontal scroll; **3 days visible at a time**, snap-to-page (each scroll step advances 3 days).
+- **Scroll affordance:** same 24 px edge-fade pattern as the hourly slide.
+- **Background:** default dark glass.
+
+## Slide 3 — Current conditions
+
+Four metric tiles:
+
+- **Wind:** SVG arrow rotated by direction degrees + speed value.
+- **Humidity:** percentage with a small drop icon.
+- **Sunrise / sunset:** two times stacked vertically, each with a mini sun-up / sun-down icon.
+- **Feels-like temperature:** numeric.
+- **Background:** default dark glass.
+
+## Slide 4 — Moon phase *(conditional, controlled by Settings toggle)*
+
+Inserted before the special-events slide. Default toggle state is **off**.
+
+- **Visual:** large stylized moon graphic with the curved shadow indicating the current phase.
+- **Below:** phase name (e.g. "Waxing Gibbous") + illumination %.
+- **Background:** deep navy (`#0a1628`).
+- Pure phase info; does **not** signal special lunar events. (Those live on slide 5.)
+
+## Slide 5 — Special events *(conditional)*
+
+Only shown when ≥ 1 event is active today or calendar-tomorrow (system local timezone). One slide per active event.
+
+- **Title style:** functional, not poetic — e.g. "Aurora", "Perseids meteor shower", "Total lunar eclipse", "Blood moon".
+- **Tomorrow badge:** plain "Tomorrow" text (no date).
+- **Event ordering when multiple are active:** today's events first, then tomorrow's; within each day, alphabetical by event type.
+- **Theme:** event backgrounds **stay celestial-dark always**, regardless of the user's theme setting.
+- Strictly passive — no notifications. **Full moon is NOT a special event.**
+
+### Aurora
+
+- Kp value · visibility text (user-aware: "Visible from your location" if user latitude crosses the threshold band, otherwise "Visible at latitudes ≥ Nº") · last-updated time.
+- **Background:** linear gradient `#0a2e1f` → `#2a0a3e` (deep teal-green → deep violet).
+- **Motion:** slow shimmer drift, ~30 s loop, opacity oscillates 0.85 → 1.0.
+
+### Meteor shower
+
+- Name (e.g. "Perseids") · peak date · expected ZHR (zenith hourly rate) · best viewing time.
+- **Background:** solid `#0a0a1f` (near-black indigo) + 30 – 40 small static white star points scattered across the slide (1 – 2 px, varied opacity).
+- **Motion:** occasional shooting star, roughly 1 every 6 s, ~0.6 s trajectory, fades at end.
+
+### Eclipse
+
+- Type (lunar / solar / partial / total) · start / peak / end times in local time · visibility from user's location (yes / no / partial) · magnitude % if available.
+- **Background:** radial gradient `#1a0a0a` (center) → `#2a1010` (edges) — suggests an eclipse silhouette.
+- **Motion:** slow brightness pulse, 4 s period, ±5 % amplitude.
+
+### Blood moon
+
+- Peak time · visibility info.
+- **Background:** linear gradient `#2a0a05` (top) → `#5a1a0a` (bottom) — warmer / oranger than eclipse so the two read differently.
+- **Motion:** slow pulse with subtle color shift toward orange, 5 s period.
+
+## Slide 6 — Settings
+
+Always last. **Vertically scrollable** within the slide.
+
+- **Background:** follows the resolved theme — dark slate (`#0f172a`) in dark mode; off-white (`#f8fafc`) in light mode. (The only theme-adaptive slide background; all others stay dark.)
+
+### Contents (top to bottom)
+
+- **Units** — metric / imperial slider toggle. *Default: metric.*
+- **Time format** — 12 h / 24 h toggle. *Default: 24 h.*
+- **Moon-phase slide** — on / off toggle. *Default: off.*
+- **Theme** — auto / light / dark. *Default: auto.*
+- **Track window position** — on / off toggle. *Default: off.*
+- **Reset icon position** — button.
+- **Manual refresh** — button.
+- **Replay tutorial** — button (re-runs the first-launch onboarding from step 1; see [onboarding.md](./onboarding.md)).
+- **About** — app name "Glimpse" + credits line: `Weather data: Open-Meteo · Aurora data: NOAA SWPC · Astronomy: SunCalc`.
