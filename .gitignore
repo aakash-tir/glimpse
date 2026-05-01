@@ -4,6 +4,9 @@ dist/
 release/
 .vite/
 .cache/
+coverage/
+test-results/
+playwright-report/
 
 # Local env / secrets
 .env

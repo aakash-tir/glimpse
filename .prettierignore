@@ -3,5 +3,8 @@ out/
 dist/
 release/
 .vite/
+coverage/
+test-results/
+playwright-report/
 package-lock.json
 *.md
