@@ -160,6 +160,54 @@ export function collapseTargetFromWindow(
   return clamped;
 }
 
+// True iff the window rectangle is fully contained within the union of
+// the supplied display rectangles. A monitor disconnect / resolution
+// change can leave a tracked windowBounds entry off-screen; the caller
+// should fall back to the default expand-from-icon behavior in that
+// case.
+export function isWindowBoundsOnScreen(
+  bounds: WindowBounds,
+  displays: DisplayBounds[],
+): boolean {
+  if (displays.length === 0) return false;
+  const left = bounds.x;
+  const top = bounds.y;
+  const right = bounds.x + bounds.width;
+  const bottom = bounds.y + bounds.height;
+  return displays.some(
+    (d) =>
+      left >= d.x &&
+      top >= d.y &&
+      right <= d.x + d.width &&
+      bottom <= d.y + d.height,
+  );
+}
+
+// Resolves the window bounds to use on expand. Encodes the
+// trackWindowPosition contract:
+//   - off (default): every expand uses default size at the icon's
+//     current screen location (via expandFromIcon).
+//   - on + saved bounds on-screen: restore the saved bounds.
+//   - on + saved bounds off-screen (monitor change): fall back to
+//     the default behavior so the user isn't stuck with an invisible
+//     window.
+export function resolveWindowBoundsForExpand(args: {
+  iconPos: IconPosition;
+  primary: DisplayBounds;
+  trackWindowPosition: boolean;
+  savedBounds: WindowBounds | null;
+  allDisplays: DisplayBounds[];
+}): WindowBounds {
+  if (
+    args.trackWindowPosition &&
+    args.savedBounds &&
+    isWindowBoundsOnScreen(args.savedBounds, args.allDisplays)
+  ) {
+    return args.savedBounds;
+  }
+  return expandFromIcon(args.iconPos, args.primary);
+}
+
 // Snap a dropped window to the nearest screen corner if within the snap
 // radius. Unlike the icon's snap, the window has no padding — corner
 // snap means the window's edge sits flush against the screen edge.

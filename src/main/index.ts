@@ -16,8 +16,8 @@ import { computeIconPosFromCursor, type ScreenPoint } from '../shared/drag';
 import { snapToCorner } from '../shared/snap';
 import {
   collapseTargetFromWindow,
-  expandFromIcon,
   maxWindowSize,
+  resolveWindowBoundsForExpand,
   snapWindowToCorner,
   squareResize,
   WINDOW_MIN_SIZE_PX,
@@ -188,7 +188,14 @@ function expandToWindow(): ModeChange {
     return modeChangePayload('window', b, null);
   }
   const iconPos = currentIconPosition();
-  const bounds = expandFromIcon(iconPos, primaryBounds());
+  const settings = loadSettings();
+  const bounds = resolveWindowBoundsForExpand({
+    iconPos,
+    primary: primaryBounds(),
+    trackWindowPosition: settings.trackWindowPosition,
+    savedBounds: settings.windowBounds,
+    allDisplays: allDisplayBounds(),
+  });
   applyWindowBounds(bounds);
   mode = 'window';
   // Anchor: where the icon's center was on screen.
@@ -237,6 +244,14 @@ function collapseToIcon(opts: CollapseOpts = {}): ModeChange {
     return modeChangePayload('icon', b, null);
   }
   const winBounds = iconWindow.getBounds();
+  // If trackWindowPosition is on, snapshot the window's current bounds
+  // before collapsing so the next expand restores exactly what the
+  // user was looking at (in case they hadn't moved/resized since the
+  // toggle was switched on).
+  const collapseSettings = loadSettings();
+  if (collapseSettings.trackWindowPosition) {
+    saveSettings({ windowBounds: winBounds });
+  }
   const iconPos = nextIconPositionForCollapse(opts);
   applyIconPosition(iconPos);
   // Reset → clear the saved iconPosition so a future launch uses the

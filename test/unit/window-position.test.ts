@@ -6,7 +6,9 @@ import {
   defaultWindowSize,
   expandFromIcon,
   isWindowAtDefaultPosition,
+  isWindowBoundsOnScreen,
   maxWindowSize,
+  resolveWindowBoundsForExpand,
   snapWindowToCorner,
   squareResize,
   WINDOW_DEFAULT_SIZE_DENOM,
@@ -421,6 +423,104 @@ describe('snapWindowToCorner', () => {
     expect(snapWindowToCorner(drop, size, primary, 40)?.corner).toBe(
       'top-left',
     );
+  });
+});
+
+describe('isWindowBoundsOnScreen', () => {
+  it('returns true for bounds fully inside a single display', () => {
+    expect(
+      isWindowBoundsOnScreen({ x: 100, y: 100, width: 200, height: 200 }, [
+        primary,
+      ]),
+    ).toBe(true);
+  });
+
+  it('returns false for bounds that overlap the right edge', () => {
+    expect(
+      isWindowBoundsOnScreen(
+        { x: primary.width - 50, y: 100, width: 200, height: 200 },
+        [primary],
+      ),
+    ).toBe(false);
+  });
+
+  it('returns false for bounds with negative coordinates', () => {
+    expect(
+      isWindowBoundsOnScreen({ x: -50, y: -50, width: 200, height: 200 }, [
+        primary,
+      ]),
+    ).toBe(false);
+  });
+
+  it('returns true for bounds fully on a secondary display', () => {
+    const secondary: DisplayBounds = {
+      x: 1920,
+      y: 0,
+      width: 1280,
+      height: 720,
+    };
+    expect(
+      isWindowBoundsOnScreen({ x: 2000, y: 100, width: 400, height: 400 }, [
+        primary,
+        secondary,
+      ]),
+    ).toBe(true);
+  });
+
+  it('returns false when no displays are connected', () => {
+    expect(
+      isWindowBoundsOnScreen({ x: 0, y: 0, width: 100, height: 100 }, []),
+    ).toBe(false);
+  });
+});
+
+describe('resolveWindowBoundsForExpand', () => {
+  const iconPos = { x: 800, y: 500 };
+  const savedBounds = { x: 200, y: 200, width: 400, height: 400 };
+
+  it('uses default expand-from-icon when trackWindowPosition is off', () => {
+    const result = resolveWindowBoundsForExpand({
+      iconPos,
+      primary,
+      trackWindowPosition: false,
+      savedBounds,
+      allDisplays: [primary],
+    });
+    expect(result).toEqual(expandFromIcon(iconPos, primary));
+  });
+
+  it('uses saved bounds when trackWindowPosition is on and bounds are on-screen', () => {
+    const result = resolveWindowBoundsForExpand({
+      iconPos,
+      primary,
+      trackWindowPosition: true,
+      savedBounds,
+      allDisplays: [primary],
+    });
+    expect(result).toEqual(savedBounds);
+  });
+
+  it('falls back to default when trackWindowPosition is on but no saved bounds', () => {
+    const result = resolveWindowBoundsForExpand({
+      iconPos,
+      primary,
+      trackWindowPosition: true,
+      savedBounds: null,
+      allDisplays: [primary],
+    });
+    expect(result).toEqual(expandFromIcon(iconPos, primary));
+  });
+
+  it('falls back to default when trackWindowPosition is on but bounds are off-screen (monitor change)', () => {
+    const offScreen = { x: 2500, y: 100, width: 400, height: 400 };
+    const result = resolveWindowBoundsForExpand({
+      iconPos,
+      primary,
+      trackWindowPosition: true,
+      savedBounds: offScreen,
+      allDisplays: [primary],
+    });
+    expect(result).toEqual(expandFromIcon(iconPos, primary));
   });
 });
 
