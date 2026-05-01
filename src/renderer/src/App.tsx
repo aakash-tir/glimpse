@@ -1,4 +1,5 @@
 import { WeatherIcon } from './components/weather-icon';
+import { ICON_OFFSET_X, ICON_OFFSET_Y } from '../../shared/icon-position';
 
 export function App(): JSX.Element {
   return (
@@ -7,15 +8,21 @@ export function App(): JSX.Element {
         {
           width: '100vw',
           height: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
           background: 'transparent',
+          position: 'relative',
           WebkitAppRegion: 'no-drag',
         } as React.CSSProperties
       }
     >
-      <WeatherIcon state={{ kind: 'ready', condition: 'clear', isDay: true }} />
+      <div
+        style={{
+          position: 'absolute',
+          left: ICON_OFFSET_X,
+          top: ICON_OFFSET_Y,
+        }}
+      >
+        <WeatherIcon state={{ kind: 'error' }} />
+      </div>
     </div>
   );
 }

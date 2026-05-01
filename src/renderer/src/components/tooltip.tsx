@@ -42,7 +42,10 @@ export function Tooltip({
     timer.current = setTimeout(() => {
       const rect = wrapperRef.current?.getBoundingClientRect();
       if (rect) {
-        setPos({ x: rect.left + rect.width / 2, y: rect.bottom + 8 });
+        // Anchor the tooltip's right edge to the target's right edge so
+        // it stays inside the icon window when the icon sits in the
+        // top-right corner.
+        setPos({ x: rect.right, y: rect.bottom + 8 });
       }
       setVisible(true);
     }, HOVER_DELAY_MS);
@@ -75,7 +78,7 @@ export function Tooltip({
             ...baseStyle,
             left: pos.x,
             top: pos.y,
-            transform: 'translateX(-50%)',
+            transform: 'translateX(-100%)',
           }}
         >
           {text}

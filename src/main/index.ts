@@ -3,8 +3,10 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   defaultIconPosition,
-  ICON_SIZE,
   resolveIconPosition,
+  windowPositionForIcon,
+  WINDOW_HEIGHT,
+  WINDOW_WIDTH,
   type DisplayBounds,
 } from '../shared/icon-position';
 import { loadSettings, saveSettings } from './settings';
@@ -23,17 +25,18 @@ function allDisplayBounds(): DisplayBounds[] {
 
 function createIconWindow(): void {
   const settings = loadSettings();
-  const pos = resolveIconPosition(
+  const iconPos = resolveIconPosition(
     settings.iconPosition,
     primaryBounds(),
     allDisplayBounds(),
   );
+  const winPos = windowPositionForIcon(iconPos);
 
   iconWindow = new BrowserWindow({
-    width: ICON_SIZE,
-    height: ICON_SIZE,
-    x: pos.x,
-    y: pos.y,
+    width: WINDOW_WIDTH,
+    height: WINDOW_HEIGHT,
+    x: winPos.x,
+    y: winPos.y,
     frame: false,
     transparent: true,
     resizable: false,
@@ -67,21 +70,27 @@ function createIconWindow(): void {
 function snapBackIfOffScreen(): void {
   if (!iconWindow) return;
   const settings = loadSettings();
-  const resolved = resolveIconPosition(
+  const resolvedIcon = resolveIconPosition(
     settings.iconPosition,
     primaryBounds(),
     allDisplayBounds(),
   );
-  iconWindow.setBounds({ ...resolved, width: ICON_SIZE, height: ICON_SIZE });
+  const winPos = windowPositionForIcon(resolvedIcon);
+  iconWindow.setBounds({
+    x: winPos.x,
+    y: winPos.y,
+    width: WINDOW_WIDTH,
+    height: WINDOW_HEIGHT,
+  });
 
-  // If the resolved position is the default (saved was off-screen), clear
-  // the saved position so future launches use the default until the user
-  // moves the icon again.
-  if (settings.iconPosition && resolved !== settings.iconPosition) {
-    const isDefault =
-      resolved.x === defaultIconPosition(primaryBounds()).x &&
-      resolved.y === defaultIconPosition(primaryBounds()).y;
-    if (isDefault) saveSettings({ iconPosition: null });
+  // If we had to fall back to the default position, clear the saved
+  // iconPosition so future launches use the default until the user moves
+  // the icon again.
+  if (settings.iconPosition && resolvedIcon !== settings.iconPosition) {
+    const def = defaultIconPosition(primaryBounds());
+    if (resolvedIcon.x === def.x && resolvedIcon.y === def.y) {
+      saveSettings({ iconPosition: null });
+    }
   }
 }
 
