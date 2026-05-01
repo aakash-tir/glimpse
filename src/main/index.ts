@@ -3,12 +3,17 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   defaultIconPosition,
+  ICON_OFFSET_X,
+  ICON_OFFSET_Y,
   resolveIconPosition,
   windowPositionForIcon,
   WINDOW_HEIGHT,
   WINDOW_WIDTH,
   type DisplayBounds,
 } from '../shared/icon-position';
+import { computeIconPosFromCursor, type ScreenPoint } from '../shared/drag';
+import { snapToCorner } from '../shared/snap';
+import type { IconPosition } from '../shared/settings-store';
 import { loadSettings, saveSettings } from './settings';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -94,24 +99,99 @@ function snapBackIfOffScreen(): void {
   }
 }
 
+type DragSession = {
+  startCursor: ScreenPoint;
+  startIcon: IconPosition;
+};
+
+let dragSession: DragSession | null = null;
+
+function currentIconPosition(): IconPosition {
+  if (!iconWindow) {
+    return defaultIconPosition(primaryBounds());
+  }
+  const bounds = iconWindow.getBounds();
+  return {
+    x: bounds.x + ICON_OFFSET_X,
+    y: bounds.y + ICON_OFFSET_Y,
+  };
+}
+
+function applyIconPosition(pos: IconPosition): void {
+  if (!iconWindow) return;
+  const win = windowPositionForIcon(pos);
+  iconWindow.setBounds({
+    x: win.x,
+    y: win.y,
+    width: WINDOW_WIDTH,
+    height: WINDOW_HEIGHT,
+  });
+}
+
 function registerIpc(): void {
   ipcMain.handle('settings:get', () => loadSettings());
   ipcMain.handle('settings:set', (_evt, patch) => saveSettings(patch));
+
+  ipcMain.on('drag:start', (_evt, cursor: ScreenPoint) => {
+    dragSession = {
+      startCursor: cursor,
+      startIcon: currentIconPosition(),
+    };
+  });
+
+  ipcMain.on('drag:move', (_evt, cursor: ScreenPoint) => {
+    if (!dragSession) return;
+    const next = computeIconPosFromCursor(
+      dragSession.startCursor,
+      dragSession.startIcon,
+      cursor,
+    );
+    applyIconPosition(next);
+  });
+
+  ipcMain.on('drag:end', (_evt, cursor: ScreenPoint) => {
+    if (!dragSession) return;
+    const dropped = computeIconPosFromCursor(
+      dragSession.startCursor,
+      dragSession.startIcon,
+      cursor,
+    );
+    dragSession = null;
+
+    const snapped = snapToCorner(dropped, primaryBounds());
+    const final = snapped?.position ?? dropped;
+    applyIconPosition(final);
+    saveSettings({ iconPosition: final });
+  });
 }
 
-void app.whenReady().then(() => {
-  registerIpc();
-  createIconWindow();
-
-  screen.on('display-metrics-changed', snapBackIfOffScreen);
-  screen.on('display-removed', snapBackIfOffScreen);
-  screen.on('display-added', snapBackIfOffScreen);
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createIconWindow();
+// Single-instance lock per plan/tech-stack.md. M2 ships the bare lock —
+// a second launch is acquired by the existing primary process via the
+// `second-instance` event but is otherwise a no-op (M3 will wire the
+// expand / focus / exit-drag-then-expand behavior).
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    // Intentionally empty until M3 — primary instance keeps running so
+    // the second launch does not produce a duplicate process.
   });
-});
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
-});
+  void app.whenReady().then(() => {
+    registerIpc();
+    createIconWindow();
+
+    screen.on('display-metrics-changed', snapBackIfOffScreen);
+    screen.on('display-removed', snapBackIfOffScreen);
+    screen.on('display-added', snapBackIfOffScreen);
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createIconWindow();
+    });
+  });
+
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit();
+  });
+}

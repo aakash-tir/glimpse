@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { Condition, IconGlyphName } from '../../../shared/condition';
 import { conditionToGlyph } from '../../../shared/condition';
+import { DragModeGlow } from './drag-mode-glow';
 import { IconGlyph } from './icon-glyph';
 import { LoadingCloud } from './loading-cloud';
 import { SadCloud } from './sad-cloud';
@@ -36,7 +38,25 @@ function ReadyContents({ glyph }: { glyph: IconGlyphName }): JSX.Element {
   );
 }
 
-export function WeatherIcon({ state }: { state: IconState }): JSX.Element {
+export type WeatherIconProps = {
+  state: IconState;
+  dragMode?: boolean;
+  onClick?: () => void;
+};
+
+export function WeatherIcon({
+  state,
+  dragMode = false,
+  onClick,
+}: WeatherIconProps): JSX.Element {
+  // Hover state is tracked explicitly (rather than via Framer Motion's
+  // `whileHover`) so it can be force-cleared while drag mode is on. With
+  // `whileHover`, swapping the prop to `undefined` mid-hover leaves the
+  // scale animation stuck at 1.15× — re-engaging hover after drag mode
+  // exits then never resets the icon to its base size.
+  const [isHovered, setIsHovered] = useState(false);
+  const showHoverScale = !dragMode && isHovered;
+
   const inner =
     state.kind === 'loading' ? (
       <LoadingCloud size={64} />
@@ -46,14 +66,20 @@ export function WeatherIcon({ state }: { state: IconState }): JSX.Element {
       <ReadyContents glyph={conditionToGlyph(state.condition, state.isDay)} />
     );
 
+  const innerWithGlow = dragMode ? <DragModeGlow>{inner}</DragModeGlow> : inner;
+
   const wrapped = (
     <motion.div
       data-testid="icon-root"
       data-icon-state={state.kind}
+      data-drag-mode={dragMode ? 'on' : 'off'}
       data-hover-scale={HOVER_SCALE}
       data-hover-duration-s={HOVER_DURATION_S}
-      whileHover={{ scale: HOVER_SCALE }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      animate={{ scale: showHoverScale ? HOVER_SCALE : 1 }}
       transition={{ duration: HOVER_DURATION_S, ease: 'easeOut' }}
+      onClick={onClick}
       style={{
         width: 64,
         height: 64,
@@ -62,7 +88,7 @@ export function WeatherIcon({ state }: { state: IconState }): JSX.Element {
         justifyContent: 'center',
       }}
     >
-      {inner}
+      {innerWithGlow}
     </motion.div>
   );
 

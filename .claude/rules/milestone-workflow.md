@@ -46,21 +46,44 @@ When all scope items in the active milestone's section of [`progress.md`](../pro
 
 Write to `./manual-tests.md` at the project root. The file is gitignored (set up at M0 scaffolding) and personal — never committed. **Overwrite each milestone**, no carryover from the previous one.
 
+**Shell convention.** All commands are written for **Git Bash on Windows** (the user's shell). Use POSIX syntax — `$APPDATA` (not `%APPDATA%`), forward slashes in paths, `rm -f` not `del`, `cat` not `type`. Quote `"$APPDATA/..."` paths so spaces in `Users\<name>` are tolerated.
+
+Each manual test must answer three questions in this order:
+
+1. **What** is being verified?
+2. **Command** — the exact line(s) the user pastes into Git Bash to set up or trigger the check.
+3. **Expected** — the observable outcome: terminal output, file contents, or visible UI behavior. Be specific (literal strings, byte counts, "icon snaps to top-left with 16 px padding") so a failed expectation is unambiguous.
+
+If a step is a UI gesture (drag, hover, double-click) rather than a shell command, still split it: the **Command** boots the app or inspects state from the shell; the gesture and what to look for go under **Expected** as part of the observable outcome. If a test really has no shell side at all (pure visual check after the app is already running), use `Command: (none — perform action while app is open)` and lean on **Expected** for the observable detail.
+
+Template:
+
 ````markdown
 # Manual tests — M<N> <milestone name>
 
 Steps to verify by hand. Skip anything already covered by the automated tests in `.claude/rules/testing.md` for this milestone — list only what the automated suite cannot reasonably exercise (visual quality, animations feeling right, real installer flows, real network behavior).
 
+All commands assume **Git Bash on Windows**.
+
 ## Setup
 
-- <preconditions, e.g. "delete %APPDATA%/Glimpse/settings.json to simulate first launch">
+- <preconditions, e.g. "delete settings.json to simulate first launch">
+
+```bash
+rm -f "$APPDATA/Glimpse/settings.json"
+npm run dev
+```
 
 ## Tests
 
 ### 1. <Short title>
 
-- **Action:** <exact UI gesture or command>
-- **Expected:** <what you should see / what should happen>
+- **What:** <what is being verified>
+- **Command:**
+  ```bash
+  <exact git bash line(s)>
+  ```
+- **Expected:** <terminal output, file contents, or observable UI behavior — include the gesture itself if relevant>
 
 ### 2. ...
 ````

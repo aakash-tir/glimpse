@@ -3,6 +3,7 @@ import {
   defaultIconPosition,
   isPositionOnScreen,
   resolveIconPosition,
+  shouldResetIconPosition,
   ICON_SIZE,
   ICON_PADDING,
   type DisplayBounds,
@@ -100,4 +101,37 @@ describe('resolveIconPosition', () => {
       defaultIconPosition(smaller),
     );
   });
+});
+
+describe('shouldResetIconPosition', () => {
+  it('returns false when there is no saved position', () => {
+    expect(shouldResetIconPosition(null, [primary])).toBe(false);
+  });
+
+  it('returns false when the saved position is on the current displays', () => {
+    expect(shouldResetIconPosition({ x: 500, y: 500 }, [primary])).toBe(false);
+  });
+
+  it.each([
+    {
+      label: 'monitor disconnected',
+      saved: { x: 2500, y: 100 },
+      displays: [primary],
+    },
+    {
+      label: 'resolution shrunk (4K → 1080p)',
+      saved: { x: 3700, y: 100 },
+      displays: [primary],
+    },
+    {
+      label: 'primary swapped to smaller display',
+      saved: { x: 1500, y: 100 },
+      displays: [{ x: 0, y: 0, width: 1024, height: 768 } as DisplayBounds],
+    },
+  ])(
+    'returns true when $label leaves saved off-screen',
+    ({ saved, displays }) => {
+      expect(shouldResetIconPosition(saved, displays)).toBe(true);
+    },
+  );
 });

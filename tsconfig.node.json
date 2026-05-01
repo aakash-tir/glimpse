@@ -21,8 +21,6 @@
     "electron.vite.config.ts",
     "tailwind.config.ts",
     "postcss.config.js",
-    "vitest.config.ts",
-    "playwright.config.ts",
-    "test/e2e/**/*.ts"
+    "vitest.config.ts"
   ]
 }

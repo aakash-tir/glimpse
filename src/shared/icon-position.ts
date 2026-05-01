@@ -74,3 +74,15 @@ export function resolveIconPosition(
   if (saved && isPositionOnScreen(saved, allDisplays)) return saved;
   return defaultIconPosition(primary);
 }
+
+// True iff a previously-saved position can no longer be honored on the
+// current display layout (monitor disconnected, resolution shrunk, primary
+// monitor swapped to a smaller one). The caller should fall back to the
+// default top-right and clear the saved position.
+export function shouldResetIconPosition(
+  saved: IconPosition | null,
+  allDisplays: DisplayBounds[],
+): boolean {
+  if (saved === null) return false;
+  return !isPositionOnScreen(saved, allDisplays);
+}
