@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ICON_SIZE } from '../../../shared/icon-position';
 import { TitleBar } from '../components/title-bar';
@@ -17,26 +17,71 @@ export type WindowViewProps = {
   enterBounds: { width: number; height: number } | null;
 };
 
+type CollapseRequest = {
+  opts: { resetToDefault?: boolean };
+  exitAnchor: { x: number; y: number };
+};
+
 // WindowView — the expanded panel placeholder. Real slide content lands
-// in M4 (slide framework). Click-anywhere-to-collapse is a temporary
-// affordance until the title-bar buttons are wired.
+// in M4 (slide framework). Title bar buttons trigger collapse via a
+// scale-down animation pivoting around the icon's eventual position;
+// when the animation completes, the actual collapse IPC fires and main
+// resizes the window back to icon-mode bounds.
 export function WindowView({
   enterAnchor,
   enterBounds,
 }: WindowViewProps): JSX.Element {
-  const handleCollapse = useCallback(() => {
-    void window.glimpse?.collapse();
+  const [collapse, setCollapse] = useState<CollapseRequest | null>(null);
+
+  const startCollapse = useCallback(
+    async (opts: { resetToDefault?: boolean } = {}) => {
+      if (collapse) return;
+      const api = window.glimpse;
+      if (!api) return;
+      const exitAnchor = await api.previewCollapseAnchor(opts);
+      setCollapse({ opts, exitAnchor });
+    },
+    [collapse],
+  );
+
+  const handleAnimationComplete = useCallback(() => {
+    // Fires for both entry and exit animations. We only act when the
+    // user has requested a collapse — ignore the entry animation's
+    // completion.
+    if (!collapse) return;
+    void window.glimpse?.collapse(collapse.opts);
+    // The mode:changed event will swap App back to IconView; this
+    // component will unmount before it re-renders.
+  }, [collapse]);
+
+  const handleClose = useCallback(() => {
+    window.glimpse?.quit();
   }, []);
 
-  // If we know the entry anchor + bounds, animate scale-from-icon.
-  // Otherwise (initial mount) skip the animation.
-  const hasAnimation = enterAnchor !== null && enterBounds !== null;
-  const initialScale = hasAnimation
+  // Animation start state.
+  const hasEntryAnimation = enterAnchor !== null && enterBounds !== null;
+  const startScale = hasEntryAnimation
     ? ICON_SIZE / Math.max(enterBounds.width, enterBounds.height)
     : 1;
-  const transformOrigin = hasAnimation
-    ? `${enterAnchor.x}px ${enterAnchor.y}px`
-    : '50% 50%';
+
+  // Animation target state. When collapsing, we shrink to the same
+  // icon-relative scale around the exit anchor; otherwise we sit at
+  // scale=1.
+  const collapsing = collapse !== null;
+  const targetScale = collapsing
+    ? enterBounds
+      ? ICON_SIZE / Math.max(enterBounds.width, enterBounds.height)
+      : 0.4
+    : 1;
+
+  // The pivot for the active animation. During collapse we pivot at the
+  // exit anchor; otherwise pivot at the entry anchor (or center if
+  // neither — the no-animation initial mount case).
+  const transformOrigin = collapse
+    ? `${collapse.exitAnchor.x}px ${collapse.exitAnchor.y}px`
+    : enterAnchor
+      ? `${enterAnchor.x}px ${enterAnchor.y}px`
+      : '50% 50%';
 
   return (
     <div
@@ -51,12 +96,15 @@ export function WindowView({
         data-testid="window-view"
         data-enter-anchor-x={enterAnchor?.x ?? ''}
         data-enter-anchor-y={enterAnchor?.y ?? ''}
-        data-enter-scale={initialScale}
+        data-enter-scale={startScale}
+        data-collapsing={collapsing ? 'on' : 'off'}
+        data-exit-anchor-x={collapse?.exitAnchor.x ?? ''}
+        data-exit-anchor-y={collapse?.exitAnchor.y ?? ''}
         data-window-scale-duration-s={WINDOW_SCALE_DURATION_S}
-        onClick={handleCollapse}
-        initial={hasAnimation ? { scale: initialScale } : false}
-        animate={{ scale: 1 }}
+        initial={hasEntryAnimation ? { scale: startScale } : false}
+        animate={{ scale: targetScale }}
         transition={{ duration: WINDOW_SCALE_DURATION_S, ease: 'easeOut' }}
+        onAnimationComplete={handleAnimationComplete}
         style={{
           width: '100%',
           height: '100%',
@@ -67,7 +115,6 @@ export function WindowView({
           justifyContent: 'center',
           fontSize: 14,
           fontFamily: 'system-ui, sans-serif',
-          cursor: 'pointer',
           userSelect: 'none',
           WebkitUserSelect: 'none',
           transformOrigin,
@@ -75,7 +122,13 @@ export function WindowView({
       >
         Glimpse
       </motion.div>
-      <TitleBar background="dark" />
+      <TitleBar
+        background="dark"
+        onWeatherIconClick={() => void startCollapse()}
+        onMinimize={() => void startCollapse()}
+        onRelocate={() => void startCollapse({ resetToDefault: true })}
+        onClose={handleClose}
+      />
     </div>
   );
 }

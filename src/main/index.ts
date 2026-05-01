@@ -187,7 +187,30 @@ function expandToWindow(): ModeChange {
   return payload;
 }
 
-function collapseToIcon(): ModeChange {
+type CollapseOpts = { resetToDefault?: boolean };
+
+function nextIconPositionForCollapse(opts: CollapseOpts): IconPosition {
+  if (!iconWindow) return defaultIconPosition(primaryBounds());
+  if (opts.resetToDefault) return defaultIconPosition(primaryBounds());
+  const winBounds = iconWindow.getBounds();
+  return collapseTargetFromWindow(winBounds, primaryBounds());
+}
+
+function previewCollapseAnchor(opts: CollapseOpts): { x: number; y: number } {
+  if (!iconWindow || mode !== 'window') return { x: 0, y: 0 };
+  const winBounds = iconWindow.getBounds();
+  const iconPos = nextIconPositionForCollapse(opts);
+  // Local to current (still-window-mode) bounds: the icon's center as
+  // it'll appear after the resize, expressed in the renderer's current
+  // coordinate space. The collapse animation's transform-origin uses
+  // this so the panel shrinks toward where the icon will end up.
+  return {
+    x: iconPos.x + ICON_SIZE / 2 - winBounds.x,
+    y: iconPos.y + ICON_SIZE / 2 - winBounds.y,
+  };
+}
+
+function collapseToIcon(opts: CollapseOpts = {}): ModeChange {
   if (!iconWindow) {
     return {
       mode: 'icon',
@@ -200,9 +223,16 @@ function collapseToIcon(): ModeChange {
     return modeChangePayload('icon', b, null);
   }
   const winBounds = iconWindow.getBounds();
-  const iconPos = collapseTargetFromWindow(winBounds, primaryBounds());
+  const iconPos = nextIconPositionForCollapse(opts);
   applyIconPosition(iconPos);
-  saveSettings({ iconPosition: iconPos });
+  // Reset → clear the saved iconPosition so a future launch uses the
+  // current default (which may shift if the display layout changes).
+  // Otherwise persist the icon's new resting place.
+  if (opts.resetToDefault) {
+    saveSettings({ iconPosition: null });
+  } else {
+    saveSettings({ iconPosition: iconPos });
+  }
   mode = 'icon';
   // After resize, the new bounds describe the icon-mode window.
   const newBounds: WindowBounds = {
@@ -230,7 +260,16 @@ function registerIpc(): void {
 
   ipcMain.handle('mode:get', () => mode);
   ipcMain.handle('mode:expand', () => expandToWindow());
-  ipcMain.handle('mode:collapse', () => collapseToIcon());
+  ipcMain.handle('mode:collapse', (_evt, opts?: CollapseOpts) =>
+    collapseToIcon(opts ?? {}),
+  );
+  ipcMain.handle('mode:preview-collapse-anchor', (_evt, opts?: CollapseOpts) =>
+    previewCollapseAnchor(opts ?? {}),
+  );
+
+  ipcMain.on('app:quit', () => {
+    app.quit();
+  });
 
   ipcMain.on('drag:start', (_evt, cursor: ScreenPoint) => {
     dragSession = {

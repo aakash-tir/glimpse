@@ -14,7 +14,13 @@ const api = {
   dragEnd: (cursor: ScreenPoint): void => ipcRenderer.send('drag:end', cursor),
   getMode: (): Promise<Mode> => ipcRenderer.invoke('mode:get'),
   expand: (): Promise<ModeChange> => ipcRenderer.invoke('mode:expand'),
-  collapse: (): Promise<ModeChange> => ipcRenderer.invoke('mode:collapse'),
+  collapse: (opts?: { resetToDefault?: boolean }): Promise<ModeChange> =>
+    ipcRenderer.invoke('mode:collapse', opts),
+  previewCollapseAnchor: (opts?: {
+    resetToDefault?: boolean;
+  }): Promise<{ x: number; y: number }> =>
+    ipcRenderer.invoke('mode:preview-collapse-anchor', opts),
+  quit: (): void => ipcRenderer.send('app:quit'),
   onModeChanged: (cb: (change: ModeChange) => void): (() => void) => {
     const handler = (_e: Electron.IpcRendererEvent, change: ModeChange): void =>
       cb(change);

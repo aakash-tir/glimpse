@@ -16,6 +16,8 @@ type GlimpseStub = {
   getMode: ReturnType<typeof vi.fn>;
   expand: ReturnType<typeof vi.fn>;
   collapse: ReturnType<typeof vi.fn>;
+  previewCollapseAnchor: ReturnType<typeof vi.fn>;
+  quit: ReturnType<typeof vi.fn>;
   onModeChanged: ReturnType<typeof vi.fn>;
 };
 
@@ -27,6 +29,8 @@ function installGlimpseStub(): GlimpseStub {
     getMode: vi.fn().mockResolvedValue('icon'),
     expand: vi.fn().mockResolvedValue('window'),
     collapse: vi.fn().mockResolvedValue('icon'),
+    previewCollapseAnchor: vi.fn().mockResolvedValue({ x: 0, y: 0 }),
+    quit: vi.fn(),
     onModeChanged: vi.fn().mockReturnValue(() => {
       // unsubscribe noop
     }),
