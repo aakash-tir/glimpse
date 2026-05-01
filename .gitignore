@@ -1,0 +1,23 @@
+node_modules/
+out/
+dist/
+release/
+.vite/
+.cache/
+coverage/
+test-results/
+playwright-report/
+
+# Local env / secrets
+.env
+.env.local
+
+# Personal manual-test checklist (per milestone-workflow rules)
+manual-tests.md
+
+# Editor / OS noise
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/

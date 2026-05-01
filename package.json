@@ -1,0 +1,97 @@
+{
+  "name": "glimpse",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Lightweight desktop weather app for Windows 11",
+  "type": "module",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "build:win": "electron-vite build && electron-builder --win",
+    "preview": "electron-vite preview",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit",
+    "test": "npm run test:unit && npm run test:component && npm run test:integration && npm run test:e2e",
+    "test:unit": "vitest run --passWithNoTests test/unit",
+    "test:component": "vitest run --passWithNoTests test/component",
+    "test:integration": "vitest run --passWithNoTests test/integration",
+    "test:e2e": "npm run build && playwright test",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "build": {
+    "appId": "com.aakash.glimpse",
+    "productName": "Glimpse",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*",
+      "package.json",
+      "!**/*.{md,map}",
+      "!**/.{git,vscode,idea}/**"
+    ],
+    "asar": true,
+    "win": {
+      "target": "nsis",
+      "icon": "app-icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "Glimpse",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "uninstallDisplayName": "Glimpse",
+      "artifactName": "Glimpse Setup.exe"
+    }
+  },
+  "dependencies": {
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "framer-motion": "^11.18.2",
+    "lucide-react": "^0.469.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-icons": "^5.6.0",
+    "suncalc": "^1.9.0",
+    "tailwind-merge": "^2.6.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@playwright/test": "^1.59.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^22.10.2",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@types/suncalc": "^1.9.2",
+    "@vitejs/plugin-react": "^4.3.4",
+    "@vitest/coverage-v8": "^2.1.9",
+    "autoprefixer": "^10.5.0",
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
+    "electron-playwright-helpers": "^2.1.0",
+    "electron-vite": "^2.3.0",
+    "eslint": "^9.17.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react": "^7.37.3",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "globals": "^15.14.0",
+    "jsdom": "^25.0.1",
+    "msw": "^2.14.2",
+    "postcss": "^8.5.13",
+    "prettier": "^3.4.2",
+    "tailwindcss": "^3.4.19",
+    "tailwindcss-animate": "^1.0.7",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.2",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.9"
+  }
+}
