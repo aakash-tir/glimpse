@@ -20,6 +20,9 @@ type GlimpseStub = {
   getMode: ReturnType<typeof vi.fn>;
   expand: ReturnType<typeof vi.fn>;
   onModeChanged: ReturnType<typeof vi.fn>;
+  resizeStart: ReturnType<typeof vi.fn>;
+  resizeMove: ReturnType<typeof vi.fn>;
+  resizeEnd: ReturnType<typeof vi.fn>;
 };
 
 function installGlimpseStub(): GlimpseStub {
@@ -33,6 +36,9 @@ function installGlimpseStub(): GlimpseStub {
     getMode: vi.fn().mockResolvedValue('window'),
     expand: vi.fn().mockResolvedValue('window'),
     onModeChanged: vi.fn().mockReturnValue(() => {}),
+    resizeStart: vi.fn(),
+    resizeMove: vi.fn(),
+    resizeEnd: vi.fn(),
   };
   (window as unknown as { glimpse: GlimpseStub }).glimpse = stub;
   return stub;

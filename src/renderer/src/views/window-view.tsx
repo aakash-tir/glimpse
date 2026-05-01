@@ -4,6 +4,7 @@ import { ICON_SIZE } from '../../../shared/icon-position';
 import { TitleBar } from '../components/title-bar';
 import { useClickClassifier } from '../components/use-click-classifier';
 import { DragModeGlow } from '../components/drag-mode-glow';
+import { ResizeHandles } from '../components/resize-handles';
 
 // Plan/styling.md: "Window open / close: scale animation, 200 ms
 // ease-out, anchored at the icon's position."
@@ -194,6 +195,7 @@ export function WindowView({
         onRelocate={() => void startCollapse({ resetToDefault: true })}
         onClose={handleClose}
       />
+      <ResizeHandles />
     </div>
   );
 }

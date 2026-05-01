@@ -17,7 +17,11 @@ import { snapToCorner } from '../shared/snap';
 import {
   collapseTargetFromWindow,
   expandFromIcon,
+  maxWindowSize,
   snapWindowToCorner,
+  squareResize,
+  WINDOW_MIN_SIZE_PX,
+  type ResizeCorner,
 } from '../shared/window-position';
 import type { IconPosition, WindowBounds } from '../shared/settings-store';
 import type { Mode, ModeChange } from '../shared/mode';
@@ -120,6 +124,14 @@ type DragSession = {
 };
 
 let dragSession: DragSession | null = null;
+
+type ResizeSession = {
+  corner: ResizeCorner;
+  startCursor: ScreenPoint;
+  origin: WindowBounds;
+};
+
+let resizeSession: ResizeSession | null = null;
 
 function currentIconPosition(): IconPosition {
   if (!iconWindow) {
@@ -271,6 +283,46 @@ function registerIpc(): void {
 
   ipcMain.on('app:quit', () => {
     app.quit();
+  });
+
+  ipcMain.on(
+    'resize:start',
+    (_evt, payload: { corner: ResizeCorner; cursor: ScreenPoint }) => {
+      if (!iconWindow || mode !== 'window') return;
+      resizeSession = {
+        corner: payload.corner,
+        startCursor: payload.cursor,
+        origin: iconWindow.getBounds(),
+      };
+    },
+  );
+
+  function applyResize(cursor: ScreenPoint): WindowBounds | null {
+    if (!resizeSession || !iconWindow) return null;
+    const next = squareResize({
+      origin: resizeSession.origin,
+      corner: resizeSession.corner,
+      cursorDx: cursor.x - resizeSession.startCursor.x,
+      cursorDy: cursor.y - resizeSession.startCursor.y,
+      minSize: WINDOW_MIN_SIZE_PX,
+      maxSize: maxWindowSize(primaryBounds()),
+    });
+    iconWindow.setBounds(next);
+    return next;
+  }
+
+  ipcMain.on('resize:move', (_evt, cursor: ScreenPoint) => {
+    applyResize(cursor);
+  });
+
+  ipcMain.on('resize:end', (_evt, cursor: ScreenPoint) => {
+    const final = applyResize(cursor);
+    resizeSession = null;
+    if (!final) return;
+    const settings = loadSettings();
+    if (settings.trackWindowPosition) {
+      saveSettings({ windowBounds: final });
+    }
   });
 
   ipcMain.on('drag:start', (_evt, cursor: ScreenPoint) => {
