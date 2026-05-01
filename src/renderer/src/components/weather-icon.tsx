@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import type { Condition, IconGlyphName } from '../../../shared/condition';
 import { conditionToGlyph } from '../../../shared/condition';
+import { DragModeGlow } from './drag-mode-glow';
 import { IconGlyph } from './icon-glyph';
 import { LoadingCloud } from './loading-cloud';
 import { SadCloud } from './sad-cloud';
@@ -36,7 +37,17 @@ function ReadyContents({ glyph }: { glyph: IconGlyphName }): JSX.Element {
   );
 }
 
-export function WeatherIcon({ state }: { state: IconState }): JSX.Element {
+export type WeatherIconProps = {
+  state: IconState;
+  dragMode?: boolean;
+  onClick?: () => void;
+};
+
+export function WeatherIcon({
+  state,
+  dragMode = false,
+  onClick,
+}: WeatherIconProps): JSX.Element {
   const inner =
     state.kind === 'loading' ? (
       <LoadingCloud size={64} />
@@ -50,18 +61,22 @@ export function WeatherIcon({ state }: { state: IconState }): JSX.Element {
     <motion.div
       data-testid="icon-root"
       data-icon-state={state.kind}
+      data-drag-mode={dragMode ? 'on' : 'off'}
       data-hover-scale={HOVER_SCALE}
       data-hover-duration-s={HOVER_DURATION_S}
-      whileHover={{ scale: HOVER_SCALE }}
+      whileHover={dragMode ? undefined : { scale: HOVER_SCALE }}
       transition={{ duration: HOVER_DURATION_S, ease: 'easeOut' }}
+      onClick={onClick}
       style={{
         width: 64,
         height: 64,
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
+        position: 'relative',
       }}
     >
+      {dragMode && <DragModeGlow />}
       {inner}
     </motion.div>
   );
