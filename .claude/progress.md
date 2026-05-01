@@ -12,7 +12,7 @@
 
 ## M0 — Project scaffold & toolchain
 
-**Status:** Not started
+**Status:** Done (2026-05-01)
 
 **Scope.** Bare Vite + React + TypeScript + Electron skeleton with tooling configured. No Glimpse functionality yet.
 
