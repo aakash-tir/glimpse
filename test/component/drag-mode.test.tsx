@@ -180,6 +180,31 @@ describe('drag mode (App-level)', () => {
       'on',
     );
   });
+
+  it('hover scale is not applied while drag mode is on, even if cursor is over the icon', () => {
+    render(<App />);
+    const icon = screen.getByTestId('icon-root');
+
+    // Hover the icon, then double-click to enter drag mode while still
+    // hovered. The icon must not stay scaled to 1.15×.
+    fireEvent.mouseEnter(icon);
+    clickIcon();
+    fastForward(50);
+    clickIcon();
+    expect(icon.getAttribute('data-drag-mode')).toBe('on');
+
+    // Exit drag mode by clicking outside while the cursor is no longer
+    // over the icon.
+    fireEvent.mouseLeave(icon);
+    clickAppContainer();
+
+    // After dragging stops with cursor off-icon, the icon should be at
+    // base scale — Framer Motion sets the inline transform on the root
+    // element. None should target the hover-scale value.
+    expect(icon.getAttribute('data-drag-mode')).toBe('off');
+    const transform = icon.getAttribute('style') ?? '';
+    expect(transform).not.toContain('scale(1.15)');
+  });
 });
 
 describe('drag IPC flow (mousedown → mousemove → mouseup)', () => {

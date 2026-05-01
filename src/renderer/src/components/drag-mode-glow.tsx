@@ -1,30 +1,40 @@
 import { motion } from 'framer-motion';
+import type { ReactNode } from 'react';
 
-// Soft white outer glow with a 1 Hz opacity pulse. Sits behind the icon
-// glyph and outside its bounds (-12 px inset) so the glyph itself is not
-// occluded. Pointer events disabled so it doesn't interfere with the
-// icon's own click / drag handling.
+// Soft white outer glow with a 1 Hz pulse. Implemented as a CSS
+// drop-shadow filter on a wrapper around the icon glyph so the halo
+// follows the icon's alpha silhouette (rather than producing a ring
+// around its bounding box, which leaves a visible hard edge where the
+// box ends).
 export const GLOW_PULSE_DURATION_S = 1;
 
-export function DragModeGlow(): JSX.Element {
+const GLOW_LOW = 'drop-shadow(0 0 6px rgba(255, 255, 255, 0.65))';
+const GLOW_HIGH = 'drop-shadow(0 0 14px rgba(255, 255, 255, 1))';
+
+export function DragModeGlow({
+  children,
+}: {
+  children: ReactNode;
+}): JSX.Element {
   return (
     <motion.div
       data-testid="drag-mode-glow"
       data-glow-pulse-duration-s={GLOW_PULSE_DURATION_S}
-      initial={{ opacity: 0.5 }}
-      animate={{ opacity: [0.5, 1, 0.5] }}
+      initial={{ filter: GLOW_LOW }}
+      animate={{ filter: [GLOW_LOW, GLOW_HIGH, GLOW_LOW] }}
       transition={{
         duration: GLOW_PULSE_DURATION_S,
         repeat: Infinity,
         ease: 'easeInOut',
       }}
       style={{
-        position: 'absolute',
-        inset: -12,
-        borderRadius: '50%',
-        boxShadow: '0 0 12px 4px rgba(255, 255, 255, 0.85)',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         pointerEvents: 'none',
       }}
-    />
+    >
+      {children}
+    </motion.div>
   );
 }
