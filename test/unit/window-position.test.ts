@@ -7,10 +7,12 @@ import {
   expandFromIcon,
   isWindowAtDefaultPosition,
   maxWindowSize,
+  snapWindowToCorner,
   squareResize,
   WINDOW_DEFAULT_SIZE_DENOM,
   WINDOW_MAX_MARGIN_PX,
   WINDOW_MIN_SIZE_PX,
+  WINDOW_SNAP_RADIUS_PX,
   type ResizeCorner,
 } from '../../src/shared/window-position';
 import {
@@ -325,6 +327,100 @@ describe('squareResize', () => {
       maxSize,
     });
     expect(result).toEqual(origin);
+  });
+});
+
+describe('snapWindowToCorner', () => {
+  const size = { width: 200, height: 200 };
+  // Each corner's top-left for a 200x200 window on the 1920x1080 primary.
+  const tl = { x: 0, y: 0 };
+  const tr = { x: primary.width - size.width, y: 0 };
+  const bl = { x: 0, y: primary.height - size.height };
+  const br = {
+    x: primary.width - size.width,
+    y: primary.height - size.height,
+  };
+
+  it('snaps to each corner from a nearby drop', () => {
+    expect(
+      snapWindowToCorner({ x: tl.x + 10, y: tl.y + 10 }, size, primary)?.corner,
+    ).toBe('top-left');
+    expect(
+      snapWindowToCorner({ x: tr.x - 10, y: tr.y + 10 }, size, primary)?.corner,
+    ).toBe('top-right');
+    expect(
+      snapWindowToCorner({ x: bl.x + 10, y: bl.y - 10 }, size, primary)?.corner,
+    ).toBe('bottom-left');
+    expect(
+      snapWindowToCorner({ x: br.x - 10, y: br.y - 10 }, size, primary)?.corner,
+    ).toBe('bottom-right');
+  });
+
+  it('snapped position has NO padding (unlike the icon snap)', () => {
+    expect(snapWindowToCorner({ x: 5, y: 5 }, size, primary)?.position).toEqual(
+      { x: 0, y: 0 },
+    );
+    expect(
+      snapWindowToCorner({ x: tr.x + 5, y: -5 }, size, primary)?.position,
+    ).toEqual(tr);
+  });
+
+  it('does not snap from an edge midpoint', () => {
+    expect(
+      snapWindowToCorner(
+        { x: primary.width / 2 - size.width / 2, y: 0 },
+        size,
+        primary,
+      ),
+    ).toBeNull();
+  });
+
+  it('does not snap from the screen center', () => {
+    expect(
+      snapWindowToCorner(
+        {
+          x: primary.width / 2 - size.width / 2,
+          y: primary.height / 2 - size.height / 2,
+        },
+        size,
+        primary,
+      ),
+    ).toBeNull();
+  });
+
+  it('snaps when distance equals the snap radius (inclusive boundary)', () => {
+    expect(
+      snapWindowToCorner(
+        { x: tl.x, y: tl.y + WINDOW_SNAP_RADIUS_PX },
+        size,
+        primary,
+      )?.corner,
+    ).toBe('top-left');
+  });
+
+  it('does not snap when distance is one pixel beyond the snap radius', () => {
+    expect(
+      snapWindowToCorner(
+        { x: tl.x, y: tl.y + WINDOW_SNAP_RADIUS_PX + 1 },
+        size,
+        primary,
+      ),
+    ).toBeNull();
+  });
+
+  it('picks the closest corner when two are within the radius', () => {
+    const closeToTl = { x: tl.x + 10, y: tl.y + 5 };
+    expect(snapWindowToCorner(closeToTl, size, primary)?.corner).toBe(
+      'top-left',
+    );
+  });
+
+  it('honors a custom radius', () => {
+    const drop = { x: tl.x + 30, y: tl.y };
+    expect(snapWindowToCorner(drop, size, primary, 20)).toBeNull();
+    expect(snapWindowToCorner(drop, size, primary, 40)?.corner).toBe(
+      'top-left',
+    );
   });
 });
 

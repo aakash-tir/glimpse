@@ -92,6 +92,27 @@ describe('TitleBar auto-hide', () => {
   });
 });
 
+describe('TitleBar disabled (during window drag)', () => {
+  it('exposes the disabled state via data attribute', () => {
+    render(<TitleBar disabled />);
+    const container = screen.getByTestId('title-bar-container');
+    expect(container.getAttribute('data-disabled')).toBe('on');
+  });
+
+  it('disables pointer-events on the trigger so events fall through to the panel', () => {
+    render(<TitleBar disabled />);
+    const container = screen.getByTestId('title-bar-container');
+    expect(container.style.pointerEvents).toBe('none');
+  });
+
+  it('stays invisible even when hovered', () => {
+    render(<TitleBar disabled />);
+    const container = screen.getByTestId('title-bar-container');
+    fireEvent.mouseEnter(container);
+    expect(container.getAttribute('data-visible')).toBe('off');
+  });
+});
+
 describe('TitleBar click handlers', () => {
   it('weather-icon click invokes onWeatherIconClick', () => {
     const cb = vi.fn();

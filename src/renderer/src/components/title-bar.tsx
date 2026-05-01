@@ -36,6 +36,11 @@ export type TitleBarProps = {
   // Defaults to 'dark' since every slide except the (light-mode)
   // Settings slide uses a dark background.
   background?: TitleBarBackground;
+  // When true, the trigger container becomes hover-inert and the bar
+  // stays hidden. Used while window-drag mode is active per
+  // plan/window.md ("Title bar is not accessible while in drag mode
+  // (must exit drag first).").
+  disabled?: boolean;
   // Click handlers — wired in a follow-up commit. Stubs for now keep
   // the test surface stable.
   onWeatherIconClick?: () => void;
@@ -48,12 +53,15 @@ export function TitleBar({
   condition = 'clear',
   isDay = true,
   background = 'dark',
+  disabled = false,
   onWeatherIconClick,
   onMinimize,
   onRelocate,
   onClose,
 }: TitleBarProps): JSX.Element {
   const [visible, setVisible] = useState(false);
+
+  const effectiveVisible = disabled ? false : visible;
 
   const wordmarkColor =
     background === 'dark' ? WORDMARK_COLOR_DARK_BG : WORDMARK_COLOR_LIGHT_BG;
@@ -64,14 +72,15 @@ export function TitleBar({
   // invisible (so only the top 24 px reveals) and grows to the full
   // title bar height when visible (so the user can move into the bar
   // without losing hover).
-  const containerHeight = visible
+  const containerHeight = effectiveVisible
     ? TITLE_BAR_HEIGHT_PX
     : TITLE_BAR_TRIGGER_HEIGHT_PX;
 
   return (
     <div
       data-testid="title-bar-container"
-      data-visible={visible ? 'on' : 'off'}
+      data-visible={effectiveVisible ? 'on' : 'off'}
+      data-disabled={disabled ? 'on' : 'off'}
       data-trigger-height-px={TITLE_BAR_TRIGGER_HEIGHT_PX}
       data-bar-height-px={TITLE_BAR_HEIGHT_PX}
       data-fade-in-ms={TITLE_BAR_FADE_IN_MS}
@@ -85,16 +94,20 @@ export function TitleBar({
         right: 0,
         height: containerHeight,
         zIndex: 10,
+        // While disabled, the trigger swallows neither hover nor clicks
+        // so the panel beneath (and its drag-mode gestures) gets them.
+        pointerEvents: disabled ? 'none' : 'auto',
       }}
     >
       <motion.div
         data-testid="title-bar"
         data-background={background}
         initial={{ opacity: 0 }}
-        animate={{ opacity: visible ? 1 : 0 }}
+        animate={{ opacity: effectiveVisible ? 1 : 0 }}
         transition={{
           duration:
-            (visible ? TITLE_BAR_FADE_IN_MS : TITLE_BAR_FADE_OUT_MS) / 1000,
+            (effectiveVisible ? TITLE_BAR_FADE_IN_MS : TITLE_BAR_FADE_OUT_MS) /
+            1000,
           ease: 'easeOut',
         }}
         style={{
@@ -112,7 +125,7 @@ export function TitleBar({
           padding: '0 6px',
           // When invisible, swallow no clicks so anything below in the
           // panel can be interacted with.
-          pointerEvents: visible ? 'auto' : 'none',
+          pointerEvents: effectiveVisible ? 'auto' : 'none',
         }}
       >
         <div style={leftCellStyle}>

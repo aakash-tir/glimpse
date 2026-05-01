@@ -16,10 +16,15 @@ const GLOW_LOW =
 const GLOW_HIGH =
   'drop-shadow(0 0 14px rgba(255, 255, 255, 1)) drop-shadow(0 0 26px rgba(255, 255, 255, 0.85))';
 
+// `fill` makes the glow wrapper fill its parent, so the same effect
+// can be applied to the small icon glyph (default, inline-flex) or
+// the full window panel (fill = true).
 export function DragModeGlow({
   children,
+  fill = false,
 }: {
   children: ReactNode;
+  fill?: boolean;
 }): JSX.Element {
   return (
     <motion.div
@@ -33,9 +38,13 @@ export function DragModeGlow({
         ease: 'easeInOut',
       }}
       style={{
-        display: 'inline-flex',
+        display: fill ? 'block' : 'inline-flex',
+        width: fill ? '100%' : undefined,
+        height: fill ? '100%' : undefined,
         alignItems: 'center',
         justifyContent: 'center',
+        // The glow filter is purely visual; let the wrapper pass clicks
+        // through to its children (each of which can claim them).
         pointerEvents: 'none',
       }}
     >

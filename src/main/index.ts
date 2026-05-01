@@ -17,6 +17,7 @@ import { snapToCorner } from '../shared/snap';
 import {
   collapseTargetFromWindow,
   expandFromIcon,
+  snapWindowToCorner,
 } from '../shared/window-position';
 import type { IconPosition, WindowBounds } from '../shared/settings-store';
 import type { Mode, ModeChange } from '../shared/mode';
@@ -114,7 +115,8 @@ function snapBackIfOffScreen(): void {
 
 type DragSession = {
   startCursor: ScreenPoint;
-  startIcon: IconPosition;
+  startPos: { x: number; y: number };
+  subject: 'icon' | 'window';
 };
 
 let dragSession: DragSession | null = null;
@@ -272,35 +274,81 @@ function registerIpc(): void {
   });
 
   ipcMain.on('drag:start', (_evt, cursor: ScreenPoint) => {
-    dragSession = {
-      startCursor: cursor,
-      startIcon: currentIconPosition(),
-    };
+    if (!iconWindow) return;
+    if (mode === 'window') {
+      const b = iconWindow.getBounds();
+      dragSession = {
+        startCursor: cursor,
+        startPos: { x: b.x, y: b.y },
+        subject: 'window',
+      };
+    } else {
+      dragSession = {
+        startCursor: cursor,
+        startPos: currentIconPosition(),
+        subject: 'icon',
+      };
+    }
   });
 
   ipcMain.on('drag:move', (_evt, cursor: ScreenPoint) => {
-    if (!dragSession) return;
+    if (!dragSession || !iconWindow) return;
     const next = computeIconPosFromCursor(
       dragSession.startCursor,
-      dragSession.startIcon,
+      dragSession.startPos,
       cursor,
     );
-    applyIconPosition(next);
+    if (dragSession.subject === 'window') {
+      const b = iconWindow.getBounds();
+      iconWindow.setBounds({
+        x: next.x,
+        y: next.y,
+        width: b.width,
+        height: b.height,
+      });
+    } else {
+      applyIconPosition(next);
+    }
   });
 
   ipcMain.on('drag:end', (_evt, cursor: ScreenPoint) => {
-    if (!dragSession) return;
+    if (!dragSession || !iconWindow) return;
     const dropped = computeIconPosFromCursor(
       dragSession.startCursor,
-      dragSession.startIcon,
+      dragSession.startPos,
       cursor,
     );
+    const subject = dragSession.subject;
     dragSession = null;
 
-    const snapped = snapToCorner(dropped, primaryBounds());
-    const final = snapped?.position ?? dropped;
-    applyIconPosition(final);
-    saveSettings({ iconPosition: final });
+    if (subject === 'window') {
+      const b = iconWindow.getBounds();
+      const snap = snapWindowToCorner(
+        dropped,
+        { width: b.width, height: b.height },
+        primaryBounds(),
+      );
+      const final = snap?.position ?? dropped;
+      const newBounds: WindowBounds = {
+        x: final.x,
+        y: final.y,
+        width: b.width,
+        height: b.height,
+      };
+      iconWindow.setBounds(newBounds);
+      // Window position persistence is opt-in; only save when the
+      // user has enabled it. Sub-feature 9 wires the setting UI; until
+      // then, the toggle is set via settings.json directly for testing.
+      const settings = loadSettings();
+      if (settings.trackWindowPosition) {
+        saveSettings({ windowBounds: newBounds });
+      }
+    } else {
+      const snapped = snapToCorner(dropped, primaryBounds());
+      const final = snapped?.position ?? dropped;
+      applyIconPosition(final);
+      saveSettings({ iconPosition: final });
+    }
   });
 }
 

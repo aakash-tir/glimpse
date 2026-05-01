@@ -23,6 +23,7 @@ import {
   ICON_SIZE,
   type DisplayBounds,
 } from './icon-position';
+import type { Corner } from './snap';
 
 // 1/6 of the primary monitor's smallest dimension.
 export const WINDOW_DEFAULT_SIZE_DENOM = 6;
@@ -31,6 +32,12 @@ export const WINDOW_DEFAULT_SIZE_DENOM = 6;
 // can't visually butt up against the very edge of the screen.
 export const WINDOW_MAX_MARGIN_PX = 16;
 export const WINDOW_MIN_SIZE_PX = 120;
+// Same threshold as the icon corner snap (40 px). Per plan/window.md:
+// "Window drag bounds: same as the icon — free placement on primary
+// monitor + snap to the 4 screen corners with 40 px radius. (Snap
+// padding does not apply to the window itself, only to the icon's
+// resting position.)"
+export const WINDOW_SNAP_RADIUS_PX = 40;
 
 export type WindowPoint = { x: number; y: number };
 
@@ -39,6 +46,8 @@ export type ResizeCorner =
   | 'top-right'
   | 'bottom-left'
   | 'bottom-right';
+
+export type WindowCornerSnap = { corner: Corner; position: WindowPoint };
 
 export function defaultWindowSize(primary: DisplayBounds): number {
   return Math.floor(
@@ -149,6 +158,40 @@ export function collapseTargetFromWindow(
     primary,
   );
   return clamped;
+}
+
+// Snap a dropped window to the nearest screen corner if within the snap
+// radius. Unlike the icon's snap, the window has no padding — corner
+// snap means the window's edge sits flush against the screen edge.
+// Returns null when no corner is close enough (drop landed near an
+// edge midpoint, the screen center, or anywhere else).
+export function snapWindowToCorner(
+  topLeft: WindowPoint,
+  size: { width: number; height: number },
+  primary: DisplayBounds,
+  radiusPx: number = WINDOW_SNAP_RADIUS_PX,
+): WindowCornerSnap | null {
+  const left = primary.x;
+  const right = primary.x + primary.width - size.width;
+  const top = primary.y;
+  const bottom = primary.y + primary.height - size.height;
+
+  const corners: WindowCornerSnap[] = [
+    { corner: 'top-left', position: { x: left, y: top } },
+    { corner: 'top-right', position: { x: right, y: top } },
+    { corner: 'bottom-left', position: { x: left, y: bottom } },
+    { corner: 'bottom-right', position: { x: right, y: bottom } },
+  ];
+
+  let best: { entry: WindowCornerSnap; dist: number } | null = null;
+  for (const entry of corners) {
+    const dx = entry.position.x - topLeft.x;
+    const dy = entry.position.y - topLeft.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > radiusPx) continue;
+    if (best === null || dist < best.dist) best = { entry, dist };
+  }
+  return best?.entry ?? null;
 }
 
 // Square-lock corner resize. The diagonal-opposite corner stays fixed;
