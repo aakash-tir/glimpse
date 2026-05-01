@@ -8,8 +8,13 @@ import type { ReactNode } from 'react';
 // box ends).
 export const GLOW_PULSE_DURATION_S = 1;
 
-const GLOW_LOW = 'drop-shadow(0 0 6px rgba(255, 255, 255, 0.65))';
-const GLOW_HIGH = 'drop-shadow(0 0 14px rgba(255, 255, 255, 1))';
+// Two stacked drop-shadows — a tighter inner glow for crispness and a
+// wider, softer outer wash for body — give a noticeably brighter halo
+// than a single shadow without losing the soft edge.
+const GLOW_LOW =
+  'drop-shadow(0 0 8px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 16px rgba(255, 255, 255, 0.6))';
+const GLOW_HIGH =
+  'drop-shadow(0 0 14px rgba(255, 255, 255, 1)) drop-shadow(0 0 26px rgba(255, 255, 255, 0.85))';
 
 export function DragModeGlow({
   children,
