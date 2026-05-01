@@ -50,10 +50,15 @@ describe('Icon position persistence across simulated restart', () => {
 
   it('falls back to default if the saved position is now off-screen', () => {
     // Saved on a (now-disconnected) larger display.
-    writeSettingsToFile(file, { ...DEFAULT_SETTINGS, iconPosition: { x: 2500, y: 100 } });
+    writeSettingsToFile(file, {
+      ...DEFAULT_SETTINGS,
+      iconPosition: { x: 2500, y: 100 },
+    });
 
     const launched = readSettingsFromFile(file);
-    const resolved = resolveIconPosition(launched.iconPosition, primary, [primary]);
+    const resolved = resolveIconPosition(launched.iconPosition, primary, [
+      primary,
+    ]);
     expect(resolved).toEqual(defaultIconPosition(primary));
   });
 

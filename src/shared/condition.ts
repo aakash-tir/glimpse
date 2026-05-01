@@ -31,7 +31,10 @@ export type IconGlyphName =
   | 'WiDayThunderstorm'
   | 'WiNightAltThunderstorm';
 
-export function conditionToGlyph(condition: Condition, isDay: boolean): IconGlyphName {
+export function conditionToGlyph(
+  condition: Condition,
+  isDay: boolean,
+): IconGlyphName {
   switch (condition) {
     case 'clear':
       return isDay ? 'WiDaySunny' : 'WiNightClear';

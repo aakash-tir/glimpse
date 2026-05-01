@@ -33,11 +33,15 @@ describe('isPositionOnScreen', () => {
   });
 
   it('returns false when the icon would overlap the right edge', () => {
-    expect(isPositionOnScreen({ x: primary.width - 10, y: 100 }, [primary])).toBe(false);
+    expect(
+      isPositionOnScreen({ x: primary.width - 10, y: 100 }, [primary]),
+    ).toBe(false);
   });
 
   it('returns false when the icon would overlap the bottom edge', () => {
-    expect(isPositionOnScreen({ x: 100, y: primary.height - 10 }, [primary])).toBe(false);
+    expect(
+      isPositionOnScreen({ x: 100, y: primary.height - 10 }, [primary]),
+    ).toBe(false);
   });
 
   it('returns false for negative coordinates outside any display', () => {
@@ -45,8 +49,15 @@ describe('isPositionOnScreen', () => {
   });
 
   it('returns true if the icon is fully contained on a secondary display', () => {
-    const secondary: DisplayBounds = { x: 1920, y: 0, width: 1280, height: 720 };
-    expect(isPositionOnScreen({ x: 2000, y: 100 }, [primary, secondary])).toBe(true);
+    const secondary: DisplayBounds = {
+      x: 1920,
+      y: 0,
+      width: 1280,
+      height: 720,
+    };
+    expect(isPositionOnScreen({ x: 2000, y: 100 }, [primary, secondary])).toBe(
+      true,
+    );
   });
 
   it('returns false when no displays are connected', () => {
@@ -61,7 +72,9 @@ describe('resolveIconPosition', () => {
   });
 
   it('falls back to default top-right when saved is null', () => {
-    expect(resolveIconPosition(null, primary, [primary])).toEqual(defaultIconPosition(primary));
+    expect(resolveIconPosition(null, primary, [primary])).toEqual(
+      defaultIconPosition(primary),
+    );
   });
 
   it('falls back to default when saved position is off-screen (monitor disconnected)', () => {

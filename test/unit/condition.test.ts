@@ -10,7 +10,11 @@ const cases: Array<{ condition: Condition; day: string; night: string }> = [
   { condition: 'rain', day: 'WiDayRain', night: 'WiNightAltRain' },
   { condition: 'snow', day: 'WiDaySnow', night: 'WiNightAltSnow' },
   { condition: 'sleet', day: 'WiDaySleet', night: 'WiNightAltSleet' },
-  { condition: 'thunderstorm', day: 'WiDayThunderstorm', night: 'WiNightAltThunderstorm' },
+  {
+    condition: 'thunderstorm',
+    day: 'WiDayThunderstorm',
+    night: 'WiNightAltThunderstorm',
+  },
 ];
 
 describe('conditionToGlyph', () => {

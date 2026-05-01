@@ -3,7 +3,12 @@ import type { IconPosition } from './settings-store';
 export const ICON_SIZE = 64;
 export const ICON_PADDING = 16;
 
-export type DisplayBounds = { x: number; y: number; width: number; height: number };
+export type DisplayBounds = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
 
 export function defaultIconPosition(primary: DisplayBounds): IconPosition {
   return {
@@ -15,7 +20,10 @@ export function defaultIconPosition(primary: DisplayBounds): IconPosition {
 // True iff the saved icon rectangle is fully contained within the union of
 // the supplied display rectangles. Off-screen → caller should fall back to
 // the default top-right position on the primary display.
-export function isPositionOnScreen(pos: IconPosition, displays: DisplayBounds[]): boolean {
+export function isPositionOnScreen(
+  pos: IconPosition,
+  displays: DisplayBounds[],
+): boolean {
   if (displays.length === 0) return false;
   const left = pos.x;
   const top = pos.y;

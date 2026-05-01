@@ -6,7 +6,12 @@ export type TimeFormat = '12h' | '24h';
 export type ThemeOverride = 'auto' | 'light' | 'dark';
 
 export type IconPosition = { x: number; y: number };
-export type WindowBounds = { x: number; y: number; width: number; height: number };
+export type WindowBounds = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
 
 export type Settings = {
   units: Units;
@@ -88,7 +93,10 @@ export function readSettingsFromFile(filePath: string): Settings {
   return mergeWithDefaults(raw);
 }
 
-export function writeSettingsToFile(filePath: string, settings: Settings): void {
+export function writeSettingsToFile(
+  filePath: string,
+  settings: Settings,
+): void {
   mkdirSync(dirname(filePath), { recursive: true });
   writeFileSync(filePath, JSON.stringify(settings, null, 2), 'utf-8');
 }

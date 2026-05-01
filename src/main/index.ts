@@ -23,7 +23,11 @@ function allDisplayBounds(): DisplayBounds[] {
 
 function createIconWindow(): void {
   const settings = loadSettings();
-  const pos = resolveIconPosition(settings.iconPosition, primaryBounds(), allDisplayBounds());
+  const pos = resolveIconPosition(
+    settings.iconPosition,
+    primaryBounds(),
+    allDisplayBounds(),
+  );
 
   iconWindow = new BrowserWindow({
     width: ICON_SIZE,

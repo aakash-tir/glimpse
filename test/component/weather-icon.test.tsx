@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, cleanup, fireEvent, act } from '@testing-library/react';
+import {
+  render,
+  screen,
+  cleanup,
+  fireEvent,
+  act,
+} from '@testing-library/react';
 import {
   WeatherIcon,
   ERROR_TOOLTIP_TEXT,
@@ -39,14 +45,22 @@ describe('WeatherIcon — glyph mapping', () => {
 
 describe('WeatherIcon — hover scale', () => {
   it('exposes hover scale of 1.15 on the root for Framer Motion', () => {
-    render(<WeatherIcon state={{ kind: 'ready', condition: 'clear', isDay: true }} />);
+    render(
+      <WeatherIcon
+        state={{ kind: 'ready', condition: 'clear', isDay: true }}
+      />,
+    );
     const root = screen.getByTestId('icon-root');
     expect(root.getAttribute('data-hover-scale')).toBe(String(HOVER_SCALE));
     expect(HOVER_SCALE).toBe(1.15);
   });
 
   it('uses a 150 ms hover duration', () => {
-    render(<WeatherIcon state={{ kind: 'ready', condition: 'clear', isDay: true }} />);
+    render(
+      <WeatherIcon
+        state={{ kind: 'ready', condition: 'clear', isDay: true }}
+      />,
+    );
     const root = screen.getByTestId('icon-root');
     expect(root.getAttribute('data-hover-duration-s')).toBe('0.15');
   });
@@ -114,7 +128,11 @@ describe('WeatherIcon — error state', () => {
 
 describe('WeatherIcon — condition cross-fade', () => {
   it('configures a 200 ms cross-fade duration on the ready element', () => {
-    render(<WeatherIcon state={{ kind: 'ready', condition: 'clear', isDay: true }} />);
+    render(
+      <WeatherIcon
+        state={{ kind: 'ready', condition: 'clear', isDay: true }}
+      />,
+    );
     const ready = screen.getByTestId('icon-ready');
     expect(ready.getAttribute('data-glyph')).toBe('WiDaySunny');
     expect(ready.getAttribute('data-crossfade-duration-s')).toBe(
@@ -125,9 +143,15 @@ describe('WeatherIcon — condition cross-fade', () => {
 
   it('updates the rendered glyph when the condition changes', () => {
     const { rerender } = render(
-      <WeatherIcon state={{ kind: 'ready', condition: 'clear', isDay: true }} />,
+      <WeatherIcon
+        state={{ kind: 'ready', condition: 'clear', isDay: true }}
+      />,
     );
-    rerender(<WeatherIcon state={{ kind: 'ready', condition: 'cloudy', isDay: true }} />);
+    rerender(
+      <WeatherIcon
+        state={{ kind: 'ready', condition: 'cloudy', isDay: true }}
+      />,
+    );
     const readys = screen.getAllByTestId('icon-ready');
     const glyphs = readys.map((el) => el.getAttribute('data-glyph'));
     // During the cross-fade both old + new mount briefly. New one must be
