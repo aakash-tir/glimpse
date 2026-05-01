@@ -165,19 +165,33 @@ function registerIpc(): void {
   });
 }
 
-void app.whenReady().then(() => {
-  registerIpc();
-  createIconWindow();
-
-  screen.on('display-metrics-changed', snapBackIfOffScreen);
-  screen.on('display-removed', snapBackIfOffScreen);
-  screen.on('display-added', snapBackIfOffScreen);
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createIconWindow();
+// Single-instance lock per plan/tech-stack.md. M2 ships the bare lock —
+// a second launch is acquired by the existing primary process via the
+// `second-instance` event but is otherwise a no-op (M3 will wire the
+// expand / focus / exit-drag-then-expand behavior).
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    // Intentionally empty until M3 — primary instance keeps running so
+    // the second launch does not produce a duplicate process.
   });
-});
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
-});
+  void app.whenReady().then(() => {
+    registerIpc();
+    createIconWindow();
+
+    screen.on('display-metrics-changed', snapBackIfOffScreen);
+    screen.on('display-removed', snapBackIfOffScreen);
+    screen.on('display-added', snapBackIfOffScreen);
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createIconWindow();
+    });
+  });
+
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit();
+  });
+}
