@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { WeatherIcon } from './components/weather-icon';
 import { useClickClassifier } from './components/use-click-classifier';
 import { ICON_OFFSET_X, ICON_OFFSET_Y } from '../../shared/icon-position';
 
 export function App(): JSX.Element {
   const [dragMode, setDragMode] = useState(false);
+  const isDraggingRef = useRef(false);
 
   const handleSingleClick = useCallback(() => {
     // M3 will wire single-click to expand the icon into the window. For M2
@@ -30,6 +31,28 @@ export function App(): JSX.Element {
     return () => window.removeEventListener('blur', onBlur);
   }, [dragMode]);
 
+  // Mousemove + mouseup are bound at the window level so a fast cursor
+  // that briefly outpaces the moving icon window doesn't drop the drag
+  // mid-gesture.
+  useEffect(() => {
+    if (!dragMode) return;
+    const onMouseMove = (e: MouseEvent): void => {
+      if (!isDraggingRef.current) return;
+      window.glimpse?.dragMove({ x: e.screenX, y: e.screenY });
+    };
+    const onMouseUp = (e: MouseEvent): void => {
+      if (!isDraggingRef.current) return;
+      isDraggingRef.current = false;
+      window.glimpse?.dragEnd({ x: e.screenX, y: e.screenY });
+    };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, [dragMode]);
+
   // Click on the transparent area of the icon window (anywhere outside the
   // 64x64 glyph) also exits drag mode. The icon's own click handler stops
   // propagation, so this listener only fires for off-icon clicks.
@@ -43,6 +66,16 @@ export function App(): JSX.Element {
       handleIconClick();
     },
     [handleIconClick],
+  );
+
+  const handleIconMouseDown = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!dragMode) return;
+      e.preventDefault();
+      isDraggingRef.current = true;
+      window.glimpse?.dragStart({ x: e.screenX, y: e.screenY });
+    },
+    [dragMode],
   );
 
   return (
@@ -67,6 +100,7 @@ export function App(): JSX.Element {
           top: ICON_OFFSET_Y,
         }}
         onClick={handleIconClickWithStop}
+        onMouseDown={handleIconMouseDown}
       >
         <WeatherIcon
           state={{ kind: 'ready', condition: 'clear', isDay: true }}
