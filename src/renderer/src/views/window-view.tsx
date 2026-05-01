@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { ICON_SIZE } from '../../../shared/icon-position';
+import { TitleBar } from '../components/title-bar';
 
 // Plan/styling.md: "Window open / close: scale animation, 200 ms
 // ease-out, anchored at the icon's position."
@@ -18,7 +19,7 @@ export type WindowViewProps = {
 
 // WindowView — the expanded panel placeholder. Real slide content lands
 // in M4 (slide framework). Click-anywhere-to-collapse is a temporary
-// affordance until the title-bar buttons land.
+// affordance until the title-bar buttons are wired.
 export function WindowView({
   enterAnchor,
   enterBounds,
@@ -38,33 +39,43 @@ export function WindowView({
     : '50% 50%';
 
   return (
-    <motion.div
-      data-testid="window-view"
-      data-enter-anchor-x={enterAnchor?.x ?? ''}
-      data-enter-anchor-y={enterAnchor?.y ?? ''}
-      data-enter-scale={initialScale}
-      data-window-scale-duration-s={WINDOW_SCALE_DURATION_S}
-      onClick={handleCollapse}
-      initial={hasAnimation ? { scale: initialScale } : false}
-      animate={{ scale: 1 }}
-      transition={{ duration: WINDOW_SCALE_DURATION_S, ease: 'easeOut' }}
+    <div
+      data-testid="window-view-root"
       style={{
+        position: 'relative',
         width: '100vw',
         height: '100vh',
-        background: 'rgba(15, 23, 42, 0.92)',
-        color: 'rgba(255, 255, 255, 0.7)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: 14,
-        fontFamily: 'system-ui, sans-serif',
-        cursor: 'pointer',
-        userSelect: 'none',
-        WebkitUserSelect: 'none',
-        transformOrigin,
       }}
     >
-      Glimpse
-    </motion.div>
+      <motion.div
+        data-testid="window-view"
+        data-enter-anchor-x={enterAnchor?.x ?? ''}
+        data-enter-anchor-y={enterAnchor?.y ?? ''}
+        data-enter-scale={initialScale}
+        data-window-scale-duration-s={WINDOW_SCALE_DURATION_S}
+        onClick={handleCollapse}
+        initial={hasAnimation ? { scale: initialScale } : false}
+        animate={{ scale: 1 }}
+        transition={{ duration: WINDOW_SCALE_DURATION_S, ease: 'easeOut' }}
+        style={{
+          width: '100%',
+          height: '100%',
+          background: 'rgba(15, 23, 42, 0.92)',
+          color: 'rgba(255, 255, 255, 0.7)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 14,
+          fontFamily: 'system-ui, sans-serif',
+          cursor: 'pointer',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+          transformOrigin,
+        }}
+      >
+        Glimpse
+      </motion.div>
+      <TitleBar background="dark" />
+    </div>
   );
 }
