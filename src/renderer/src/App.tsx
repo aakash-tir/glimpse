@@ -21,7 +21,9 @@ export function App(): JSX.Element {
           top: ICON_OFFSET_Y,
         }}
       >
-        <WeatherIcon state={{ kind: 'error' }} />
+        <WeatherIcon
+          state={{ kind: 'ready', condition: 'clear', isDay: true }}
+        />
       </div>
     </div>
   );
