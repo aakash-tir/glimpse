@@ -5,6 +5,7 @@ import {
   defaultIconPosition,
   ICON_OFFSET_X,
   ICON_OFFSET_Y,
+  ICON_SIZE,
   resolveIconPosition,
   windowPositionForIcon,
   WINDOW_HEIGHT as ICON_WINDOW_HEIGHT,
@@ -18,7 +19,7 @@ import {
   expandFromIcon,
 } from '../shared/window-position';
 import type { IconPosition, WindowBounds } from '../shared/settings-store';
-import type { Mode } from '../shared/mode';
+import type { Mode, ModeChange } from '../shared/mode';
 import { loadSettings, saveSettings } from './settings';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -145,25 +146,82 @@ function applyWindowBounds(bounds: WindowBounds): void {
   iconWindow.setBounds(bounds);
 }
 
-function expandToWindow(): Mode {
-  if (!iconWindow || mode === 'window') return mode;
+function modeChangePayload(
+  newMode: Mode,
+  newBounds: WindowBounds,
+  anchorScreen: { x: number; y: number } | null,
+): ModeChange {
+  const anchor = anchorScreen
+    ? { x: anchorScreen.x - newBounds.x, y: anchorScreen.y - newBounds.y }
+    : null;
+  return {
+    mode: newMode,
+    anchor,
+    bounds: { width: newBounds.width, height: newBounds.height },
+  };
+}
+
+function expandToWindow(): ModeChange {
+  if (!iconWindow) {
+    return {
+      mode: 'icon',
+      anchor: null,
+      bounds: { width: ICON_WINDOW_WIDTH, height: ICON_WINDOW_HEIGHT },
+    };
+  }
+  if (mode === 'window') {
+    const b = iconWindow.getBounds();
+    return modeChangePayload('window', b, null);
+  }
   const iconPos = currentIconPosition();
   const bounds = expandFromIcon(iconPos, primaryBounds());
   applyWindowBounds(bounds);
   mode = 'window';
-  iconWindow.webContents.send('mode:changed', mode);
-  return mode;
+  // Anchor: where the icon's center was on screen.
+  const anchorScreen = {
+    x: iconPos.x + ICON_SIZE / 2,
+    y: iconPos.y + ICON_SIZE / 2,
+  };
+  const payload = modeChangePayload('window', bounds, anchorScreen);
+  iconWindow.webContents.send('mode:changed', payload);
+  return payload;
 }
 
-function collapseToIcon(): Mode {
-  if (!iconWindow || mode === 'icon') return mode;
-  const bounds = iconWindow.getBounds();
-  const iconPos = collapseTargetFromWindow(bounds, primaryBounds());
+function collapseToIcon(): ModeChange {
+  if (!iconWindow) {
+    return {
+      mode: 'icon',
+      anchor: null,
+      bounds: { width: ICON_WINDOW_WIDTH, height: ICON_WINDOW_HEIGHT },
+    };
+  }
+  if (mode === 'icon') {
+    const b = iconWindow.getBounds();
+    return modeChangePayload('icon', b, null);
+  }
+  const winBounds = iconWindow.getBounds();
+  const iconPos = collapseTargetFromWindow(winBounds, primaryBounds());
   applyIconPosition(iconPos);
   saveSettings({ iconPosition: iconPos });
   mode = 'icon';
-  iconWindow.webContents.send('mode:changed', mode);
-  return mode;
+  // After resize, the new bounds describe the icon-mode window.
+  const newBounds: WindowBounds = {
+    x: iconPos.x - ICON_OFFSET_X,
+    y: iconPos.y - ICON_OFFSET_Y,
+    width: ICON_WINDOW_WIDTH,
+    height: ICON_WINDOW_HEIGHT,
+  };
+  // Anchor for the icon-view entry: the center of the panel that just
+  // collapsed, in the new (icon-mode) window's coordinate space. The
+  // icon-view doesn't currently animate-in, so this is informational
+  // for now — the renderer simply ignores the anchor when mode === 'icon'.
+  const anchorScreen = {
+    x: winBounds.x + winBounds.width / 2,
+    y: winBounds.y + winBounds.height / 2,
+  };
+  const payload = modeChangePayload('icon', newBounds, anchorScreen);
+  iconWindow.webContents.send('mode:changed', payload);
+  return payload;
 }
 
 function registerIpc(): void {

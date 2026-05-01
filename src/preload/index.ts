@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { Settings } from '../shared/settings-store';
 import type { ScreenPoint } from '../shared/drag';
-import type { Mode } from '../shared/mode';
+import type { Mode, ModeChange } from '../shared/mode';
 
 const api = {
   getSettings: (): Promise<Settings> => ipcRenderer.invoke('settings:get'),
@@ -13,11 +13,11 @@ const api = {
     ipcRenderer.send('drag:move', cursor),
   dragEnd: (cursor: ScreenPoint): void => ipcRenderer.send('drag:end', cursor),
   getMode: (): Promise<Mode> => ipcRenderer.invoke('mode:get'),
-  expand: (): Promise<Mode> => ipcRenderer.invoke('mode:expand'),
-  collapse: (): Promise<Mode> => ipcRenderer.invoke('mode:collapse'),
-  onModeChanged: (cb: (mode: Mode) => void): (() => void) => {
-    const handler = (_e: Electron.IpcRendererEvent, mode: Mode): void =>
-      cb(mode);
+  expand: (): Promise<ModeChange> => ipcRenderer.invoke('mode:expand'),
+  collapse: (): Promise<ModeChange> => ipcRenderer.invoke('mode:collapse'),
+  onModeChanged: (cb: (change: ModeChange) => void): (() => void) => {
+    const handler = (_e: Electron.IpcRendererEvent, change: ModeChange): void =>
+      cb(change);
     ipcRenderer.on('mode:changed', handler);
     return () => {
       ipcRenderer.off('mode:changed', handler);
