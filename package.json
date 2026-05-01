@@ -13,7 +13,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit",
+    "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit && tsc -p tsconfig.e2e.json --noEmit",
     "test": "npm run test:unit && npm run test:component && npm run test:integration && npm run test:e2e",
     "test:unit": "vitest run --passWithNoTests test/unit",
     "test:component": "vitest run --passWithNoTests test/component",
