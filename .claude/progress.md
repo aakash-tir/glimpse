@@ -53,7 +53,7 @@
 
 ## M2 — Drag & snap behavior
 
-**Status:** Not started
+**Status:** Done (2026-05-01)
 
 **Scope.** Make the icon repositionable via the double-click → drag → release flow.
 
