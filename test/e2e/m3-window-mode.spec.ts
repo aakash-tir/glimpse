@@ -1,13 +1,32 @@
 import { test, expect, _electron as electron } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
+import { spawn } from 'node:child_process';
 import { resolve, dirname } from 'node:path';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+
+const require = createRequire(import.meta.url);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dirname, '../..');
 
 async function launch(): Promise<ElectronApplication> {
   return await electron.launch({ args: ['.'], cwd: projectRoot });
+}
+
+async function spawnSecondInstance(): Promise<void> {
+  const electronBin = require('electron') as string;
+  const child = spawn(electronBin, ['.'], { cwd: projectRoot });
+  await new Promise<void>((resolveExit, rejectExit) => {
+    const timeout = setTimeout(() => {
+      child.kill();
+      rejectExit(new Error('second instance did not exit within 8 s'));
+    }, 8000);
+    child.once('exit', () => {
+      clearTimeout(timeout);
+      resolveExit();
+    });
+  });
 }
 
 async function getWindowBounds(
@@ -204,6 +223,67 @@ test('outside-click does NOT close the window', async () => {
     const bounds = await getWindowBounds(app);
     expect(bounds.width).toBe(bounds.height);
     expect(bounds.height).toBeGreaterThan(112);
+  } finally {
+    await app.close();
+  }
+});
+
+test('single-instance lock — 2nd launch from icon mode auto-expands', async () => {
+  const app = await launch();
+  try {
+    const page = await app.firstWindow();
+    // Confirm we start in icon mode.
+    await expect(page.getByTestId('icon-view')).toBeVisible();
+
+    await spawnSecondInstance();
+    // Mode change + setBounds + renderer swap.
+    await page.waitForTimeout(500);
+
+    await expect(page.getByTestId('window-view')).toBeVisible();
+  } finally {
+    await app.close();
+  }
+});
+
+test('single-instance lock — 2nd launch with window already open focuses', async () => {
+  const app = await launch();
+  try {
+    const page = await app.firstWindow();
+    await expandToWindow(page);
+    const before = await getWindowBounds(app);
+
+    await spawnSecondInstance();
+    await page.waitForTimeout(300);
+
+    // Still in window mode at the same bounds — focus is a no-op for the
+    // user-visible state aside from window stacking.
+    await expect(page.getByTestId('window-view')).toBeVisible();
+    const after = await getWindowBounds(app);
+    expect(after).toEqual(before);
+  } finally {
+    await app.close();
+  }
+});
+
+test('single-instance lock — 2nd launch in icon-drag mode exits drag and expands', async () => {
+  const app = await launch();
+  try {
+    const page = await app.firstWindow();
+    const icon = page.getByTestId('icon-root');
+
+    // Enter icon-drag mode (double-click).
+    await icon.dispatchEvent('click');
+    await icon.dispatchEvent('click');
+    await page.waitForTimeout(50);
+    await expect(icon).toHaveAttribute('data-drag-mode', 'on');
+
+    await spawnSecondInstance();
+    await page.waitForTimeout(500);
+
+    // Now in window mode; the icon-mode drag-mode state is gone with
+    // the unmounted IconView.
+    await expect(page.getByTestId('window-view')).toBeVisible();
+    expect(await page.getByTestId('icon-view').count()).toBe(0);
   } finally {
     await app.close();
   }

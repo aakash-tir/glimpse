@@ -404,17 +404,33 @@ function registerIpc(): void {
   });
 }
 
-// Single-instance lock per plan/tech-stack.md. M2 ships the bare lock —
-// a second launch is acquired by the existing primary process via the
-// `second-instance` event but is otherwise a no-op (M3 will wire the
-// expand / focus / exit-drag-then-expand behavior).
+// Single-instance lock per plan/tech-stack.md.
+//
+// Per plan/window.md: "if collapsed, auto-expand; if window already
+// open, focus. If first instance is in drag mode when 2nd launch fires,
+// exit drag then expand."
+//
+// The "exit drag then expand" case falls out naturally from expanding:
+// the IconView (which owns the renderer-side drag-mode toggle) unmounts
+// when mode flips to 'window', and a fresh IconView mounts with drag
+// mode off on the next collapse. We do clear any active mid-mouse-drag
+// session here so a stranded dragSession doesn't apply phantom moves
+// after the expand.
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
 } else {
   app.on('second-instance', () => {
-    // Intentionally empty until the M3 sub-feature that wires
-    // collapsed → expand / open → focus / drag-mode → exit-then-expand.
+    if (!iconWindow) return;
+    if (mode === 'window') {
+      // Restore from minimize if needed and bring to front.
+      if (iconWindow.isMinimized()) iconWindow.restore();
+      iconWindow.focus();
+      return;
+    }
+    // mode === 'icon'. Clear any in-flight drag, then expand.
+    dragSession = null;
+    expandToWindow();
   });
 
   void app.whenReady().then(() => {
