@@ -33,7 +33,7 @@
 
 ## M1 — Icon mode (collapsed state)
 
-**Status:** Not started
+**Status:** Done (2026-05-01)
 
 **Scope.** Render and position the icon. Static visual only — no real weather yet (use a placeholder condition).
 
