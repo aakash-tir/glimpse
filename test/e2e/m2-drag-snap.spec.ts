@@ -58,7 +58,7 @@ test('clicking the transparent app area exits drag mode', async () => {
       'on',
     );
 
-    await page.getByTestId('app-root').dispatchEvent('click');
+    await page.getByTestId('icon-view').dispatchEvent('click');
 
     await expect(page.getByTestId('icon-root')).toHaveAttribute(
       'data-drag-mode',

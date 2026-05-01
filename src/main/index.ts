@@ -7,18 +7,24 @@ import {
   ICON_OFFSET_Y,
   resolveIconPosition,
   windowPositionForIcon,
-  WINDOW_HEIGHT,
-  WINDOW_WIDTH,
+  WINDOW_HEIGHT as ICON_WINDOW_HEIGHT,
+  WINDOW_WIDTH as ICON_WINDOW_WIDTH,
   type DisplayBounds,
 } from '../shared/icon-position';
 import { computeIconPosFromCursor, type ScreenPoint } from '../shared/drag';
 import { snapToCorner } from '../shared/snap';
-import type { IconPosition } from '../shared/settings-store';
+import {
+  collapseTargetFromWindow,
+  expandFromIcon,
+} from '../shared/window-position';
+import type { IconPosition, WindowBounds } from '../shared/settings-store';
+import type { Mode } from '../shared/mode';
 import { loadSettings, saveSettings } from './settings';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 let iconWindow: BrowserWindow | null = null;
+let mode: Mode = 'icon';
 
 function primaryBounds(): DisplayBounds {
   return screen.getPrimaryDisplay().workArea;
@@ -38,8 +44,8 @@ function createIconWindow(): void {
   const winPos = windowPositionForIcon(iconPos);
 
   iconWindow = new BrowserWindow({
-    width: WINDOW_WIDTH,
-    height: WINDOW_HEIGHT,
+    width: ICON_WINDOW_WIDTH,
+    height: ICON_WINDOW_HEIGHT,
     x: winPos.x,
     y: winPos.y,
     frame: false,
@@ -74,6 +80,12 @@ function createIconWindow(): void {
 
 function snapBackIfOffScreen(): void {
   if (!iconWindow) return;
+  // Display changes only re-anchor the icon; if the user is currently in
+  // window mode we leave the panel where it is (the user is actively
+  // looking at it). The next collapse will re-clamp via
+  // collapseTargetFromWindow.
+  if (mode !== 'icon') return;
+
   const settings = loadSettings();
   const resolvedIcon = resolveIconPosition(
     settings.iconPosition,
@@ -84,8 +96,8 @@ function snapBackIfOffScreen(): void {
   iconWindow.setBounds({
     x: winPos.x,
     y: winPos.y,
-    width: WINDOW_WIDTH,
-    height: WINDOW_HEIGHT,
+    width: ICON_WINDOW_WIDTH,
+    height: ICON_WINDOW_HEIGHT,
   });
 
   // If we had to fall back to the default position, clear the saved
@@ -123,14 +135,44 @@ function applyIconPosition(pos: IconPosition): void {
   iconWindow.setBounds({
     x: win.x,
     y: win.y,
-    width: WINDOW_WIDTH,
-    height: WINDOW_HEIGHT,
+    width: ICON_WINDOW_WIDTH,
+    height: ICON_WINDOW_HEIGHT,
   });
+}
+
+function applyWindowBounds(bounds: WindowBounds): void {
+  if (!iconWindow) return;
+  iconWindow.setBounds(bounds);
+}
+
+function expandToWindow(): Mode {
+  if (!iconWindow || mode === 'window') return mode;
+  const iconPos = currentIconPosition();
+  const bounds = expandFromIcon(iconPos, primaryBounds());
+  applyWindowBounds(bounds);
+  mode = 'window';
+  iconWindow.webContents.send('mode:changed', mode);
+  return mode;
+}
+
+function collapseToIcon(): Mode {
+  if (!iconWindow || mode === 'icon') return mode;
+  const bounds = iconWindow.getBounds();
+  const iconPos = collapseTargetFromWindow(bounds, primaryBounds());
+  applyIconPosition(iconPos);
+  saveSettings({ iconPosition: iconPos });
+  mode = 'icon';
+  iconWindow.webContents.send('mode:changed', mode);
+  return mode;
 }
 
 function registerIpc(): void {
   ipcMain.handle('settings:get', () => loadSettings());
   ipcMain.handle('settings:set', (_evt, patch) => saveSettings(patch));
+
+  ipcMain.handle('mode:get', () => mode);
+  ipcMain.handle('mode:expand', () => expandToWindow());
+  ipcMain.handle('mode:collapse', () => collapseToIcon());
 
   ipcMain.on('drag:start', (_evt, cursor: ScreenPoint) => {
     dragSession = {
@@ -174,8 +216,8 @@ if (!gotLock) {
   app.quit();
 } else {
   app.on('second-instance', () => {
-    // Intentionally empty until M3 — primary instance keeps running so
-    // the second launch does not produce a duplicate process.
+    // Intentionally empty until the M3 sub-feature that wires
+    // collapsed → expand / open → focus / drag-mode → exit-then-expand.
   });
 
   void app.whenReady().then(() => {
