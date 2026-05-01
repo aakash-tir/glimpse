@@ -14,6 +14,9 @@ playwright-report/
 
 # Personal manual-test checklist (per milestone-workflow rules)
 manual-tests.md
+# Personal manual-test review notes + supporting screenshots
+manual-tests-review.md
+images/
 
 # Editor / OS noise
 .DS_Store
