@@ -8,7 +8,11 @@ export const ICON_PADDING = 16;
 // drag glow have room to render outside the icon's bounds. The window
 // stays transparent; only the icon glyph + tooltip are visible.
 export const WINDOW_WIDTH = 260;
-export const WINDOW_HEIGHT = 130;
+// Sized to: top padding (16) + icon (64) + 4px gap + ~25px tooltip + 7px
+// breathing = 116. Top + right padding stay at 16; bottom is intentionally
+// snug so the transparent window doesn't claim more screen real estate
+// than the visible content needs.
+export const WINDOW_HEIGHT = 116;
 
 // Where the icon sits inside the window (top-right with ICON_PADDING).
 export const ICON_OFFSET_X = WINDOW_WIDTH - ICON_PADDING - ICON_SIZE;

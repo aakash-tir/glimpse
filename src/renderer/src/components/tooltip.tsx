@@ -45,8 +45,9 @@ export function Tooltip({
       if (rect) {
         // Anchor the tooltip's right edge to the target's right edge so
         // it stays inside the icon window when the icon sits in the
-        // top-right corner.
-        setPos({ x: rect.right, y: rect.bottom + 8 });
+        // top-right corner. 4px gap below the icon keeps the visible
+        // bottom of the window snug.
+        setPos({ x: rect.right, y: rect.bottom + 4 });
       }
       setVisible(true);
     }, HOVER_DELAY_MS);
