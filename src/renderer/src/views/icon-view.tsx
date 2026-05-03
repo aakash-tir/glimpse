@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { WeatherIcon } from '../components/weather-icon';
 import { useClickClassifier } from '../components/use-click-classifier';
-import { ICON_OFFSET_X, ICON_OFFSET_Y } from '../../../shared/icon-position';
 
 // Mirror of WindowView's WINDOW_SCALE_DURATION_S. The IconView
 // opacity-fade-out timing matches WindowView's collapse fade so the two
@@ -157,8 +156,38 @@ export function IconView(): JSX.Element {
       <div
         style={{
           position: 'absolute',
-          left: ICON_OFFSET_X,
-          top: ICON_OFFSET_Y,
+          // Anchor the glyph to the WINDOW CENTER rather than to the
+          // icon-mode top-left offset. In icon mode (96 × 96) the
+          // window center is (48, 48) which equals ICON_PADDING +
+          // ICON_SIZE / 2 — so the visual position is identical to
+          // the previous (16, 16) top-left + 64×64 glyph anchoring.
+          //
+          // The reason this matters: when main calls setBounds() to
+          // expand, the BrowserWindow both *resizes* and *moves* to
+          // new screen bounds. The OS reuses the renderer's stale
+          // framebuffer to fill the new window with content anchored
+          // to the new top-left. Local (16, 16) of a 200×200 window
+          // is at a completely different screen position than local
+          // (16, 16) of the 96×96 window — visible as the glyph
+          // "moving to top-left" of the new window.
+          //
+          // expandFromIcon() (in shared/window-position.ts) centers
+          // the new window on the icon's pre-expand center, so the
+          // window CENTER stays at the same screen position before
+          // and after the resize. Center-anchoring the glyph means
+          // it stays at the same screen position too, regardless of
+          // the window resize. The glyph just sits there until
+          // WindowView mounts and covers it.
+          //
+          // Edge case: when the icon is at the canonical default
+          // top-right position, expandFromIcon returns the default
+          // window bounds (a fixed screen location, not centered on
+          // the icon). The glyph would jump to the new window's
+          // center in that case — the opacity-fade animation on the
+          // IconView root masks that.
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
         }}
         onClick={handleIconClickWithStop}
         onMouseDown={handleIconMouseDown}
