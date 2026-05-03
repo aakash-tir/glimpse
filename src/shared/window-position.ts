@@ -19,6 +19,7 @@
 import type { IconPosition, WindowBounds } from './settings-store';
 import {
   defaultIconPosition,
+  displayForIcon,
   ICON_PADDING,
   ICON_SIZE,
   type DisplayBounds,
@@ -190,13 +191,25 @@ export function clampWindowForDrag(args: {
 
 // Window bounds when expanding from a given icon position.
 //
-// - If the icon sits at the default top-right position, the window
-//   opens at the default window position (default size, top-right).
-// - Otherwise, the window's center aligns with the icon's center, then
-//   clamped to the primary display so the panel stays fully on-screen.
+// - If the icon sits at the canonical default top-right position
+//   (always primary's top-right with 16 px padding — that's THE
+//   default), the window opens at the canonical default window
+//   bounds. This preserves the default-icon ↔ default-window
+//   round-trip rule from plan/window.md.
+// - Otherwise, the window's center aligns with the icon's center,
+//   then clamped to the icon's display (the display containing the
+//   icon's center, or the closest one). On a multi-monitor setup,
+//   an icon dragged onto the secondary expands into a window on the
+//   secondary, NOT yanked back to primary.
+//
+// Default size always comes from the primary display per
+// plan/window.md ("1/6 of the primary monitor's smallest dimension")
+// — this keeps the panel size consistent regardless of which display
+// the user expanded on.
 export function expandFromIcon(
   iconPos: IconPosition,
   primary: DisplayBounds,
+  allDisplays: DisplayBounds[] = [primary],
 ): WindowBounds {
   const defIcon = defaultIconPosition(primary);
   if (iconPos.x === defIcon.x && iconPos.y === defIcon.y) {
@@ -205,10 +218,11 @@ export function expandFromIcon(
   const size = defaultWindowSize(primary);
   const cx = iconPos.x + ICON_SIZE / 2;
   const cy = iconPos.y + ICON_SIZE / 2;
+  const display = displayForIcon(iconPos, allDisplays, primary);
   const clamped = clampWindowToDisplay(
     { x: Math.round(cx - size / 2), y: Math.round(cy - size / 2) },
     { width: size, height: size },
-    primary,
+    display,
   );
   return { x: clamped.x, y: clamped.y, width: size, height: size };
 }
@@ -282,39 +296,48 @@ export function resolveWindowBoundsForExpand(args: {
   ) {
     return args.savedBounds;
   }
-  return expandFromIcon(args.iconPos, args.primary);
+  return expandFromIcon(args.iconPos, args.primary, args.allDisplays);
 }
 
-// Snap a dropped window to the nearest screen corner if within the snap
-// radius. Unlike the icon's snap, the window has no padding — corner
-// snap means the window's edge sits flush against the screen edge.
-// Returns null when no corner is close enough (drop landed near an
-// edge midpoint, the screen center, or anywhere else).
-export function snapWindowToCorner(
-  topLeft: WindowPoint,
+// Snap-target corner positions for one display, given a window size.
+// Window has no padding — corner snap means the window's edge sits
+// flush against the display edge.
+function windowCornersForDisplay(
+  display: DisplayBounds,
   size: { width: number; height: number },
-  primary: DisplayBounds,
-  radiusPx: number = WINDOW_SNAP_RADIUS_PX,
-): WindowCornerSnap | null {
-  const left = primary.x;
-  const right = primary.x + primary.width - size.width;
-  const top = primary.y;
-  const bottom = primary.y + primary.height - size.height;
-
-  const corners: WindowCornerSnap[] = [
+): WindowCornerSnap[] {
+  const left = display.x;
+  const right = display.x + display.width - size.width;
+  const top = display.y;
+  const bottom = display.y + display.height - size.height;
+  return [
     { corner: 'top-left', position: { x: left, y: top } },
     { corner: 'top-right', position: { x: right, y: top } },
     { corner: 'bottom-left', position: { x: left, y: bottom } },
     { corner: 'bottom-right', position: { x: right, y: bottom } },
   ];
+}
 
+// Snap a dropped window to the nearest screen corner across any
+// connected display, if within the snap radius. Multi-monitor: a drop
+// near the secondary display's bottom-left corner snaps flush against
+// THAT display's bottom-left, not the primary's. Returns null when no
+// corner on any display is close enough.
+export function snapWindowToCorner(
+  topLeft: WindowPoint,
+  size: { width: number; height: number },
+  displays: DisplayBounds[],
+  radiusPx: number = WINDOW_SNAP_RADIUS_PX,
+): WindowCornerSnap | null {
   let best: { entry: WindowCornerSnap; dist: number } | null = null;
-  for (const entry of corners) {
-    const dx = entry.position.x - topLeft.x;
-    const dy = entry.position.y - topLeft.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist > radiusPx) continue;
-    if (best === null || dist < best.dist) best = { entry, dist };
+  for (const display of displays) {
+    for (const entry of windowCornersForDisplay(display, size)) {
+      const dx = entry.position.x - topLeft.x;
+      const dy = entry.position.y - topLeft.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > radiusPx) continue;
+      if (best === null || dist < best.dist) best = { entry, dist };
+    }
   }
   return best?.entry ?? null;
 }

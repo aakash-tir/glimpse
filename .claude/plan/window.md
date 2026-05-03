@@ -7,7 +7,8 @@ The weather panel that opens when the user clicks the [icon](./icon.md). Square,
 - Click icon → window **scales up out of the icon's current position over 200 ms ease-out**.
 - On collapse, window scales back down to icon position over the same duration.
 - When collapsed, the icon returns to the **window's last position** (window-center → icon-center). The icon is **clamped** to stay fully on-screen if the window's center was near a screen edge.
-- **Special case:** if the window was at the default position when collapsed, the icon snaps to the default top-right padded position.
+- **Special case:** if the window was at the canonical default position (primary's top-right) when collapsed, the icon snaps to the default top-right padded position.
+- **Multi-monitor:** the window can be expanded on, dragged onto, and collapsed back from any connected display. `expandFromIcon` clamps the new bounds against the icon's display (not always primary), so an icon dragged onto the secondary monitor opens its window on the secondary too. Collapse mirrors this — the icon lands on whichever display the window's pending position resolves to. The "snap back to default" rule still uses the canonical primary default since that's THE default for the app.
 
 ## Size
 
@@ -20,7 +21,7 @@ The weather panel that opens when the user clicks the [icon](./icon.md). Square,
 
 - **Stuck in place** unless dragged. Drag is initiated by **double-click** on the window body; clicking outside exits.
 - **Double-click is disabled on the arrow buttons** so navigation can't accidentally trigger drag.
-- **Window drag bounds:** free placement, **constrained to fully fit on the cursor's current display** (the user can't drag the window off-screen — it hugs the display edge as the cursor approaches it). Multi-monitor: the window stays hugging the source display's edge until the cursor has moved far enough into the destination display that the whole window would fit there, then jumps. Same algorithm as the icon's drag clamp. Snap to the 4 screen corners on release with **40 px** radius.
+- **Window drag bounds:** free placement, **constrained to fully fit on the cursor's current display** (the user can't drag the window off-screen — it hugs the display edge as the cursor approaches it). Multi-monitor: the window stays hugging the source display's edge until the cursor has moved far enough into the destination display that the whole window would fit there, then jumps. Same algorithm as the icon's drag clamp. Snap to the 4 screen corners of **any connected display** on release with **40 px** radius — drop near the secondary monitor's bottom-right and the window snaps flush to that corner, just on the secondary.
 - **No padding constraint** in window mode — the window can span to screen corners. Padding applies only to the icon.
 
 ## Closing rules

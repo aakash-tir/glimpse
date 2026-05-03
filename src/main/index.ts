@@ -5,6 +5,7 @@ import {
   clampIconForDrag,
   clampIconToDisplay,
   defaultIconPosition,
+  displayForIcon,
   ICON_OFFSET_X,
   ICON_OFFSET_Y,
   ICON_SIZE,
@@ -257,18 +258,26 @@ function expandToWindow(): ModeChange {
 type CollapseOpts = { resetToDefault?: boolean };
 
 // Returns where the icon should land when the panel collapses.
-//   - Relocate (resetToDefault): always default top-right.
+//   - Relocate (resetToDefault): always default top-right (primary).
 //   - Otherwise: the pendingIconPosition captured at expand and
-//     shifted by any window drags since. Clamped to the primary
-//     display so a stale value (e.g. after a monitor disconnect)
-//     can't strand the icon off-screen.
+//     shifted by any window drags since. Clamped to whichever
+//     display the icon ended up on (or closest to) — so a window
+//     dragged to the secondary monitor collapses to an icon on the
+//     secondary monitor, not yanked back to primary. After a monitor
+//     disconnect, displayForIcon falls back to the closest connected
+//     display so the icon can't be stranded off-screen.
 //   - Fallback: pre-M3 behavior (icon at the icon's current location)
 //     in the unlikely event we're collapsing without a pending value.
 function nextIconPositionForCollapse(opts: CollapseOpts): IconPosition {
   if (!iconWindow) return defaultIconPosition(primaryBounds());
   if (opts.resetToDefault) return defaultIconPosition(primaryBounds());
   if (pendingIconPosition) {
-    return clampIconToDisplay(pendingIconPosition, primaryBounds());
+    const display = displayForIcon(
+      pendingIconPosition,
+      allDisplayBounds(),
+      primaryBounds(),
+    );
+    return clampIconToDisplay(pendingIconPosition, display);
   }
   return currentIconPosition();
 }
@@ -478,15 +487,17 @@ function registerIpc(): void {
     dragSession = null;
 
     if (session.subject === 'window') {
+      // Snap considers the corners of EVERY connected display, so a
+      // release near the secondary monitor's bottom-right snaps to
+      // that corner instead of being ignored. The unsnapped path uses
+      // the same drag clamp as drag:move so a release near a screen
+      // edge stays where the user actually saw the window during the
+      // drag.
       const snap = snapWindowToCorner(
         dropped,
         { width: session.startSize.width, height: session.startSize.height },
-        primaryBounds(),
+        allDisplayBounds(),
       );
-      // Snap returns positions on the primary display (already
-      // on-screen). The unsnapped path uses the same drag clamp as
-      // drag:move so a release near a screen edge stays where the
-      // user actually saw the window during the drag.
       const final =
         snap?.position ??
         clampWindowForDrag({
@@ -525,10 +536,12 @@ function registerIpc(): void {
         saveSettings({ windowBounds: newBounds });
       }
     } else {
-      const snapped = snapToCorner(dropped, primaryBounds());
-      // Snap returns corner-padded positions on the primary display; the
-      // unsnapped path uses the cross-display drag clamp so a release
-      // near a monitor seam stays where the user actually sees the icon.
+      // Snap considers each display's 4 corners; release near the
+      // secondary monitor's bottom-left snaps to that corner with the
+      // same 16 px padding rule. The unsnapped path uses the cross-
+      // display drag clamp so a release near a monitor seam stays
+      // where the user actually sees the icon.
+      const snapped = snapToCorner(dropped, allDisplayBounds());
       const final =
         snapped?.position ??
         clampIconForDrag({

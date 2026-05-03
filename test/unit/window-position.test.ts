@@ -147,6 +147,42 @@ describe('expandFromIcon', () => {
       defaultWindowBounds(offsetPrimary),
     );
   });
+
+  it('clamps to the SECONDARY display when the icon sits there (multi-monitor)', () => {
+    // Two side-by-side 1920x1080 displays. Icon center on display B.
+    const displayB: DisplayBounds = {
+      x: 1920,
+      y: 0,
+      width: 1920,
+      height: 1080,
+    };
+    const allDisplays = [primary, displayB];
+    const iconOnB = { x: 2500, y: 400 };
+    const result = expandFromIcon(iconOnB, primary, allDisplays);
+    // Window must fit fully on display B, NOT yanked back to primary.
+    expect(result.x).toBeGreaterThanOrEqual(displayB.x);
+    expect(result.x + result.width).toBeLessThanOrEqual(
+      displayB.x + displayB.width,
+    );
+    // Center should align with the icon's center.
+    expect(result.x + result.width / 2).toBeCloseTo(
+      iconOnB.x + ICON_SIZE / 2,
+      0,
+    );
+  });
+
+  it('still uses primary for the canonical default when icon is at primary default (multi-monitor)', () => {
+    const displayB: DisplayBounds = {
+      x: 1920,
+      y: 0,
+      width: 1920,
+      height: 1080,
+    };
+    const def = defaultIconPosition(primary);
+    expect(expandFromIcon(def, primary, [primary, displayB])).toEqual(
+      defaultWindowBounds(primary),
+    );
+  });
 });
 
 describe('collapseTargetFromWindow', () => {
@@ -336,6 +372,7 @@ describe('squareResize', () => {
 
 describe('snapWindowToCorner', () => {
   const size = { width: 200, height: 200 };
+  const displays = [primary];
   // Each corner's top-left for a 200x200 window on the 1920x1080 primary.
   const tl = { x: 0, y: 0 };
   const tr = { x: primary.width - size.width, y: 0 };
@@ -347,25 +384,29 @@ describe('snapWindowToCorner', () => {
 
   it('snaps to each corner from a nearby drop', () => {
     expect(
-      snapWindowToCorner({ x: tl.x + 10, y: tl.y + 10 }, size, primary)?.corner,
+      snapWindowToCorner({ x: tl.x + 10, y: tl.y + 10 }, size, displays)
+        ?.corner,
     ).toBe('top-left');
     expect(
-      snapWindowToCorner({ x: tr.x - 10, y: tr.y + 10 }, size, primary)?.corner,
+      snapWindowToCorner({ x: tr.x - 10, y: tr.y + 10 }, size, displays)
+        ?.corner,
     ).toBe('top-right');
     expect(
-      snapWindowToCorner({ x: bl.x + 10, y: bl.y - 10 }, size, primary)?.corner,
+      snapWindowToCorner({ x: bl.x + 10, y: bl.y - 10 }, size, displays)
+        ?.corner,
     ).toBe('bottom-left');
     expect(
-      snapWindowToCorner({ x: br.x - 10, y: br.y - 10 }, size, primary)?.corner,
+      snapWindowToCorner({ x: br.x - 10, y: br.y - 10 }, size, displays)
+        ?.corner,
     ).toBe('bottom-right');
   });
 
   it('snapped position has NO padding (unlike the icon snap)', () => {
-    expect(snapWindowToCorner({ x: 5, y: 5 }, size, primary)?.position).toEqual(
-      { x: 0, y: 0 },
-    );
     expect(
-      snapWindowToCorner({ x: tr.x + 5, y: -5 }, size, primary)?.position,
+      snapWindowToCorner({ x: 5, y: 5 }, size, displays)?.position,
+    ).toEqual({ x: 0, y: 0 });
+    expect(
+      snapWindowToCorner({ x: tr.x + 5, y: -5 }, size, displays)?.position,
     ).toEqual(tr);
   });
 
@@ -374,7 +415,7 @@ describe('snapWindowToCorner', () => {
       snapWindowToCorner(
         { x: primary.width / 2 - size.width / 2, y: 0 },
         size,
-        primary,
+        displays,
       ),
     ).toBeNull();
   });
@@ -387,7 +428,7 @@ describe('snapWindowToCorner', () => {
           y: primary.height / 2 - size.height / 2,
         },
         size,
-        primary,
+        displays,
       ),
     ).toBeNull();
   });
@@ -397,7 +438,7 @@ describe('snapWindowToCorner', () => {
       snapWindowToCorner(
         { x: tl.x, y: tl.y + WINDOW_SNAP_RADIUS_PX },
         size,
-        primary,
+        displays,
       )?.corner,
     ).toBe('top-left');
   });
@@ -407,24 +448,60 @@ describe('snapWindowToCorner', () => {
       snapWindowToCorner(
         { x: tl.x, y: tl.y + WINDOW_SNAP_RADIUS_PX + 1 },
         size,
-        primary,
+        displays,
       ),
     ).toBeNull();
   });
 
   it('picks the closest corner when two are within the radius', () => {
     const closeToTl = { x: tl.x + 10, y: tl.y + 5 };
-    expect(snapWindowToCorner(closeToTl, size, primary)?.corner).toBe(
+    expect(snapWindowToCorner(closeToTl, size, displays)?.corner).toBe(
       'top-left',
     );
   });
 
   it('honors a custom radius', () => {
     const drop = { x: tl.x + 30, y: tl.y };
-    expect(snapWindowToCorner(drop, size, primary, 20)).toBeNull();
-    expect(snapWindowToCorner(drop, size, primary, 40)?.corner).toBe(
+    expect(snapWindowToCorner(drop, size, displays, 20)).toBeNull();
+    expect(snapWindowToCorner(drop, size, displays, 40)?.corner).toBe(
       'top-left',
     );
+  });
+
+  it('snaps to a corner of the SECONDARY display when the drop is near it', () => {
+    // Two side-by-side 1920x1080 displays. The window's natural snap
+    // target on display B's bottom-right is at (B.x + B.w - size,
+    // B.h - size) = (3840 - 200, 880) = (3640, 880). Drop near there
+    // should snap to that corner — NOT be ignored because the corner
+    // isn't on the primary.
+    const displayB = { x: 1920, y: 0, width: 1920, height: 1080 };
+    const both = [primary, displayB];
+    const target = {
+      x: displayB.x + displayB.width - size.width,
+      y: displayB.height - size.height,
+    };
+    const result = snapWindowToCorner(
+      { x: target.x + 10, y: target.y + 10 },
+      size,
+      both,
+    );
+    expect(result?.corner).toBe('bottom-right');
+    expect(result?.position).toEqual(target);
+  });
+
+  it('picks the closest corner across all displays when several are in range', () => {
+    // Two side-by-side displays. A drop right on the seam is closer to
+    // primary's top-right than to display B's top-left (by ~size.width
+    // either way — actually they're the same distance). Verify that
+    // when the drop is biased toward primary, it picks primary's
+    // top-right corner.
+    const displayB = { x: 1920, y: 0, width: 1920, height: 1080 };
+    const both = [primary, displayB];
+    const primaryTR = { x: primary.width - size.width, y: 0 };
+    const drop = { x: primaryTR.x + 5, y: 5 };
+    const result = snapWindowToCorner(drop, size, both);
+    expect(result?.corner).toBe('top-right');
+    expect(result?.position).toEqual(primaryTR);
   });
 });
 

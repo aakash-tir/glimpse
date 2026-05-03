@@ -24,12 +24,15 @@ async function getIconWindowBounds(
 }
 
 // Two clicks dispatched back-to-back via the locator API land well
-// under the 250 ms double-click threshold and avoid flakiness from
-// real-time scheduling in CI.
+// under the 250 ms double-click threshold. The trailing assertion
+// makes the helper deterministic — Playwright's auto-retry waits
+// until the React drag-mode state has propagated, so subsequent
+// mousedown / mousemove dispatches can't race the toggle.
 async function doubleClickIcon(page: Page): Promise<void> {
   const icon = page.getByTestId('icon-root');
   await icon.dispatchEvent('click');
   await icon.dispatchEvent('click');
+  await expect(icon).toHaveAttribute('data-drag-mode', 'on');
 }
 
 test('double-click enters drag mode and renders the glow', async () => {
