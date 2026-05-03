@@ -1,34 +1,51 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
 import { WeatherIcon } from '../components/weather-icon';
 import { useClickClassifier } from '../components/use-click-classifier';
 import { ICON_OFFSET_X, ICON_OFFSET_Y } from '../../../shared/icon-position';
+
+// Mirror of WindowView's WINDOW_SCALE_DURATION_S. The IconView
+// opacity-fade-out timing matches WindowView's collapse fade so the two
+// directions feel symmetric.
+const ICON_FADE_DURATION_S = 0.2;
 
 // IconView — the collapsed, icon-mode renderer. Owns its own drag-mode
 // state and the icon's click handlers. Single-click asks main to
 // expand to window mode; double-click toggles drag mode.
 export function IconView(): JSX.Element {
   const [dragMode, setDragMode] = useState(false);
-  // Latched the moment the click classifier commits a single-click that
-  // triggers expand. The icon glyph is then hidden via `visibility:
-  // hidden` (kept mounted in the DOM so existing tests can still query
-  // it by testid) so the renderer doesn't paint the glyph at its (16,
-  // 16) icon-mode offset in the freshly-resized window — that paint
-  // showed up as a one-frame flash of the icon at the new window's
-  // top-left corner. The earlier resize-event-listener fix was racy
-  // because the renderer can paint between the OS resizing the window
-  // and the resize event causing a React re-render; setting state
-  // synchronously inside the click handler guarantees the glyph is
-  // hidden before the IPC even reaches main.
+  // Latched when the click classifier commits a single-click that
+  // triggers expand. Drives an opacity fade-out on the IconView root —
+  // mirror of the M3 polish (commit 92396c3) that opacity-fades
+  // WindowView during collapse to mask the 1–2 frame paint race
+  // between mode:changed and the OS resizing the BrowserWindow. The
+  // expand direction has the same race (renderer's last paint of
+  // IconView, with the glyph at icon-mode local (16, 16), gets
+  // stretched into the freshly-resized window — visible as the glyph
+  // flashing at the new window's top-left), and the fix is the
+  // same: fade the source view to opacity 0 over ~200 ms so even if
+  // the OS uses a stale framebuffer mid-fade, what it stretches is
+  // already partially transparent and dissolves into the wallpaper
+  // rather than reading as a sharp glyph at top-left.
   const [expanding, setExpanding] = useState(false);
+  // Set true after the fade-out animation completes. Adds a hard
+  // visibility:hidden on top of opacity:0 so a stale paint after the
+  // animation finishes can't reintroduce the glyph.
+  const [hidden, setHidden] = useState(false);
   const isDraggingRef = useRef(false);
 
   const handleSingleClick = useCallback(() => {
     // Single-click only expands when not in drag mode (drag mode swallows
-    // single clicks per plan/icon.md).
-    if (dragMode) return;
+    // single clicks per plan/icon.md). Also gated on `expanding` so a
+    // stray click during the fade-out doesn't fire a second expand IPC.
+    if (dragMode || expanding) return;
     setExpanding(true);
     void window.glimpse?.expand();
-  }, [dragMode]);
+  }, [dragMode, expanding]);
+
+  const handleFadeAnimationComplete = useCallback(() => {
+    if (expanding) setHidden(true);
+  }, [expanding]);
 
   const handleDoubleClick = useCallback(() => {
     setDragMode((on) => !on);
@@ -112,10 +129,15 @@ export function IconView(): JSX.Element {
   );
 
   return (
-    <div
+    <motion.div
       data-testid="icon-view"
       data-drag-mode={dragMode ? 'on' : 'off'}
       data-expanding={expanding ? 'on' : 'off'}
+      data-hidden={hidden ? 'on' : 'off'}
+      data-icon-fade-duration-s={ICON_FADE_DURATION_S}
+      animate={{ opacity: expanding ? 0 : 1 }}
+      transition={{ duration: ICON_FADE_DURATION_S, ease: 'easeOut' }}
+      onAnimationComplete={handleFadeAnimationComplete}
       onClick={handleOutsideClick}
       style={
         {
@@ -124,6 +146,11 @@ export function IconView(): JSX.Element {
           background: 'transparent',
           position: 'relative',
           WebkitAppRegion: 'no-drag',
+          // visibility (not display:none) so the still-running fade
+          // animation doesn't get yanked mid-frame. Only kicks in after
+          // the fade completes; until then the opacity animation does
+          // the work.
+          visibility: hidden ? 'hidden' : 'visible',
         } as React.CSSProperties
       }
     >
@@ -132,12 +159,6 @@ export function IconView(): JSX.Element {
           position: 'absolute',
           left: ICON_OFFSET_X,
           top: ICON_OFFSET_Y,
-          // visibility (not display:none / conditional render) keeps the
-          // glyph + its testid in the DOM so existing tests can still
-          // query icon-root after a single-click commits expand. The
-          // visual hide is what prevents the one-frame flash of the
-          // glyph at the resized window's top-left.
-          visibility: expanding ? 'hidden' : 'visible',
         }}
         onClick={handleIconClickWithStop}
         onMouseDown={handleIconMouseDown}
@@ -147,6 +168,6 @@ export function IconView(): JSX.Element {
           dragMode={dragMode}
         />
       </div>
-    </div>
+    </motion.div>
   );
 }
