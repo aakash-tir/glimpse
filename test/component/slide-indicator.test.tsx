@@ -14,7 +14,9 @@ describe('SlideIndicator — basic rendering', () => {
         backgroundLuminance="dark"
       />,
     );
-    expect(screen.getByTestId('slide-indicator').getAttribute('data-slide-count')).toBe('4');
+    expect(
+      screen.getByTestId('slide-indicator').getAttribute('data-slide-count'),
+    ).toBe('4');
     expect(screen.getByTestId('slide-dot-0')).toBeInTheDocument();
     expect(screen.getByTestId('slide-dot-1')).toBeInTheDocument();
     expect(screen.getByTestId('slide-dot-2')).toBeInTheDocument();
@@ -30,10 +32,18 @@ describe('SlideIndicator — basic rendering', () => {
         backgroundLuminance="dark"
       />,
     );
-    expect(screen.getByTestId('slide-dot-0').getAttribute('data-active')).toBe('off');
-    expect(screen.getByTestId('slide-dot-1').getAttribute('data-active')).toBe('off');
-    expect(screen.getByTestId('slide-dot-2').getAttribute('data-active')).toBe('on');
-    expect(screen.getByTestId('slide-dot-3').getAttribute('data-active')).toBe('off');
+    expect(screen.getByTestId('slide-dot-0').getAttribute('data-active')).toBe(
+      'off',
+    );
+    expect(screen.getByTestId('slide-dot-1').getAttribute('data-active')).toBe(
+      'off',
+    );
+    expect(screen.getByTestId('slide-dot-2').getAttribute('data-active')).toBe(
+      'on',
+    );
+    expect(screen.getByTestId('slide-dot-3').getAttribute('data-active')).toBe(
+      'off',
+    );
   });
 
   it('renders the active dot larger than the inactive dots', () => {
@@ -86,37 +96,59 @@ describe('SlideIndicator — adaptive dot color', () => {
 describe('SlideIndicator — wired through SlideDeck', () => {
   it('updates the active dot when the slide changes', () => {
     render(<SlideDeck />);
-    expect(screen.getByTestId('slide-indicator').getAttribute('data-current-index')).toBe('0');
-    expect(screen.getByTestId('slide-dot-0').getAttribute('data-active')).toBe('on');
+    expect(
+      screen.getByTestId('slide-indicator').getAttribute('data-current-index'),
+    ).toBe('0');
+    expect(screen.getByTestId('slide-dot-0').getAttribute('data-active')).toBe(
+      'on',
+    );
 
     fireEvent.click(screen.getByTestId('slide-deck-arrow-next'));
-    expect(screen.getByTestId('slide-indicator').getAttribute('data-current-index')).toBe('1');
-    expect(screen.getByTestId('slide-dot-0').getAttribute('data-active')).toBe('off');
-    expect(screen.getByTestId('slide-dot-1').getAttribute('data-active')).toBe('on');
+    expect(
+      screen.getByTestId('slide-indicator').getAttribute('data-current-index'),
+    ).toBe('1');
+    expect(screen.getByTestId('slide-dot-0').getAttribute('data-active')).toBe(
+      'off',
+    );
+    expect(screen.getByTestId('slide-dot-1').getAttribute('data-active')).toBe(
+      'on',
+    );
   });
 
   it('grows the dot count when moon-phase slide is enabled', () => {
     const { rerender } = render(<SlideDeck moonEnabled={false} />);
-    expect(screen.getByTestId('slide-indicator').getAttribute('data-slide-count')).toBe('4');
+    expect(
+      screen.getByTestId('slide-indicator').getAttribute('data-slide-count'),
+    ).toBe('4');
 
     rerender(<SlideDeck moonEnabled />);
-    expect(screen.getByTestId('slide-indicator').getAttribute('data-slide-count')).toBe('5');
+    expect(
+      screen.getByTestId('slide-indicator').getAttribute('data-slide-count'),
+    ).toBe('5');
   });
 
   it('grows the dot count when events become active', () => {
     const { rerender } = render(<SlideDeck eventsActive={false} />);
-    expect(screen.getByTestId('slide-indicator').getAttribute('data-slide-count')).toBe('4');
+    expect(
+      screen.getByTestId('slide-indicator').getAttribute('data-slide-count'),
+    ).toBe('4');
 
     rerender(<SlideDeck eventsActive />);
-    expect(screen.getByTestId('slide-indicator').getAttribute('data-slide-count')).toBe('5');
+    expect(
+      screen.getByTestId('slide-indicator').getAttribute('data-slide-count'),
+    ).toBe('5');
   });
 
   it('shrinks the dot count when events disappear', () => {
     const { rerender } = render(<SlideDeck eventsActive />);
-    expect(screen.getByTestId('slide-indicator').getAttribute('data-slide-count')).toBe('5');
+    expect(
+      screen.getByTestId('slide-indicator').getAttribute('data-slide-count'),
+    ).toBe('5');
 
     rerender(<SlideDeck eventsActive={false} />);
-    expect(screen.getByTestId('slide-indicator').getAttribute('data-slide-count')).toBe('4');
+    expect(
+      screen.getByTestId('slide-indicator').getAttribute('data-slide-count'),
+    ).toBe('4');
   });
 
   it('uses light dots on dark slides (today, default theme)', () => {
@@ -131,7 +163,9 @@ describe('SlideIndicator — wired through SlideDeck', () => {
     fireEvent.click(screen.getByTestId('slide-deck-arrow-next'));
     fireEvent.click(screen.getByTestId('slide-deck-arrow-next'));
     fireEvent.click(screen.getByTestId('slide-deck-arrow-next'));
-    expect(screen.getByTestId('slide-deck').getAttribute('data-current-slide-id')).toBe('settings');
+    expect(
+      screen.getByTestId('slide-deck').getAttribute('data-current-slide-id'),
+    ).toBe('settings');
     const dot = screen.getByTestId('slide-dot-0');
     expect(dot.style.background).toMatch(/15,\s*23,\s*42/);
   });

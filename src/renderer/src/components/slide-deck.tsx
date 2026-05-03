@@ -1,4 +1,10 @@
-import { useCallback, useMemo, useRef, useState, type CSSProperties } from 'react';
+import {
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import {
@@ -8,7 +14,10 @@ import {
   type SlideId,
   type WrapDirection,
 } from '../../../shared/slides';
-import { SlideIndicator, type SlideBackgroundLuminance } from './slide-indicator';
+import {
+  SlideIndicator,
+  type SlideBackgroundLuminance,
+} from './slide-indicator';
 
 // Plan/styling.md: "Cube slide transition: 350 ms ease-in-out, rotates
 // in the direction of the arrow click. No reverse-spin on wrap (loops
@@ -127,10 +136,7 @@ export function SlideDeck({
   // double-render.
   const [currentIndex, setCurrentIndex] = useState(reconciled);
 
-  if (
-    prevVisibleRef.current !== visibleSlides &&
-    reconciled !== currentIndex
-  ) {
+  if (prevVisibleRef.current !== visibleSlides && reconciled !== currentIndex) {
     // Sync state to the reconciled index when the visibility list
     // changes mid-life. React 18 batches this so it does not loop.
     setCurrentIndex(reconciled);
@@ -138,7 +144,10 @@ export function SlideDeck({
   prevVisibleRef.current = visibleSlides;
   prevIndexRef.current = currentIndex;
 
-  const safeIndex = Math.min(currentIndex, Math.max(0, visibleSlides.length - 1));
+  const safeIndex = Math.min(
+    currentIndex,
+    Math.max(0, visibleSlides.length - 1),
+  );
   const currentSlideId = visibleSlides[safeIndex] ?? 'today';
   const currentMeta = SLIDE_META[currentSlideId];
   const currentBackground = currentMeta.background(themeMode);
@@ -243,7 +252,10 @@ export function SlideDeck({
           left: ARROW_INSET_PX,
         }}
       >
-        <ChevronLeft size={ARROW_SIZE_PX - 8} color={arrowGlyphColor(currentBackground.luminance)} />
+        <ChevronLeft
+          size={ARROW_SIZE_PX - 8}
+          color={arrowGlyphColor(currentBackground.luminance)}
+        />
       </button>
 
       <button
@@ -256,7 +268,10 @@ export function SlideDeck({
           right: ARROW_INSET_PX,
         }}
       >
-        <ChevronRight size={ARROW_SIZE_PX - 8} color={arrowGlyphColor(currentBackground.luminance)} />
+        <ChevronRight
+          size={ARROW_SIZE_PX - 8}
+          color={arrowGlyphColor(currentBackground.luminance)}
+        />
       </button>
 
       <SlideIndicator
@@ -302,5 +317,7 @@ const arrowButtonBaseStyle: CSSProperties = {
 };
 
 function arrowGlyphColor(luminance: SlideBackgroundLuminance): string {
-  return luminance === 'light' ? 'rgba(15, 23, 42, 0.7)' : 'rgba(255, 255, 255, 0.85)';
+  return luminance === 'light'
+    ? 'rgba(15, 23, 42, 0.7)'
+    : 'rgba(255, 255, 255, 0.85)';
 }

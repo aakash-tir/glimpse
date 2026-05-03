@@ -55,7 +55,8 @@ export function SlideIndicator({
               borderRadius: '50%',
               background: dotColor,
               opacity: active ? 1 : DOT_INACTIVE_OPACITY,
-              transition: 'width 150ms ease, height 150ms ease, opacity 150ms ease',
+              transition:
+                'width 150ms ease, height 150ms ease, opacity 150ms ease',
             }}
           />
         );

@@ -28,14 +28,7 @@ describe('computeVisibleSlides', () => {
   it('shows all 6 slides when both flags are on', () => {
     expect(
       computeVisibleSlides({ moonEnabled: true, eventsActive: true }),
-    ).toEqual([
-      'today',
-      'seven-day',
-      'current',
-      'moon',
-      'events',
-      'settings',
-    ]);
+    ).toEqual(['today', 'seven-day', 'current', 'moon', 'events', 'settings']);
   });
 
   it('keeps settings last regardless of flags', () => {

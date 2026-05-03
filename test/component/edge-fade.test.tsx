@@ -18,7 +18,9 @@ describe('EdgeFade', () => {
 
   it('renders the left-side fade with the same width', () => {
     render(<EdgeFade side="left" visible />);
-    expect(screen.getByTestId('edge-fade-left').getAttribute('data-side')).toBe('left');
+    expect(screen.getByTestId('edge-fade-left').getAttribute('data-side')).toBe(
+      'left',
+    );
   });
 
   it('switches opacity to 0 when visible is false (fade disappears at the boundary)', () => {
@@ -37,6 +39,8 @@ describe('EdgeFade', () => {
 
   it('is pointer-events-none so it never intercepts scroll / click', () => {
     render(<EdgeFade side="right" visible />);
-    expect(screen.getByTestId('edge-fade-right').style.pointerEvents).toBe('none');
+    expect(screen.getByTestId('edge-fade-right').style.pointerEvents).toBe(
+      'none',
+    );
   });
 });
