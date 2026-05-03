@@ -4,18 +4,19 @@ import type { IconPosition } from './settings-store';
 export const ICON_SIZE = 64;
 export const ICON_PADDING = 16;
 
-// The Electron window is larger than the icon so tooltips and (future)
-// drag glow have room to render outside the icon's bounds. The window
-// stays transparent; only the icon glyph + tooltip are visible.
-export const WINDOW_WIDTH = 260;
-// Sized to: top padding (16) + icon (64) + 0px gap + ~25px tooltip + 7px
-// breathing = 112. Top + right padding stay at 16; bottom is intentionally
-// snug so the transparent window doesn't claim more screen real estate
-// than the visible content needs.
-export const WINDOW_HEIGHT = 112;
+// The Electron window wrapping the icon is just barely larger than the
+// 64×64 glyph — enough margin for the 1.15× hover scale and the drag-
+// mode glow's drop-shadow filter to render without clipping. We do
+// NOT reserve room for a wide tooltip here: tooltip rendering is a
+// separate concern (will be its own popup window or HTML-positioned
+// element when M5 lands). Keeping the icon-mode window compact is
+// what allows the "icon at the LEFT edge midpoint" case (B3b) to
+// work without Windows OS-clamping the window position.
+export const WINDOW_WIDTH = 64 + ICON_PADDING * 2; // 96
+export const WINDOW_HEIGHT = 64 + ICON_PADDING * 2; // 96
 
-// Where the icon sits inside the window (top-right with ICON_PADDING).
-export const ICON_OFFSET_X = WINDOW_WIDTH - ICON_PADDING - ICON_SIZE;
+// Icon centered in the icon-mode window (16 px margin on every side).
+export const ICON_OFFSET_X = ICON_PADDING;
 export const ICON_OFFSET_Y = ICON_PADDING;
 
 export type DisplayBounds = {

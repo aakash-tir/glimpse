@@ -112,12 +112,12 @@ test('single-click on icon expands to window mode at expected bounds with anchor
     await expect(icon).toBeVisible();
 
     const beforeBounds = await getWindowBounds(app);
-    // Icon-mode bounds: roughly 260 x 112 (Electron / Windows DWM may
-    // round-trip the constructor's size by a few px on first paint).
-    expect(beforeBounds.width).toBeGreaterThanOrEqual(255);
-    expect(beforeBounds.width).toBeLessThanOrEqual(270);
-    expect(beforeBounds.height).toBeGreaterThanOrEqual(108);
-    expect(beforeBounds.height).toBeLessThanOrEqual(120);
+    // Icon-mode bounds: 96 x 96 (Electron / Windows DWM may round-
+    // trip the constructor's size by a few px on first paint).
+    expect(beforeBounds.width).toBeGreaterThanOrEqual(94);
+    expect(beforeBounds.width).toBeLessThanOrEqual(100);
+    expect(beforeBounds.height).toBeGreaterThanOrEqual(94);
+    expect(beforeBounds.height).toBeLessThanOrEqual(100);
 
     await page.getByTestId('icon-root').dispatchEvent('click');
     await page.waitForTimeout(400);
@@ -151,7 +151,7 @@ test('title-bar weather-icon click collapses to icon at the window position', as
     // (pendingIconPosition) returns the icon to its expand-time spot,
     // not to the clamped window's center.
     const preExpand = await getWindowBounds(app);
-    const preExpandIconScreenX = preExpand.x + 180;
+    const preExpandIconScreenX = preExpand.x + 16;
     const preExpandIconScreenY = preExpand.y + 16;
 
     await expandToWindow(page);
@@ -161,12 +161,12 @@ test('title-bar weather-icon click collapses to icon at the window position', as
     await page.waitForTimeout(500);
 
     const collapsed = await getWindowBounds(app);
-    expect(collapsed.width).toBe(260);
-    expect(collapsed.height).toBe(112);
+    expect(collapsed.width).toBe(96);
+    expect(collapsed.height).toBe(96);
     await expect(page.getByTestId('icon-view')).toBeVisible();
 
-    // Icon glyph at offset (180, 16) inside 260x112 icon-mode bounds.
-    const iconScreenX = collapsed.x + 180;
+    // Icon glyph at offset (16, 16) inside 96×96 icon-mode bounds.
+    const iconScreenX = collapsed.x + 16;
     const iconScreenY = collapsed.y + 16;
     expect(Math.abs(iconScreenX - preExpandIconScreenX)).toBeLessThanOrEqual(2);
     expect(Math.abs(iconScreenY - preExpandIconScreenY)).toBeLessThanOrEqual(2);
@@ -219,8 +219,8 @@ test('minimize-to-icon button resets the icon to the default top-right position'
     await page.waitForTimeout(500);
 
     const bounds = await getWindowBounds(app);
-    // Icon-mode window: icon at offset (180, 16) inside 260x112.
-    const iconScreenX = bounds.x + 180;
+    // Icon-mode window: icon at offset (16, 16) inside 96×96.
+    const iconScreenX = bounds.x + 16;
     const iconScreenY = bounds.y + 16;
     // Allow a couple of pixels of slack — Windows DPI / DWM can
     // round-trip setBounds → getContentBounds with a small offset
@@ -270,7 +270,7 @@ test('outside-click does NOT close the window', async () => {
     await expect(page.getByTestId('window-view')).toBeVisible();
     const bounds = await getWindowBounds(app);
     expect(bounds.width).toBe(bounds.height);
-    expect(bounds.height).toBeGreaterThan(112);
+    expect(bounds.height).toBeGreaterThan(96);
   } finally {
     await app.close();
   }
@@ -528,8 +528,8 @@ test('minimize after resize lands icon at the resized window center', async () =
     await page.waitForTimeout(500);
 
     const collapsed = await getWindowBounds(app);
-    // Icon glyph at offset (180, 16) inside 260×112 icon-mode bounds.
-    const iconCenterX = collapsed.x + 180 + 32;
+    // Icon glyph at offset (16, 16) inside 96×96 icon-mode bounds.
+    const iconCenterX = collapsed.x + 16 + 32;
     const iconCenterY = collapsed.y + 16 + 32;
     // ±2 px DWM tolerance.
     expect(Math.abs(iconCenterX - expectedCenterX)).toBeLessThanOrEqual(2);
@@ -610,7 +610,7 @@ test('B1: in-place collapse with no drag/resize returns icon to default exactly'
     await page.waitForTimeout(500);
 
     const collapsed = await getWindowBounds(app);
-    const iconScreenX = collapsed.x + 180;
+    const iconScreenX = collapsed.x + 16;
     const iconScreenY = collapsed.y + 16;
     expect(Math.abs(iconScreenX - expectedDefault.x)).toBeLessThanOrEqual(2);
     expect(Math.abs(iconScreenY - expectedDefault.y)).toBeLessThanOrEqual(2);
@@ -659,7 +659,7 @@ test('B2: resize only (no drag) returns icon to expand-time position, not window
     await page.waitForTimeout(500);
 
     const collapsed = await getWindowBounds(app);
-    const iconScreenX = collapsed.x + 180;
+    const iconScreenX = collapsed.x + 16;
     const iconScreenY = collapsed.y + 16;
     // Icon should be back at expand-time default, NOT at the
     // resized window's center.
@@ -714,7 +714,7 @@ test('B3a: drag-to-corner snap puts icon at that corner with 16 px padding', asy
     await page.waitForTimeout(500);
 
     const collapsed = await getWindowBounds(app);
-    const iconScreenX = collapsed.x + 180;
+    const iconScreenX = collapsed.x + 16;
     const iconScreenY = collapsed.y + 16;
     // Icon should be at top-left corner with 16 px padding.
     expect(Math.abs(iconScreenX - (display.x + 16))).toBeLessThanOrEqual(2);
@@ -724,18 +724,7 @@ test('B3a: drag-to-corner snap puts icon at that corner with 16 px padding', asy
   }
 });
 
-// TODO(B3b): re-enable after the icon-mode window dimensions are
-// shrunk in a follow-up commit. The current 260×112 icon-mode
-// window with the icon glyph at internal offset (180, 16) means
-// for the icon to land at screen x=16 (left-edge midpoint), the
-// icon-mode window has to be at x=-164. Windows OS clamps that
-// position when y is mid-screen (it allows the negative x at
-// corners — see B3a — but not at edge midpoints), shifting the
-// icon glyph ~54 px right of the spec'd position. Shrinking the
-// icon-mode window to ~96×96 with the icon glyph centered fixes
-// this without affecting any user-visible behavior — the 260×112
-// size was placeholder room for an unbuilt M5 tooltip feature.
-test.skip('B3b: drag-to-edge snap puts icon at that edge midpoint', async () => {
+test('B3b: drag-to-edge snap puts icon at that edge midpoint', async () => {
   resetSettings();
   const app = await launch();
   try {
@@ -797,7 +786,7 @@ test.skip('B3b: drag-to-edge snap puts icon at that edge midpoint', async () => 
     await page.waitForTimeout(500);
 
     const collapsed = await getWindowBounds(app);
-    const iconScreenX = collapsed.x + 180;
+    const iconScreenX = collapsed.x + 16;
     const iconScreenY = collapsed.y + 16;
     expect(Math.abs(iconScreenX - (display.x + 16))).toBeLessThanOrEqual(2);
     const expectedY = display.y + Math.floor((display.height - 64) / 2);
@@ -863,7 +852,7 @@ test('Esc does NOT close the window', async () => {
     await expect(page.getByTestId('window-view')).toBeVisible();
     const bounds = await getWindowBounds(app);
     expect(bounds.width).toBe(bounds.height);
-    expect(bounds.height).toBeGreaterThan(112);
+    expect(bounds.height).toBeGreaterThan(96);
   } finally {
     await app.close();
   }
