@@ -6,9 +6,39 @@ import { ICON_OFFSET_X, ICON_OFFSET_Y } from '../../../shared/icon-position';
 // IconView — the collapsed, icon-mode renderer. Owns its own drag-mode
 // state and the icon's click handlers. Single-click asks main to
 // expand to window mode; double-click toggles drag mode.
+// Width/height threshold above which we treat the BrowserWindow as
+// "resized for window mode" — the icon-mode window is 96 × 96 (see
+// WINDOW_WIDTH / WINDOW_HEIGHT in icon-position.ts). Anything materially
+// larger means main has already begun the icon → window expand and we
+// should stop painting the icon glyph at its icon-mode offset.
+const ICON_MODE_MAX_SIDE_PX = 100;
+
 export function IconView(): JSX.Element {
   const [dragMode, setDragMode] = useState(false);
+  // Tracks whether the BrowserWindow has been resized past icon-mode
+  // dimensions. Set true the moment main calls setBounds(window-mode
+  // bounds), which fires a window `resize` event in the renderer. Used
+  // to hide the icon glyph for the brief interval between (a) main
+  // resizing the BrowserWindow and (b) the renderer receiving
+  // `mode:changed` and swapping in WindowView. Without this, the
+  // renderer paints one frame of the glyph at its (16, 16) icon-mode
+  // offset inside the freshly-resized larger window — visually a flash
+  // at the new window's top-left corner.
+  const [windowResized, setWindowResized] = useState(false);
   const isDraggingRef = useRef(false);
+
+  useEffect(() => {
+    const onResize = (): void => {
+      if (
+        window.innerWidth > ICON_MODE_MAX_SIDE_PX ||
+        window.innerHeight > ICON_MODE_MAX_SIDE_PX
+      ) {
+        setWindowResized(true);
+      }
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const handleSingleClick = useCallback(() => {
     // Single-click only expands when not in drag mode (drag mode swallows
@@ -86,6 +116,7 @@ export function IconView(): JSX.Element {
     <div
       data-testid="icon-view"
       data-drag-mode={dragMode ? 'on' : 'off'}
+      data-window-resized={windowResized ? 'on' : 'off'}
       onClick={handleOutsideClick}
       style={
         {
@@ -97,20 +128,22 @@ export function IconView(): JSX.Element {
         } as React.CSSProperties
       }
     >
-      <div
-        style={{
-          position: 'absolute',
-          left: ICON_OFFSET_X,
-          top: ICON_OFFSET_Y,
-        }}
-        onClick={handleIconClickWithStop}
-        onMouseDown={handleIconMouseDown}
-      >
-        <WeatherIcon
-          state={{ kind: 'ready', condition: 'clear', isDay: true }}
-          dragMode={dragMode}
-        />
-      </div>
+      {windowResized ? null : (
+        <div
+          style={{
+            position: 'absolute',
+            left: ICON_OFFSET_X,
+            top: ICON_OFFSET_Y,
+          }}
+          onClick={handleIconClickWithStop}
+          onMouseDown={handleIconMouseDown}
+        >
+          <WeatherIcon
+            state={{ kind: 'ready', condition: 'clear', isDay: true }}
+            dragMode={dragMode}
+          />
+        </div>
+      )}
     </div>
   );
 }
