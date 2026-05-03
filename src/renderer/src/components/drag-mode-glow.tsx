@@ -1,50 +1,86 @@
 import { motion } from 'framer-motion';
 import type { ReactNode } from 'react';
 
-// Soft white outer glow with a 1 Hz pulse. Implemented as a CSS
-// drop-shadow filter on a wrapper around the icon glyph so the halo
-// follows the icon's alpha silhouette (rather than producing a ring
-// around its bounding box, which leaves a visible hard edge where the
-// box ends).
+// Soft white outer glow with a 1 Hz pulse. Two implementations behind
+// one component:
+//
+//   - Icon mode (fill = false): wraps the glyph and applies a
+//     drop-shadow CSS filter. drop-shadow follows the glyph's alpha
+//     silhouette and bleeds into the surrounding transparent window,
+//     producing a real outer halo.
+//   - Window mode (fill = true): renders as an absolutely-positioned
+//     overlay sibling and uses inset box-shadow to paint a glow ring
+//     INSIDE the panel along its edges. The window panel fills the
+//     whole BrowserWindow, so a drop-shadow would be clipped at the
+//     window boundary — leaving only the inner bleed visible, which
+//     reads as the panel changing color rather than gaining a halo.
+//     An inset shadow side-steps the clipping.
 export const GLOW_PULSE_DURATION_S = 1;
 
-// Two stacked drop-shadows — a tighter inner glow for crispness and a
-// wider, softer outer wash for body — give a noticeably brighter halo
-// than a single shadow without losing the soft edge.
-const GLOW_LOW =
+// Icon-mode pulse: drop-shadow filter on the glyph wrapper.
+const GLYPH_GLOW_LOW =
   'drop-shadow(0 0 8px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 16px rgba(255, 255, 255, 0.6))';
-const GLOW_HIGH =
+const GLYPH_GLOW_HIGH =
   'drop-shadow(0 0 14px rgba(255, 255, 255, 1)) drop-shadow(0 0 26px rgba(255, 255, 255, 0.85))';
 
-// `fill` makes the glow wrapper fill its parent, so the same effect
-// can be applied to the small icon glyph (default, inline-flex) or
-// the full window panel (fill = true).
+// Window-mode pulse: inset box-shadow paints a ring along the panel's
+// inner edge. The tight ring (small blur, small spread) gives the
+// crisp outline; the wider ring (larger blur, larger spread) is the
+// soft body of the glow that bleeds inward. Pulsing animates both.
+const FILL_GLOW_LOW =
+  'inset 0 0 12px 2px rgba(255, 255, 255, 0.7), inset 0 0 24px 6px rgba(255, 255, 255, 0.35)';
+const FILL_GLOW_HIGH =
+  'inset 0 0 16px 3px rgba(255, 255, 255, 0.95), inset 0 0 32px 10px rgba(255, 255, 255, 0.55)';
+
 export function DragModeGlow({
   children,
   fill = false,
 }: {
-  children: ReactNode;
+  children?: ReactNode;
   fill?: boolean;
 }): JSX.Element {
+  if (fill) {
+    return (
+      <motion.div
+        data-testid="drag-mode-glow"
+        data-glow-pulse-duration-s={GLOW_PULSE_DURATION_S}
+        data-glow-variant="fill"
+        initial={{ boxShadow: FILL_GLOW_LOW }}
+        animate={{ boxShadow: [FILL_GLOW_LOW, FILL_GLOW_HIGH, FILL_GLOW_LOW] }}
+        transition={{
+          duration: GLOW_PULSE_DURATION_S,
+          repeat: Infinity,
+          ease: 'easeInOut',
+        }}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          // Above the panel content so the inset ring is visible, but
+          // pointer-events:none so panel double-click + mousedown still
+          // reach the panel underneath.
+          zIndex: 5,
+          pointerEvents: 'none',
+        }}
+      />
+    );
+  }
   return (
     <motion.div
       data-testid="drag-mode-glow"
       data-glow-pulse-duration-s={GLOW_PULSE_DURATION_S}
-      initial={{ filter: GLOW_LOW }}
-      animate={{ filter: [GLOW_LOW, GLOW_HIGH, GLOW_LOW] }}
+      data-glow-variant="glyph"
+      initial={{ filter: GLYPH_GLOW_LOW }}
+      animate={{ filter: [GLYPH_GLOW_LOW, GLYPH_GLOW_HIGH, GLYPH_GLOW_LOW] }}
       transition={{
         duration: GLOW_PULSE_DURATION_S,
         repeat: Infinity,
         ease: 'easeInOut',
       }}
       style={{
-        display: fill ? 'block' : 'inline-flex',
-        width: fill ? '100%' : undefined,
-        height: fill ? '100%' : undefined,
+        display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        // The glow filter is purely visual; let the wrapper pass clicks
-        // through to its children (each of which can claim them).
+        // Pass clicks through to the wrapped glyph.
         pointerEvents: 'none',
       }}
     >

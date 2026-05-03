@@ -50,7 +50,9 @@ Settings is the **only theme-adaptive slide background**.
 - **Cube slide transition:** **350 ms ease-in-out**, rotates in the direction of the arrow click. No reverse-spin on wrap (loops continue in click direction).
 - **Icon hover:** scale 1.15× over **150 ms ease-out**.
 - **Icon condition cross-fade:** **200 ms** when the displayed condition changes.
-- **Drag-mode glow:** soft white outer glow, ~12 px blur, gentle **1 Hz** pulse. Same effect for icon and window.
+- **Drag-mode glow:** soft white glow with a gentle **1 Hz** pulse. Two visual variants for the same intent:
+  - **Icon mode:** outer halo around the glyph (~12 px blur). Implemented as a `drop-shadow` filter on the glyph wrapper, so the halo follows the glyph's alpha silhouette and bleeds into the surrounding transparent window.
+  - **Window mode:** **inset** glow ring along the panel's inner edge (~12 – 16 px blur). The window panel fills the entire `BrowserWindow`, so a `drop-shadow` would be clipped at the window boundary; an `inset box-shadow` paints inside the panel and reads as a luminous border. Implemented as an absolutely-positioned overlay sibling so toggling drag mode does not remount the panel and replay its entry animation.
 - **Title bar reveal:** **150 ms fade-in**, **300 ms fade-out** when hovering the top edge.
 - **Loading skeleton shimmer:** subtle horizontal sweep, repeating every **~1.5 s**.
 

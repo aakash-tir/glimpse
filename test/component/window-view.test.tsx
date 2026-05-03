@@ -136,7 +136,31 @@ describe('WindowView drag mode', () => {
     render(<WindowView enterAnchor={null} enterBounds={null} />);
     doubleClickPanel();
     expect(getView().getAttribute('data-drag-mode')).toBe('on');
-    expect(screen.queryByTestId('drag-mode-glow')).not.toBeNull();
+    const glow = screen.queryByTestId('drag-mode-glow');
+    expect(glow).not.toBeNull();
+    // Window-mode uses the inset-shadow overlay variant, not the
+    // drop-shadow glyph wrapper. The variant attribute distinguishes
+    // the two implementations and prevents a regression where the
+    // window mistakenly renders the glyph variant (which gets clipped
+    // at the BrowserWindow boundary and reads as a panel-color shift
+    // rather than an edge highlight).
+    expect(glow!.getAttribute('data-glow-variant')).toBe('fill');
+  });
+
+  it('toggling drag mode does NOT remount the panel (entry animation must not replay)', () => {
+    render(<WindowView enterAnchor={null} enterBounds={null} />);
+    const panelBefore = getView();
+    doubleClickPanel();
+    const panelAfterToggleOn = getView();
+    // Same DOM node identity → React did not unmount/remount the
+    // motion.div. If the conditional wrap pattern ever returns,
+    // panelInner's parent changes and React mounts a new element here,
+    // breaking referential identity AND replaying the entry animation.
+    expect(panelAfterToggleOn).toBe(panelBefore);
+
+    doubleClickPanel();
+    const panelAfterToggleOff = getView();
+    expect(panelAfterToggleOff).toBe(panelBefore);
   });
 
   it('single click on the panel does NOT enter drag mode', () => {

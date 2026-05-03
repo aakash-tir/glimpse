@@ -24,7 +24,7 @@ The default surface of Glimpse. A small condition-aware icon pinned at the top-r
   - While in drag mode, the icon is moved by **mousedown-and-drag-and-release** (no extra clicks needed).
   - Single-click on the icon while in drag mode is **ignored**.
   - **Clicking outside the icon exits drag mode.**
-- **Drag-mode visual:** soft white outer glow, ~12 px blur, gentle 1 Hz pulse. (Same effect for the window when in window-drag mode.)
+- **Drag-mode visual:** soft white outer glow around the glyph, ~12 px blur, gentle 1 Hz pulse. (The window in window-drag mode uses the same intent — soft white glow with a 1 Hz pulse — but as an **inset** ring along the panel's edge rather than an outer halo. See [`styling.md` § Animations](./styling.md#animations) for the why.)
 - **Snap to corners:** when dropped within **40 px** of any of the 4 screen corners, the icon snaps to that corner with the same 16 px padding preserved. Edges and centers do **not** snap.
 
 ## Background refresh

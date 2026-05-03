@@ -178,12 +178,6 @@ export function WindowView({
         userSelect: 'none',
         WebkitUserSelect: 'none',
         transformOrigin,
-        // DragModeGlow's wrapper sets pointer-events: none (so the
-        // glow halo doesn't intercept clicks meant for ancestors —
-        // important for IconView's outer click handler). Re-enable
-        // it on the panel so the double-click-to-toggle-drag and
-        // mousedown-drag handlers below still fire.
-        pointerEvents: 'auto',
       }}
     >
       Glimpse
@@ -205,7 +199,12 @@ export function WindowView({
         visibility: hidden ? 'hidden' : 'visible',
       }}
     >
-      {dragMode ? <DragModeGlow fill>{panelInner}</DragModeGlow> : panelInner}
+      {/* The panel is always rendered at the same tree position so that
+          toggling dragMode does not unmount/remount its motion.div and
+          replay the entry scale animation. The glow renders as a
+          separate absolutely-positioned overlay sibling. */}
+      {panelInner}
+      {dragMode ? <DragModeGlow fill /> : null}
       <TitleBar
         background="dark"
         disabled={dragMode}
