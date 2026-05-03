@@ -47,7 +47,7 @@ Settings is the **only theme-adaptive slide background**.
 
 - **Library:** **Framer Motion** for cube transitions, scale animations, coachmark spotlights, and event-background motion.
 - **Window open / close:** scale animation, **200 ms ease-out**, anchored at the icon's position.
-- **Cube slide transition:** **350 ms ease-in-out**, rotates in the direction of the arrow click. No reverse-spin on wrap (loops continue in click direction).
+- **Cube slide transition:** **500 ms ease-in-out**, rotates in the direction of the arrow click. No reverse-spin on wrap (loops continue in click direction).
 - **Icon hover:** scale 1.15× over **150 ms ease-out**.
 - **Icon condition cross-fade:** **200 ms** when the displayed condition changes.
 - **Drag-mode glow:** soft white glow with a gentle **1 Hz** pulse. Two visual variants for the same intent:

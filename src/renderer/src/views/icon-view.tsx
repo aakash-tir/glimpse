@@ -1,39 +1,90 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { WeatherIcon } from '../components/weather-icon';
 import { useClickClassifier } from '../components/use-click-classifier';
-import { ICON_OFFSET_X, ICON_OFFSET_Y } from '../../../shared/icon-position';
 
 // IconView — the collapsed, icon-mode renderer. Owns its own drag-mode
 // state and the icon's click handlers. Single-click asks main to
 // expand to window mode; double-click toggles drag mode.
 export function IconView(): JSX.Element {
   const [dragMode, setDragMode] = useState(false);
+  // Latched when the click classifier commits a single-click that
+  // triggers expand. Snap-hides the glyph and gates the deferred
+  // expand IPC (see handleSingleClick for the timing rationale).
+  const [expanding, setExpanding] = useState(false);
   const isDraggingRef = useRef(false);
 
   const handleSingleClick = useCallback(() => {
     // Single-click only expands when not in drag mode (drag mode swallows
-    // single clicks per plan/icon.md).
-    if (dragMode) return;
-    void window.glimpse?.expand();
-  }, [dragMode]);
+    // single clicks per plan/icon.md). Also gated on `expanding` so a
+    // stray click during the deferred IPC doesn't fire a second expand.
+    if (dragMode || expanding) return;
+    // flushSync forces React to commit the `expanding=true` update to
+    // the DOM synchronously before this function returns. Without it,
+    // the commit lands in a microtask after the click handler — the
+    // first rAF below could in principle run before the commit on a
+    // bad scheduling tick. flushSync removes that variable from the
+    // race so the rAF chain is purely waiting on the paint pipeline.
+    flushSync(() => {
+      setExpanding(true);
+    });
+    // Defer the expand IPC long enough for the entire render pipeline
+    // to publish the glyph-hidden frame to the OS swap chain BEFORE
+    // main resizes the BrowserWindow. The pipeline is:
+    //
+    //   React commit  →  paint (renderer)
+    //                 →  composite (GPU process)
+    //                 →  swap chain present (OS / DXGI)
+    //                 →  DWM displays at next vsync
+    //
+    // Two RAFs only covers the paint step. The GPU → swap-chain →
+    // DWM legs run on separate processes/threads; under load or just
+    // unlucky vsync alignment they can still be showing the frame
+    // BEFORE setExpanding when the IPC arrives in main. main calls
+    // iconWindow.setBounds(<window-mode bounds>) synchronously, and
+    // DWM uses whatever surface the swap chain holds at that instant
+    // as the source for the resize — so a stale frame produces the
+    // glyph-at-top-left flash.
+    //
+    // Three RAFs (~48 ms) gives the GPU composite + swap chain
+    // present a full extra frame to catch up. This empirically
+    // eliminates the residual flash that two RAFs leaves on busy /
+    // hardware-accelerated machines. The added ~16 ms is below
+    // perceptual threshold on top of the click classifier's existing
+    // 250 ms double-click wait.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          void window.glimpse?.expand();
+        });
+      });
+    });
+  }, [dragMode, expanding]);
 
   const handleDoubleClick = useCallback(() => {
     setDragMode((on) => !on);
   }, []);
 
-  const handleIconClick = useClickClassifier({
-    onSingleClick: handleSingleClick,
-    onDoubleClick: handleDoubleClick,
-  });
+  const { click: handleIconClick, cancelPending: cancelPendingClick } =
+    useClickClassifier({
+      onSingleClick: handleSingleClick,
+      onDoubleClick: handleDoubleClick,
+    });
 
   // Window blur (focus moved to another app or the desktop) exits drag
-  // mode — the user has effectively "clicked outside" the icon.
+  // mode — the user has effectively "clicked outside" the icon. Same
+  // pending-click cancellation as handleOutsideClick: a queued click
+  // recorded while in drag mode shouldn't fire onSingleClick after the
+  // blur flips dragMode to false.
   useEffect(() => {
     if (!dragMode) return;
-    const onBlur = (): void => setDragMode(false);
+    const onBlur = (): void => {
+      setDragMode(false);
+      cancelPendingClick();
+    };
     window.addEventListener('blur', onBlur);
     return () => window.removeEventListener('blur', onBlur);
-  }, [dragMode]);
+  }, [dragMode, cancelPendingClick]);
 
   // Mousemove + mouseup are bound at the window level so a fast cursor
   // that briefly outpaces the moving icon window doesn't drop the drag
@@ -60,9 +111,18 @@ export function IconView(): JSX.Element {
   // Click on the transparent area of the icon window (anywhere outside the
   // 64x64 glyph) also exits drag mode. The icon's own click handler stops
   // propagation, so this listener only fires for off-icon clicks.
+  //
+  // Also cancels any pending click queued in the click classifier — see
+  // the bug where clicking on the icon while in drag mode (which queues
+  // a 250 ms single-click timer) and then clicking off-icon (which exits
+  // drag mode) would let the queued timer fire after dragMode flipped to
+  // false, mistakenly triggering expand(). The cancel ensures the queued
+  // click is discarded along with the drag-mode exit.
   const handleOutsideClick = useCallback(() => {
-    if (dragMode) setDragMode(false);
-  }, [dragMode]);
+    if (!dragMode) return;
+    setDragMode(false);
+    cancelPendingClick();
+  }, [dragMode, cancelPendingClick]);
 
   const handleIconClickWithStop = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -86,6 +146,7 @@ export function IconView(): JSX.Element {
     <div
       data-testid="icon-view"
       data-drag-mode={dragMode ? 'on' : 'off'}
+      data-expanding={expanding ? 'on' : 'off'}
       onClick={handleOutsideClick}
       style={
         {
@@ -97,11 +158,33 @@ export function IconView(): JSX.Element {
         } as React.CSSProperties
       }
     >
+      {/* The glyph is snap-hidden via visibility:hidden the moment
+          the user single-clicks to expand, so the next paint
+          contains no glyph pixels. Combined with the double-RAF
+          defer in handleSingleClick, this guarantees the OS resizes
+          the BrowserWindow against a framebuffer that no longer
+          contains the glyph — eliminating the flash at the new
+          window's top-left.
+
+          visibility:hidden (rather than unmounting / display:none)
+          keeps the element in the DOM so test queries against
+          icon-root remain valid through the brief expanding window,
+          and so a queued single-click whose subsequent click event
+          arrives between setExpanding(true) and the IPC firing
+          still hits a real element (the gate in handleSingleClick
+          short-circuits the second expand). */}
       <div
         style={{
           position: 'absolute',
-          left: ICON_OFFSET_X,
-          top: ICON_OFFSET_Y,
+          // Anchor the glyph to the WINDOW CENTER. In icon mode
+          // (96 × 96) this resolves to (48, 48) — equal to
+          // ICON_PADDING + ICON_SIZE / 2 — so the visual position
+          // is identical to the previous top-left + 64 × 64
+          // anchoring.
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
+          visibility: expanding ? 'hidden' : 'visible',
         }}
         onClick={handleIconClickWithStop}
         onMouseDown={handleIconMouseDown}

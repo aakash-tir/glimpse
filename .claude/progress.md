@@ -101,12 +101,12 @@
 
 ## M4 — Slide framework + cube animation + dot indicator
 
-**Status:** Not started
+**Status:** Done (2026-05-03)
 
 **Scope.** The 6-slide skeleton with placeholder content. No real data wiring yet.
 
 - 6 placeholder slides: today, 7-day, current, moon, events, settings (each shows just its name in the center for now).
-- Cube rotation animation between slides via Framer Motion: 350 ms ease-in-out, rotates in click direction, no reverse-spin on wrap.
+- Cube rotation animation between slides via Framer Motion: 500 ms ease-in-out, rotates in click direction, no reverse-spin on wrap.
 - Left + right arrow buttons at panel edges. Only navigation surface (no keyboard, no swipe).
 - Slide indicator dots centered along the bottom edge; active dot larger; adaptive color (light on dark, dark on light Settings).
 - Dynamic slide count: moon-phase slide and special-events slide can appear/disappear; the currently-viewed slide does not shift when others change.

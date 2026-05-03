@@ -5,6 +5,7 @@ import { TitleBar } from '../components/title-bar';
 import { useClickClassifier } from '../components/use-click-classifier';
 import { DragModeGlow } from '../components/drag-mode-glow';
 import { ResizeHandles } from '../components/resize-handles';
+import { SlideDeck } from '../components/slide-deck';
 
 // Plan/styling.md: "Window open / close: scale animation, 200 ms
 // ease-out, anchored at the icon's position."
@@ -36,6 +37,11 @@ export function WindowView({
   enterBounds,
 }: WindowViewProps): JSX.Element {
   const [collapse, setCollapse] = useState<CollapseRequest | null>(null);
+  // Moon-phase slide visibility flag, sourced from settings on mount.
+  // M4 only wires this read path; the toggle in the Settings slide
+  // lands in M7. Events visibility is hard-coded false at M4 and
+  // becomes data-driven in M5 / M8.
+  const [moonEnabled, setMoonEnabled] = useState(false);
   // Hides the panel + title bar in the brief window between the scale
   // animation finishing and `mode:changed` arriving from main. Without
   // this, the BrowserWindow resizes to icon-mode bounds while WindowView
@@ -75,13 +81,26 @@ export function WindowView({
   // Single-click on the panel does nothing in window mode; the click
   // classifier is here purely to disambiguate double-clicks for drag
   // mode and to absorb stray single clicks.
-  const handlePanelClick = useClickClassifier({
+  const { click: handlePanelClick } = useClickClassifier({
     onSingleClick: () => {
       // Intentionally no-op; outside-click does NOT collapse the window
       // and a panel click should be inert.
     },
     onDoubleClick: handlePanelDoubleClick,
   });
+
+  // Pull moon-phase visibility from persisted settings on mount.
+  useEffect(() => {
+    let cancelled = false;
+    const api = window.glimpse;
+    if (!api) return;
+    void api.getSettings().then((settings) => {
+      if (!cancelled) setMoonEnabled(settings.moonPhaseSlideEnabled);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Window blur exits drag mode (the user's focus moved elsewhere).
   useEffect(() => {
@@ -168,19 +187,19 @@ export function WindowView({
       style={{
         width: '100%',
         height: '100%',
-        background: 'rgba(15, 23, 42, 0.92)',
-        color: 'rgba(255, 255, 255, 0.7)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: 14,
-        fontFamily: 'system-ui, sans-serif',
+        // No panel backdrop — the BrowserWindow's `transparent: true`
+        // surface is intentionally exposed during cube transitions, so
+        // the desktop wallpaper shows through the gaps between the
+        // rotating cube faces. In idle state each slide's background
+        // covers the panel; the wallpaper only peeks through during
+        // the rotation, which is the desired effect.
+        position: 'relative',
         userSelect: 'none',
         WebkitUserSelect: 'none',
         transformOrigin,
       }}
     >
-      Glimpse
+      <SlideDeck moonEnabled={moonEnabled} eventsActive={false} />
     </motion.div>
   );
 

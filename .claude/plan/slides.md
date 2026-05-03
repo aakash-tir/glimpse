@@ -1,6 +1,6 @@
 # Slides
 
-The window content is organized as a deck of slides. Slides are navigated by arrow buttons; transitions are 350 ms ease-in-out cube rotations. Slides loop in the click direction (no reverse-spin on wrap).
+The window content is organized as a deck of slides. Slides are navigated by arrow buttons; transitions are 500 ms ease-in-out cube rotations. Slides loop in the click direction (no reverse-spin on wrap).
 
 ## Slide indicator
 
@@ -9,7 +9,7 @@ Centered along the bottom edge of the window: a row of small dots, one per curre
 ## Navigation
 
 - Left and right arrow buttons on the panel edges (only these two — no other navigation, no keyboard).
-- Cube animation rotates **in the direction of the arrow click**. **350 ms ease-in-out.**
+- Cube animation rotates **in the direction of the arrow click**. **500 ms ease-in-out.**
 - Slides loop in the click direction (no reverse-spin on wrap).
 
 ## Dynamic slide count

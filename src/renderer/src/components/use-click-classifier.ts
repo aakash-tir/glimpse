@@ -10,15 +10,26 @@ type ClickClassifierOptions = {
   thresholdMs?: number;
 };
 
-// Returns a `click` event handler that fires `onSingleClick` after the
-// threshold elapses with no second click, or `onDoubleClick` immediately
-// when a second click arrives within the threshold. The pending
-// single-click is cancelled in the double-click case so it never fires.
+export type ClickClassifier = {
+  click: () => void;
+  // Cancels any pending single-click timer scheduled by a recent click.
+  // Use this when the surrounding state changes such that a previously-
+  // recorded click is no longer relevant — e.g. drag mode exits via an
+  // off-icon click, and we don't want a pending on-icon click's timer
+  // to fire onSingleClick after dragMode has flipped to false.
+  cancelPending: () => void;
+};
+
+// Returns an object with a `click` event handler that fires
+// `onSingleClick` after the threshold elapses with no second click, or
+// `onDoubleClick` immediately when a second click arrives within the
+// threshold. Plus a `cancelPending` escape hatch for callers that need
+// to discard a queued click in response to an external state change.
 export function useClickClassifier({
   onSingleClick,
   onDoubleClick,
   thresholdMs = DOUBLE_CLICK_THRESHOLD_MS,
-}: ClickClassifierOptions): () => void {
+}: ClickClassifierOptions): ClickClassifier {
   const lastClickRef = useRef<number | null>(null);
   const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -38,7 +49,15 @@ export function useClickClassifier({
     };
   }, []);
 
-  return useCallback(() => {
+  const cancelPending = useCallback(() => {
+    if (pendingTimerRef.current !== null) {
+      clearTimeout(pendingTimerRef.current);
+      pendingTimerRef.current = null;
+    }
+    lastClickRef.current = null;
+  }, []);
+
+  const click = useCallback(() => {
     const now = performance.now();
     const prev = lastClickRef.current;
     if (isDoubleClick(prev, now, thresholdMs)) {
@@ -57,4 +76,6 @@ export function useClickClassifier({
       onSingleClickRef.current();
     }, thresholdMs);
   }, [thresholdMs]);
+
+  return { click, cancelPending };
 }
