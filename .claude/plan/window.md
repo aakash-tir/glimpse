@@ -15,7 +15,7 @@ The weather panel that opens when the user clicks the [icon](./icon.md). Square,
 - **Default size:** 1/6 of the primary monitor's smallest dimension on each side (true square — e.g. 180 × 180 on a 1080 p display).
 - **Resizable** via the four corner handles only (no edge handles). Width and height are kept equal during resize.
   - **Min size:** 120 × 120 px.
-  - **Max size:** smaller of (display width, display height) minus a small margin.
+  - **Max size:** the smaller of two caps — (a) the absolute cap, `min(displayW, displayH) - 16`, and (b) the per-corner cap, the largest size that still fits on the display containing the diagonal-fixed corner. The window can never grow off-screen, regardless of which corner is being dragged.
 
 ## Drag
 
@@ -29,11 +29,11 @@ The weather panel that opens when the user clicks the [icon](./icon.md). Square,
 - **Outside-click does NOT close the window.** Only title-bar controls or the title-bar weather icon collapse / close.
 - **No Esc-to-close.** Only the title-bar **×** button quits the app.
 
-## Window position persistence
+## Window position + size persistence
 
-- By default, the window always opens at the icon's current location and at the default size.
-- Settings has a **"Track window position"** toggle (default: **off**). When on, the window's last size and position are stored to `settings.json` and restored next launch.
-- If a tracked position is now off-screen (monitor change), fall back to default behavior.
+- **Default** (toggle off): position always opens at the icon's current location. **Size** uses the in-session carry: if the user has resized the window earlier in the same session, that size is reused (at the icon's location). If they haven't resized yet, the default size is used. The in-session size is held in memory only — not written to `settings.json` — and resets on app start.
+- **"Track window position"** toggle (default: **off**): when on, the window's full bounds (size **and** position) are persisted to `settings.json` on each collapse / drag-end / resize-end and restored on next launch.
+- If a tracked position is now off-screen (monitor change), fall back to the default expand-from-icon behavior. The in-session size still applies if set.
 
 ## Title bar
 

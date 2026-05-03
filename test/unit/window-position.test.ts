@@ -9,6 +9,7 @@ import {
   expandFromIcon,
   isWindowAtDefaultPosition,
   isWindowBoundsOnScreen,
+  maxSizeForResize,
   maxWindowSize,
   resolveWindowBoundsForExpand,
   snapWindowToCorner,
@@ -25,6 +26,7 @@ import {
   ICON_SIZE,
   type DisplayBounds,
 } from '../../src/shared/icon-position';
+import type { WindowBounds } from '../../src/shared/settings-store';
 
 const primary: DisplayBounds = { x: 0, y: 0, width: 1920, height: 1080 };
 const small: DisplayBounds = { x: 0, y: 0, width: 1024, height: 768 };
@@ -797,5 +799,173 @@ describe('clampWindowForDrag — multi-display seam', () => {
         allDisplays: [top, bottom],
       }),
     ).toEqual({ x: 100, y: 1080 - 300 });
+  });
+});
+
+describe('maxSizeForResize', () => {
+  // Window at (200, 200) size 200×200 on a 1920×1080 primary.
+  const origin: WindowBounds = { x: 200, y: 200, width: 200, height: 200 };
+
+  it('bottom-right: capped by display right/bottom edges (top-left fixed)', () => {
+    expect(
+      maxSizeForResize({ corner: 'bottom-right', origin, display: primary }),
+    ).toBe(Math.min(1920 - 200, 1080 - 200)); // 880
+  });
+
+  it('bottom-left: capped by left edge gap and bottom edge (top-right fixed)', () => {
+    expect(
+      maxSizeForResize({ corner: 'bottom-left', origin, display: primary }),
+    ).toBe(Math.min(200 + 200, 1080 - 200)); // 400
+  });
+
+  it('top-right: capped by right edge and top edge gap (bottom-left fixed)', () => {
+    expect(
+      maxSizeForResize({ corner: 'top-right', origin, display: primary }),
+    ).toBe(Math.min(1920 - 200, 200 + 200)); // 400
+  });
+
+  it('top-left: capped by left and top edge gaps (bottom-right fixed)', () => {
+    expect(
+      maxSizeForResize({ corner: 'top-left', origin, display: primary }),
+    ).toBe(Math.min(200 + 200, 200 + 200)); // 400
+  });
+
+  it('returns the current size when the fixed corner is at a display edge in the dragged direction', () => {
+    // Window flush against the top-left of the display. Top-left
+    // resize would need to grow up/left, but the fixed bottom-right
+    // is at (200, 200) — so the cap is exactly the current size.
+    const flush: WindowBounds = { x: 0, y: 0, width: 200, height: 200 };
+    expect(
+      maxSizeForResize({ corner: 'top-left', origin: flush, display: primary }),
+    ).toBe(200);
+  });
+
+  it('respects display origin offsets', () => {
+    const dispB: DisplayBounds = {
+      x: 1920,
+      y: 0,
+      width: 1920,
+      height: 1080,
+    };
+    const onB: WindowBounds = { x: 2100, y: 200, width: 200, height: 200 };
+    expect(
+      maxSizeForResize({ corner: 'bottom-right', origin: onB, display: dispB }),
+    ).toBe(Math.min(1920 + 1920 - 2100, 1080 - 200)); // 880
+  });
+});
+
+describe('expandFromIcon — sizeOverride (in-session size carry)', () => {
+  it('uses sizeOverride instead of defaultWindowSize when provided', () => {
+    const iconPos = { x: 800, y: 500 };
+    const sizeOverride = 320;
+    const result = expandFromIcon(iconPos, primary, [primary], sizeOverride);
+    expect(result.width).toBe(sizeOverride);
+    expect(result.height).toBe(sizeOverride);
+    // Center on icon center.
+    expect(result.x + sizeOverride / 2).toBeCloseTo(
+      iconPos.x + ICON_SIZE / 2,
+      0,
+    );
+  });
+
+  it('skips the default-position special case when sizeOverride is given', () => {
+    // Icon at the canonical default top-right with a non-default size:
+    // should center on icon, NOT snap to defaultWindowBounds (which
+    // would use the default size).
+    const def = defaultIconPosition(primary);
+    const sizeOverride = 320;
+    const result = expandFromIcon(def, primary, [primary], sizeOverride);
+    expect(result.width).toBe(sizeOverride);
+    // defaultWindowBounds size is 180 — so a 320 result proves we
+    // didn't take the special case path.
+    expect(result.width).not.toBe(defaultWindowSize(primary));
+  });
+
+  it('still takes the default-position special case when no sizeOverride', () => {
+    const def = defaultIconPosition(primary);
+    expect(expandFromIcon(def, primary, [primary])).toEqual(
+      defaultWindowBounds(primary),
+    );
+  });
+
+  it('clamps the sized window against the icons display, not just primary', () => {
+    const dispB: DisplayBounds = {
+      x: 1920,
+      y: 0,
+      width: 1920,
+      height: 1080,
+    };
+    const iconOnB = { x: 2500, y: 400 };
+    const result = expandFromIcon(iconOnB, primary, [primary, dispB], 600);
+    expect(result.x).toBeGreaterThanOrEqual(dispB.x);
+    expect(result.x + result.width).toBeLessThanOrEqual(dispB.x + dispB.width);
+  });
+});
+
+describe('resolveWindowBoundsForExpand — sessionSize', () => {
+  const iconPos = { x: 800, y: 500 };
+
+  it('passes sessionSize through to expandFromIcon when trackWindowPosition is off', () => {
+    const result = resolveWindowBoundsForExpand({
+      iconPos,
+      primary,
+      trackWindowPosition: false,
+      savedBounds: null,
+      allDisplays: [primary],
+      sessionSize: 320,
+    });
+    expect(result).toEqual(expandFromIcon(iconPos, primary, [primary], 320));
+  });
+
+  it('savedBounds wins over sessionSize when trackWindowPosition is on', () => {
+    const saved: WindowBounds = { x: 100, y: 100, width: 400, height: 400 };
+    const result = resolveWindowBoundsForExpand({
+      iconPos,
+      primary,
+      trackWindowPosition: true,
+      savedBounds: saved,
+      allDisplays: [primary],
+      sessionSize: 320,
+    });
+    expect(result).toEqual(saved);
+  });
+
+  it('omitted sessionSize falls through to default size', () => {
+    const result = resolveWindowBoundsForExpand({
+      iconPos,
+      primary,
+      trackWindowPosition: false,
+      savedBounds: null,
+      allDisplays: [primary],
+    });
+    expect(result.width).toBe(defaultWindowSize(primary));
+  });
+});
+
+describe('collapseTargetFromWindow — multi-display', () => {
+  it('clamps the icon to the SECONDARY display when the window is there', () => {
+    const dispB: DisplayBounds = {
+      x: 1920,
+      y: 0,
+      width: 1920,
+      height: 1080,
+    };
+    const onB: WindowBounds = { x: 2500, y: 400, width: 200, height: 200 };
+    const result = collapseTargetFromWindow(onB, primary, [primary, dispB]);
+    // Icon center should align with window center (2600, 500).
+    expect(result.x + ICON_SIZE / 2).toBeCloseTo(2600, 0);
+    expect(result.y + ICON_SIZE / 2).toBeCloseTo(500, 0);
+    // And stays on display B.
+    expect(result.x).toBeGreaterThanOrEqual(dispB.x);
+    expect(result.x + ICON_SIZE).toBeLessThanOrEqual(dispB.x + dispB.width);
+  });
+
+  it('still snaps to canonical default when window is at primary default', () => {
+    expect(
+      collapseTargetFromWindow(defaultWindowBounds(primary), primary, [
+        primary,
+        { x: 1920, y: 0, width: 1920, height: 1080 },
+      ]),
+    ).toEqual(defaultIconPosition(primary));
   });
 });

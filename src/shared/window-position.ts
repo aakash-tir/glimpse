@@ -20,6 +20,7 @@ import type { IconPosition, WindowBounds } from './settings-store';
 import {
   defaultIconPosition,
   displayForIcon,
+  displayForPoint,
   ICON_PADDING,
   ICON_SIZE,
   type DisplayBounds,
@@ -191,31 +192,35 @@ export function clampWindowForDrag(args: {
 
 // Window bounds when expanding from a given icon position.
 //
-// - If the icon sits at the canonical default top-right position
-//   (always primary's top-right with 16 px padding — that's THE
-//   default), the window opens at the canonical default window
-//   bounds. This preserves the default-icon ↔ default-window
-//   round-trip rule from plan/window.md.
+// - If the icon sits at the canonical default top-right position AND
+//   no sizeOverride is given (the user hasn't resized this session),
+//   the window opens at the canonical default window bounds.
+//   Preserves the default-icon ↔ default-window round-trip rule.
 // - Otherwise, the window's center aligns with the icon's center,
-//   then clamped to the icon's display (the display containing the
-//   icon's center, or the closest one). On a multi-monitor setup,
-//   an icon dragged onto the secondary expands into a window on the
-//   secondary, NOT yanked back to primary.
+//   then clamped to the icon's display (multi-monitor aware).
 //
-// Default size always comes from the primary display per
-// plan/window.md ("1/6 of the primary monitor's smallest dimension")
-// — this keeps the panel size consistent regardless of which display
-// the user expanded on.
+// `sizeOverride` carries the in-session size persistence: once the
+// user resizes, the next collapse-then-expand reuses that size at
+// the icon's location instead of falling back to default. Disk
+// persistence is still gated by trackWindowPosition (handled in
+// resolveWindowBoundsForExpand). Default size always comes from
+// primary so the panel size is consistent regardless of which
+// display the icon is on.
 export function expandFromIcon(
   iconPos: IconPosition,
   primary: DisplayBounds,
   allDisplays: DisplayBounds[] = [primary],
+  sizeOverride?: number,
 ): WindowBounds {
   const defIcon = defaultIconPosition(primary);
-  if (iconPos.x === defIcon.x && iconPos.y === defIcon.y) {
+  if (
+    sizeOverride === undefined &&
+    iconPos.x === defIcon.x &&
+    iconPos.y === defIcon.y
+  ) {
     return defaultWindowBounds(primary);
   }
-  const size = defaultWindowSize(primary);
+  const size = sizeOverride ?? defaultWindowSize(primary);
   const cx = iconPos.x + ICON_SIZE / 2;
   const cy = iconPos.y + ICON_SIZE / 2;
   const display = displayForIcon(iconPos, allDisplays, primary);
@@ -229,24 +234,28 @@ export function expandFromIcon(
 
 // Icon position when collapsing the window. Mirrors `expandFromIcon`:
 //
-// - If the window is at the default window position, the icon snaps
-//   back to the default top-right (this is the "special case" in
-//   plan/window.md).
-// - Otherwise, icon-center aligns with window-center, then clamped to
-//   the primary display.
+// - If the window is at the canonical default window position
+//   (primary's top-right), the icon snaps back to the canonical
+//   default top-right (the "special case" in plan/window.md).
+// - Otherwise, icon-center aligns with window-center, then clamped
+//   to whichever display the window's center is on. Multi-monitor:
+//   a window on the secondary monitor collapses to an icon on the
+//   secondary, NOT yanked back to primary.
 export function collapseTargetFromWindow(
   bounds: WindowBounds,
   primary: DisplayBounds,
+  allDisplays: DisplayBounds[] = [primary],
 ): IconPosition {
   if (isWindowAtDefaultPosition(bounds, primary)) {
     return defaultIconPosition(primary);
   }
   const cx = bounds.x + bounds.width / 2;
   const cy = bounds.y + bounds.height / 2;
+  const display = displayForPoint({ x: cx, y: cy }, allDisplays, primary);
   const clamped = clampWindowToDisplay(
     { x: Math.round(cx - ICON_SIZE / 2), y: Math.round(cy - ICON_SIZE / 2) },
     { width: ICON_SIZE, height: ICON_SIZE },
-    primary,
+    display,
   );
   return clamped;
 }
@@ -288,6 +297,11 @@ export function resolveWindowBoundsForExpand(args: {
   trackWindowPosition: boolean;
   savedBounds: WindowBounds | null;
   allDisplays: DisplayBounds[];
+  // In-session size persistence: if the user resized the window
+  // earlier this session, the next expand reuses that size at the
+  // icon's location (even with trackWindowPosition off). Disk
+  // persistence is still gated by trackWindowPosition.
+  sessionSize?: number;
 }): WindowBounds {
   if (
     args.trackWindowPosition &&
@@ -296,7 +310,12 @@ export function resolveWindowBoundsForExpand(args: {
   ) {
     return args.savedBounds;
   }
-  return expandFromIcon(args.iconPos, args.primary, args.allDisplays);
+  return expandFromIcon(
+    args.iconPos,
+    args.primary,
+    args.allDisplays,
+    args.sessionSize,
+  );
 }
 
 // Snap-target corner positions for one display, given a window size.
@@ -340,6 +359,49 @@ export function snapWindowToCorner(
     }
   }
   return best?.entry ?? null;
+}
+
+// Largest size the window can be resized to without spilling off the
+// display containing the diagonal-fixed corner. The fixed corner
+// stays put, so the new bounds extend from there toward the dragged
+// corner; the cap is the smaller of (room from fixed corner to
+// display edge in X, same in Y).
+//
+// This is the per-display companion to maxWindowSize (which only
+// caps against the primary display's overall dimensions). Callers
+// pass min(maxWindowSize, maxSizeForResize) to squareResize.
+export function maxSizeForResize(args: {
+  corner: ResizeCorner;
+  origin: WindowBounds;
+  display: DisplayBounds;
+}): number {
+  const { corner, origin, display } = args;
+  let maxW: number;
+  let maxH: number;
+  switch (corner) {
+    case 'bottom-right':
+      // Fixed at top-left = (origin.x, origin.y).
+      maxW = display.x + display.width - origin.x;
+      maxH = display.y + display.height - origin.y;
+      break;
+    case 'bottom-left':
+      // Fixed at top-right = (origin.x + origin.width, origin.y).
+      maxW = origin.x + origin.width - display.x;
+      maxH = display.y + display.height - origin.y;
+      break;
+    case 'top-right':
+      // Fixed at bottom-left = (origin.x, origin.y + origin.height).
+      maxW = display.x + display.width - origin.x;
+      maxH = origin.y + origin.height - display.y;
+      break;
+    case 'top-left':
+      // Fixed at bottom-right = (origin.x + origin.width,
+      //                          origin.y + origin.height).
+      maxW = origin.x + origin.width - display.x;
+      maxH = origin.y + origin.height - display.y;
+      break;
+  }
+  return Math.max(0, Math.min(maxW, maxH));
 }
 
 // Square-lock corner resize. The diagonal-opposite corner stays fixed;

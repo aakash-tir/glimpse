@@ -1,7 +1,8 @@
 import { test, expect, _electron as electron } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
 import { spawn } from 'node:child_process';
-import { resolve, dirname } from 'node:path';
+import { rmSync } from 'node:fs';
+import { resolve, dirname, join } from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
@@ -12,6 +13,16 @@ const projectRoot = resolve(__dirname, '../..');
 
 async function launch(): Promise<ElectronApplication> {
   return await electron.launch({ args: ['.'], cwd: projectRoot });
+}
+
+// Some tests in this file save iconPosition / windowBounds to
+// %APPDATA%\Glimpse\settings.json, which leaks state into later tests
+// since Electron always reads the same path. Tests that need a clean
+// slate call this before launching.
+function resetSettings(): void {
+  const appData = process.env['APPDATA'];
+  if (!appData) return;
+  rmSync(join(appData, 'Glimpse', 'settings.json'), { force: true });
 }
 
 async function spawnSecondInstance(): Promise<void> {
@@ -55,6 +66,42 @@ async function clickTitleBarButton(page: Page, testid: string): Promise<void> {
   // Wait for fade-in (~150 ms) + a small buffer.
   await page.waitForTimeout(220);
   await page.getByTestId(testid).click();
+}
+
+// Move the window into the middle of the screen so resize tests have
+// room to grow in every direction. The default expand position is
+// top-right, where the bottom-right resize is capped by the screen
+// edge — useless for testing growth.
+//
+// Drag math: the renderer computes new-top-left = cursor + offset,
+// where offset = startPos - startCursor (captured at mousedown). To
+// shift the window's top-left by a delta D, the cursor must move by
+// the same D. We pick start/end cursor coords so the cursor delta
+// matches the desired window-top-left delta from default (~1740, 0)
+// to the middle (~640, 400): (-1100, +400).
+async function dragWindowToMiddle(page: Page): Promise<void> {
+  const panel = page.getByTestId('window-view');
+  await panel.dispatchEvent('click');
+  await panel.dispatchEvent('click');
+  await page.waitForTimeout(50);
+  await expect(panel).toHaveAttribute('data-drag-mode', 'on');
+  await panel.dispatchEvent('mousedown', { screenX: 1500, screenY: 100 });
+  await page.evaluate(() => {
+    window.dispatchEvent(
+      new MouseEvent('mousemove', { screenX: 400, screenY: 500 }),
+    );
+  });
+  await page.evaluate(() => {
+    window.dispatchEvent(
+      new MouseEvent('mouseup', { screenX: 400, screenY: 500 }),
+    );
+  });
+  await page.waitForTimeout(200);
+  // Exit drag mode.
+  await panel.dispatchEvent('click');
+  await panel.dispatchEvent('click');
+  await page.waitForTimeout(50);
+  await expect(panel).toHaveAttribute('data-drag-mode', 'off');
 }
 
 test('single-click on icon expands to window mode at expected bounds with anchor data', async () => {
@@ -394,6 +441,153 @@ test('window-mode drag clamps to display edges (cannot drag off-screen)', async 
     );
     expect(Math.abs(after.width - before.width)).toBeLessThanOrEqual(2);
     expect(Math.abs(after.height - before.height)).toBeLessThanOrEqual(2);
+  } finally {
+    await app.close();
+  }
+});
+
+test('window resize cannot grow off-screen (display-aware max-size cap)', async () => {
+  // sub-feature 7 issue 1: dragging the bottom-right resize handle
+  // far past the display edge used to grow the window past the
+  // screen boundary because squareResize only capped against the
+  // primary's overall maxWindowSize, not against the position of
+  // the diagonal-fixed corner. maxSizeForResize fixes this.
+  resetSettings();
+  const app = await launch();
+  try {
+    const page = await app.firstWindow();
+    await expandToWindow(page);
+    const display = await app.evaluate(
+      async ({ screen }) => screen.getPrimaryDisplay().workArea,
+    );
+
+    // Mouse-down on bottom-right handle (top-left stays fixed at
+    // current bounds), then drag wildly past the screen via real
+    // mouse events (page.mouse). dispatchEvent on the handle was
+    // unreliable for the resize React handler — page.mouse goes
+    // through the OS event path and reaches the renderer the same
+    // way a user's mouse would.
+    const handle = page.getByTestId('resize-handle-bottom-right');
+    const box = await handle.boundingBox();
+    expect(box).not.toBeNull();
+    const startX = box!.x + box!.width / 2;
+    const startY = box!.y + box!.height / 2;
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX + 5000, startY + 5000);
+    await page.mouse.up();
+    await page.waitForTimeout(200);
+
+    const after = await getWindowBounds(app);
+    expect(after.x + after.width).toBeLessThanOrEqual(
+      display.x + display.width + 2,
+    );
+    expect(after.y + after.height).toBeLessThanOrEqual(
+      display.y + display.height + 2,
+    );
+    // And it must still be a square.
+    expect(Math.abs(after.width - after.height)).toBeLessThanOrEqual(2);
+  } finally {
+    await app.close();
+  }
+});
+
+test('minimize after resize lands icon at the resized window center', async () => {
+  // sub-feature 7 issue 2: previously, pendingIconPosition (frozen
+  // at expand time) didn't follow resizes, so collapse put the icon
+  // at the original expand-time spot — far from where the resized
+  // window visually appeared. Now collapseTargetFromWindow uses the
+  // window's CURRENT center.
+  resetSettings();
+  const app = await launch();
+  try {
+    const page = await app.firstWindow();
+    await expandToWindow(page);
+    // Move to the middle so the bottom-right resize has room to grow.
+    await dragWindowToMiddle(page);
+
+    // Resize from bottom-right (top-left stays fixed). Use
+    // page.mouse for reliable event delivery to the React handler.
+    const handle = page.getByTestId('resize-handle-bottom-right');
+    const box = await handle.boundingBox();
+    expect(box).not.toBeNull();
+    const startX = box!.x + box!.width / 2;
+    const startY = box!.y + box!.height / 2;
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX + 200, startY + 200);
+    await page.mouse.up();
+    await page.waitForTimeout(200);
+
+    const resized = await getWindowBounds(app);
+    const expectedCenterX = resized.x + resized.width / 2;
+    const expectedCenterY = resized.y + resized.height / 2;
+
+    // Collapse via weather-icon (in-place collapse path).
+    await clickTitleBarButton(page, 'title-bar-weather-icon');
+    await page.waitForTimeout(500);
+
+    const collapsed = await getWindowBounds(app);
+    // Icon glyph at offset (180, 16) inside 260×112 icon-mode bounds.
+    const iconCenterX = collapsed.x + 180 + 32;
+    const iconCenterY = collapsed.y + 16 + 32;
+    // ±2 px DWM tolerance.
+    expect(Math.abs(iconCenterX - expectedCenterX)).toBeLessThanOrEqual(2);
+    expect(Math.abs(iconCenterY - expectedCenterY)).toBeLessThanOrEqual(2);
+  } finally {
+    await app.close();
+  }
+});
+
+test('resize size persists across minimize → re-expand within session', async () => {
+  // sub-feature 7 issue 3 (option b from the writeup): after a
+  // resize, the next expand reuses that size at the icon's location
+  // even with trackWindowPosition off. Disk persistence still
+  // requires the toggle.
+  resetSettings();
+  const app = await launch();
+  try {
+    const page = await app.firstWindow();
+    await expandToWindow(page);
+    const defaultExpanded = await getWindowBounds(app);
+    const defaultSize = defaultExpanded.width;
+    // Move to the middle so the bottom-right resize has room to grow.
+    await dragWindowToMiddle(page);
+    const afterDrag = await getWindowBounds(app);
+    // Sanity: drag actually moved the window away from the default
+    // top-right (otherwise the resize will be capped to current size).
+    expect(afterDrag.x).toBeLessThan(defaultExpanded.x - 100);
+
+    // Now resize from bottom-right — there's plenty of room to grow.
+    const handle = page.getByTestId('resize-handle-bottom-right');
+    const box = await handle.boundingBox();
+    expect(box).not.toBeNull();
+    const startX = box!.x + box!.width / 2;
+    const startY = box!.y + box!.height / 2;
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX + 200, startY + 200);
+    await page.mouse.up();
+    await page.waitForTimeout(200);
+
+    const resized = await getWindowBounds(app);
+    const resizedSize = resized.width;
+    // Sanity: the resize actually changed the size.
+    expect(resizedSize).toBeGreaterThan(defaultSize + 50);
+
+    // Collapse via weather-icon.
+    await clickTitleBarButton(page, 'title-bar-weather-icon');
+    await page.waitForTimeout(500);
+
+    // Re-expand by clicking the icon.
+    await page.getByTestId('icon-root').dispatchEvent('click');
+    await page.waitForTimeout(400);
+
+    const reExpanded = await getWindowBounds(app);
+    // ±2 px DWM tolerance — the new expand should reuse the resized
+    // size, NOT fall back to default.
+    expect(Math.abs(reExpanded.width - resizedSize)).toBeLessThanOrEqual(2);
+    expect(Math.abs(reExpanded.height - resizedSize)).toBeLessThanOrEqual(2);
   } finally {
     await app.close();
   }

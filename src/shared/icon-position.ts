@@ -169,36 +169,35 @@ export function shouldResetIconPosition(
   return !isPositionOnScreen(saved, allDisplays);
 }
 
-// Find the display that an icon belongs to: the one containing its
-// center, or — if the center isn't on any display (transient post-
-// monitor-disconnect state) — the display whose center is closest in
-// Euclidean distance. Falls back to `primary` when displays is empty.
+// Find the display that contains a given screen point, or — if the
+// point isn't on any display (transient post-monitor-disconnect state,
+// or a point in the gap between displays) — the display whose center
+// is closest in Euclidean distance. Falls back to `primary` when
+// displays is empty.
 //
-// Used wherever we need to clamp / measure an icon position against
-// "the display this icon is on" rather than always assuming primary
-// (collapse target, expand-from-icon, etc.). Lifting this out of the
-// per-call sites keeps the multi-monitor logic in one place.
-export function displayForIcon(
-  pos: IconPosition,
+// Used wherever we need to identify "which display does this point
+// belong to" — icon-collapse target, window-resize bounds clamp,
+// etc. Centralizes the multi-monitor anchoring logic.
+export function displayForPoint(
+  point: { x: number; y: number },
   allDisplays: DisplayBounds[],
   primary: DisplayBounds,
 ): DisplayBounds {
   if (allDisplays.length === 0) return primary;
-  const center = { x: pos.x + ICON_SIZE / 2, y: pos.y + ICON_SIZE / 2 };
   const containing = allDisplays.find(
     (d) =>
-      center.x >= d.x &&
-      center.y >= d.y &&
-      center.x < d.x + d.width &&
-      center.y < d.y + d.height,
+      point.x >= d.x &&
+      point.y >= d.y &&
+      point.x < d.x + d.width &&
+      point.y < d.y + d.height,
   );
   if (containing) return containing;
   let closest = allDisplays[0];
   let closestDist = Infinity;
   for (const d of allDisplays) {
     const dCenter = { x: d.x + d.width / 2, y: d.y + d.height / 2 };
-    const dx = dCenter.x - center.x;
-    const dy = dCenter.y - center.y;
+    const dx = dCenter.x - point.x;
+    const dy = dCenter.y - point.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     if (dist < closestDist) {
       closestDist = dist;
@@ -206,4 +205,18 @@ export function displayForIcon(
     }
   }
   return closest;
+}
+
+// Convenience wrapper: which display does this icon belong to?
+// (icon's center, not its top-left).
+export function displayForIcon(
+  pos: IconPosition,
+  allDisplays: DisplayBounds[],
+  primary: DisplayBounds,
+): DisplayBounds {
+  return displayForPoint(
+    { x: pos.x + ICON_SIZE / 2, y: pos.y + ICON_SIZE / 2 },
+    allDisplays,
+    primary,
+  );
 }
