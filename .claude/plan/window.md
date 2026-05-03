@@ -20,7 +20,7 @@ The weather panel that opens when the user clicks the [icon](./icon.md). Square,
 
 - **Stuck in place** unless dragged. Drag is initiated by **double-click** on the window body; clicking outside exits.
 - **Double-click is disabled on the arrow buttons** so navigation can't accidentally trigger drag.
-- **Window drag bounds:** same as the icon — free placement on primary monitor + snap to the 4 screen corners with 40 px radius. (Snap padding does not apply to the window itself, only to the icon's resting position.)
+- **Window drag bounds:** free placement, **constrained to fully fit on the cursor's current display** (the user can't drag the window off-screen — it hugs the display edge as the cursor approaches it). Multi-monitor: the window stays hugging the source display's edge until the cursor has moved far enough into the destination display that the whole window would fit there, then jumps. Same algorithm as the icon's drag clamp. Snap to the 4 screen corners on release with **40 px** radius.
 - **No padding constraint** in window mode — the window can span to screen corners. Padding applies only to the icon.
 
 ## Closing rules

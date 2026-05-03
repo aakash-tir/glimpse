@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
+  clampWindowForDrag,
+  clampWindowToDisplay,
   collapseTargetFromWindow,
   defaultWindowBounds,
   defaultWindowPosition,
@@ -533,5 +535,190 @@ describe('small display interactions', () => {
     const iconPos = { x: small.width - ICON_SIZE - 5, y: 400 };
     const result = expandFromIcon(iconPos, small);
     expect(result.x + result.width).toBeLessThanOrEqual(small.x + small.width);
+  });
+});
+
+describe('clampWindowToDisplay', () => {
+  const size = { width: 200, height: 200 };
+
+  it('returns the point unchanged when fully inside the display', () => {
+    expect(clampWindowToDisplay({ x: 500, y: 400 }, size, primary)).toEqual({
+      x: 500,
+      y: 400,
+    });
+  });
+
+  it('clamps to right edge when the window would overflow horizontally', () => {
+    expect(clampWindowToDisplay({ x: 1900, y: 400 }, size, primary)).toEqual({
+      x: 1920 - 200,
+      y: 400,
+    });
+  });
+
+  it('clamps to bottom edge when the window would overflow vertically', () => {
+    expect(clampWindowToDisplay({ x: 500, y: 1000 }, size, primary)).toEqual({
+      x: 500,
+      y: 1080 - 200,
+    });
+  });
+
+  it('clamps to top-left when the candidate is far above-left', () => {
+    expect(clampWindowToDisplay({ x: -500, y: -300 }, size, primary)).toEqual({
+      x: 0,
+      y: 0,
+    });
+  });
+
+  it('respects display origin offsets', () => {
+    expect(
+      clampWindowToDisplay({ x: -50, y: 100 }, size, offsetPrimary),
+    ).toEqual({
+      x: offsetPrimary.x,
+      y: 200,
+    });
+  });
+});
+
+describe('clampWindowForDrag — single display', () => {
+  const size = { width: 200, height: 200 };
+  const displays = [primary];
+
+  it('passes the candidate through when it fits on the cursor display', () => {
+    const candidate = { x: 500, y: 400 };
+    expect(
+      clampWindowForDrag({
+        candidate,
+        size,
+        cursor: { x: 600, y: 500 },
+        prevPos: { x: 480, y: 380 },
+        allDisplays: displays,
+      }),
+    ).toEqual(candidate);
+  });
+
+  it('clamps to right edge when dragging past the right of the screen', () => {
+    expect(
+      clampWindowForDrag({
+        candidate: { x: 1900, y: 400 },
+        size,
+        cursor: { x: 1900, y: 500 },
+        prevPos: { x: 1700, y: 400 },
+        allDisplays: displays,
+      }),
+    ).toEqual({ x: 1920 - 200, y: 400 });
+  });
+
+  it('clamps to bottom edge when dragging past the bottom of the screen', () => {
+    expect(
+      clampWindowForDrag({
+        candidate: { x: 500, y: 1000 },
+        size,
+        cursor: { x: 500, y: 1075 },
+        prevPos: { x: 500, y: 850 },
+        allDisplays: displays,
+      }),
+    ).toEqual({ x: 500, y: 1080 - 200 });
+  });
+
+  it('returns prevPos when no displays are connected (defensive)', () => {
+    const prev = { x: 100, y: 100 };
+    expect(
+      clampWindowForDrag({
+        candidate: { x: 9999, y: 9999 },
+        size,
+        cursor: { x: 5, y: 5 },
+        prevPos: prev,
+        allDisplays: [],
+      }),
+    ).toEqual(prev);
+  });
+});
+
+describe('clampWindowForDrag — multi-display seam', () => {
+  // Two side-by-side 1080p displays. Display B starts at x=1920.
+  const displayA: DisplayBounds = { x: 0, y: 0, width: 1920, height: 1080 };
+  const displayB: DisplayBounds = {
+    x: 1920,
+    y: 0,
+    width: 1920,
+    height: 1080,
+  };
+  const displays = [displayA, displayB];
+  const size = { width: 400, height: 300 };
+
+  it('passes the candidate through when it fits on display A and the cursor is on A', () => {
+    const candidate = { x: 1500, y: 400 };
+    expect(
+      clampWindowForDrag({
+        candidate,
+        size,
+        cursor: { x: 1700, y: 500 },
+        prevPos: { x: 1480, y: 400 },
+        allDisplays: displays,
+      }),
+    ).toEqual(candidate);
+  });
+
+  it('clamps to A when cursor crosses to B but window does not fit on B yet', () => {
+    // Cursor is in B (x ≥ 1920) but the candidate's right edge spills
+    // past A's right edge (would put the window partially off A) AND
+    // doesn't yet fit on B (would put it partially off B's left
+    // edge). The window must hug A's right edge.
+    expect(
+      clampWindowForDrag({
+        candidate: { x: 1700, y: 400 },
+        size,
+        cursor: { x: 2000, y: 500 },
+        prevPos: { x: 1500, y: 400 },
+        allDisplays: displays,
+      }),
+    ).toEqual({ x: 1920 - 400, y: 400 });
+  });
+
+  it('jumps to B once the candidate fits fully on B', () => {
+    // Cursor is well into B; the candidate fits fully on B.
+    const candidate = { x: 2200, y: 400 };
+    expect(
+      clampWindowForDrag({
+        candidate,
+        size,
+        cursor: { x: 2400, y: 500 },
+        prevPos: { x: 1500, y: 400 },
+        allDisplays: displays,
+      }),
+    ).toEqual(candidate);
+  });
+
+  it('clamps to B when window was already on B and cursor wanders off-screen', () => {
+    expect(
+      clampWindowForDrag({
+        candidate: { x: 3700, y: 400 },
+        size,
+        cursor: { x: 3900, y: 500 },
+        prevPos: { x: 3000, y: 400 },
+        allDisplays: displays,
+      }),
+    ).toEqual({ x: 3840 - 400, y: 400 });
+  });
+
+  it('handles the cursor sitting in a gap between displays by holding on prevPos display', () => {
+    // Stacked displays with a 50 px vertical gap.
+    const top: DisplayBounds = { x: 0, y: 0, width: 1920, height: 1080 };
+    const bottom: DisplayBounds = {
+      x: 0,
+      y: 1130,
+      width: 1920,
+      height: 1080,
+    };
+    expect(
+      clampWindowForDrag({
+        candidate: { x: 100, y: 1100 },
+        size,
+        // Cursor is in the gap (no display contains it).
+        cursor: { x: 100, y: 1100 },
+        prevPos: { x: 100, y: 800 },
+        allDisplays: [top, bottom],
+      }),
+    ).toEqual({ x: 100, y: 1080 - 300 });
   });
 });

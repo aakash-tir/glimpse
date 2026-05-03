@@ -96,19 +96,96 @@ export function isWindowAtDefaultPosition(
   );
 }
 
-function clampToDisplay(
+// Clamp a window's top-left so the entire window rectangle fits within
+// the given display. Used both for the expand-from-icon math (window
+// can't be born off-screen) and as the building block for
+// clampWindowForDrag below.
+export function clampWindowToDisplay(
   point: WindowPoint,
   size: { width: number; height: number },
-  primary: DisplayBounds,
+  display: DisplayBounds,
 ): WindowPoint {
-  const minX = primary.x;
-  const maxX = primary.x + primary.width - size.width;
-  const minY = primary.y;
-  const maxY = primary.y + primary.height - size.height;
+  const minX = display.x;
+  const maxX = display.x + display.width - size.width;
+  const minY = display.y;
+  const maxY = display.y + display.height - size.height;
   return {
     x: Math.max(minX, Math.min(maxX, point.x)),
     y: Math.max(minY, Math.min(maxY, point.y)),
   };
+}
+
+// True iff the window rectangle (top-left = pos, given size) fits
+// fully within the given display.
+function fitsOnDisplay(
+  pos: WindowPoint,
+  size: { width: number; height: number },
+  d: DisplayBounds,
+): boolean {
+  return (
+    pos.x >= d.x &&
+    pos.y >= d.y &&
+    pos.x + size.width <= d.x + d.width &&
+    pos.y + size.height <= d.y + d.height
+  );
+}
+
+// Returns the display containing the cursor, or null if the cursor
+// isn't on any connected display (rare — happens transiently when
+// the cursor is in a gap between displays).
+function displayContaining(
+  point: { x: number; y: number },
+  displays: DisplayBounds[],
+): DisplayBounds | null {
+  return (
+    displays.find(
+      (d) =>
+        point.x >= d.x &&
+        point.y >= d.y &&
+        point.x < d.x + d.width &&
+        point.y < d.y + d.height,
+    ) ?? null
+  );
+}
+
+// Cross-display drag clamp for the window. Direct mirror of
+// clampIconForDrag in icon-position.ts (same docstring intent —
+// keep the algorithms in lockstep).
+//
+// Single-display: behaves like clampWindowToDisplay against the
+// cursor's display — the window hugs the edges as the cursor
+// approaches them, so the user can't drag the panel off-screen.
+//
+// Multi-display: as the cursor crosses from display A to display B,
+// the window stays hugging A's edge until the cursor has moved far
+// enough into B that the window would fit fully on B at its current
+// drag offset. Only then does the window "jump" onto B. This avoids
+// flickering between displays in the seam region where the offset
+// would put the window partially off either display.
+export function clampWindowForDrag(args: {
+  candidate: WindowPoint;
+  size: { width: number; height: number };
+  cursor: { x: number; y: number };
+  prevPos: WindowPoint;
+  allDisplays: DisplayBounds[];
+}): WindowPoint {
+  const { candidate, size, cursor, prevPos, allDisplays } = args;
+  if (allDisplays.length === 0) return prevPos;
+
+  const cursorDisplay = displayContaining(cursor, allDisplays);
+  if (cursorDisplay && fitsOnDisplay(candidate, size, cursorDisplay)) {
+    return candidate;
+  }
+
+  // Candidate doesn't fit on the cursor's display (or the cursor is in
+  // a gap). Hold the window on whichever display it was last on,
+  // hugging that display's edge in the cursor's direction.
+  const fallback =
+    displayContaining(
+      { x: prevPos.x + size.width / 2, y: prevPos.y + size.height / 2 },
+      allDisplays,
+    ) ?? allDisplays[0];
+  return clampWindowToDisplay(candidate, size, fallback);
 }
 
 // Window bounds when expanding from a given icon position.
@@ -128,7 +205,7 @@ export function expandFromIcon(
   const size = defaultWindowSize(primary);
   const cx = iconPos.x + ICON_SIZE / 2;
   const cy = iconPos.y + ICON_SIZE / 2;
-  const clamped = clampToDisplay(
+  const clamped = clampWindowToDisplay(
     { x: Math.round(cx - size / 2), y: Math.round(cy - size / 2) },
     { width: size, height: size },
     primary,
@@ -152,7 +229,7 @@ export function collapseTargetFromWindow(
   }
   const cx = bounds.x + bounds.width / 2;
   const cy = bounds.y + bounds.height / 2;
-  const clamped = clampToDisplay(
+  const clamped = clampWindowToDisplay(
     { x: Math.round(cx - ICON_SIZE / 2), y: Math.round(cy - ICON_SIZE / 2) },
     { width: ICON_SIZE, height: ICON_SIZE },
     primary,

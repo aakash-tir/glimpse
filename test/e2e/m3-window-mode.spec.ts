@@ -347,6 +347,58 @@ test('window-mode drag does not change the window size (regression)', async () =
   }
 });
 
+test('window-mode drag clamps to display edges (cannot drag off-screen)', async () => {
+  // Per the manual-tests-review follow-up: dragging the window past
+  // the right or bottom edge should leave it hugging that edge, not
+  // partially or fully off-screen. clampWindowForDrag in main is
+  // responsible; the unit tests cover its math, this E2E confirms
+  // the IPC wiring + setBounds path actually applies the clamp.
+  const app = await launch();
+  try {
+    const page = await app.firstWindow();
+    await expandToWindow(page);
+    const before = await getWindowBounds(app);
+    const display = await app.evaluate(
+      async ({ screen }) => screen.getPrimaryDisplay().workArea,
+    );
+
+    // Enter window-drag mode.
+    const panel = page.getByTestId('window-view');
+    await panel.dispatchEvent('click');
+    await panel.dispatchEvent('click');
+    await page.waitForTimeout(50);
+    await expect(panel).toHaveAttribute('data-drag-mode', 'on');
+
+    // Try to drag well past the right + bottom edges.
+    await panel.dispatchEvent('mousedown', { screenX: 400, screenY: 300 });
+    await page.evaluate(() => {
+      window.dispatchEvent(
+        new MouseEvent('mousemove', { screenX: 9999, screenY: 9999 }),
+      );
+    });
+    await page.evaluate(() => {
+      window.dispatchEvent(
+        new MouseEvent('mouseup', { screenX: 9999, screenY: 9999 }),
+      );
+    });
+    await page.waitForTimeout(200);
+
+    const after = await getWindowBounds(app);
+    // Window's right edge ≤ display's right edge (within ±2 px DWM
+    // rounding); same for bottom. Width/height unchanged.
+    expect(after.x + after.width).toBeLessThanOrEqual(
+      display.x + display.width + 2,
+    );
+    expect(after.y + after.height).toBeLessThanOrEqual(
+      display.y + display.height + 2,
+    );
+    expect(Math.abs(after.width - before.width)).toBeLessThanOrEqual(2);
+    expect(Math.abs(after.height - before.height)).toBeLessThanOrEqual(2);
+  } finally {
+    await app.close();
+  }
+});
+
 test('Esc does NOT close the window', async () => {
   const app = await launch();
   try {

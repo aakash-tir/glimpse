@@ -17,6 +17,7 @@ import {
 import { computeIconPosFromCursor, type ScreenPoint } from '../shared/drag';
 import { snapToCorner } from '../shared/snap';
 import {
+  clampWindowForDrag,
   maxWindowSize,
   resolveWindowBoundsForExpand,
   snapWindowToCorner,
@@ -138,6 +139,13 @@ type DragSession =
       startCursor: ScreenPoint;
       startPos: { x: number; y: number };
       startSize: { width: number; height: number };
+      // Where the window's top-left actually landed after the most
+      // recent drag tick. clampWindowForDrag uses this to decide which
+      // display the window is currently anchored to when the cursor
+      // crosses a multi-monitor seam — so we don't need to call
+      // getBounds() each tick (which would re-introduce the DWM frame
+      // drift that fix 4 just removed).
+      lastAppliedPos: { x: number; y: number };
     };
 
 let dragSession: DragSession | null = null;
@@ -409,6 +417,9 @@ function registerIpc(): void {
         // value rather than calling getBounds() again — see the
         // DragSession type comment for the DWM-drift rationale.
         startSize: { width: b.width, height: b.height },
+        // Seed the multi-monitor anchor at the start position; updated
+        // after each successful move below.
+        lastAppliedPos: { x: b.x, y: b.y },
       };
     } else {
       dragSession = {
@@ -427,12 +438,24 @@ function registerIpc(): void {
       cursor,
     );
     if (dragSession.subject === 'window') {
+      // Constrain the window to fit fully on the cursor's display.
+      // Cross-monitor: hugs the source display's edge until the cursor
+      // has moved far enough into the destination that the whole
+      // window fits there. Mirrors the icon's drag clamp.
+      const final = clampWindowForDrag({
+        candidate: next,
+        size: dragSession.startSize,
+        cursor,
+        prevPos: dragSession.lastAppliedPos,
+        allDisplays: allDisplayBounds(),
+      });
       iconWindow.setBounds({
-        x: next.x,
-        y: next.y,
+        x: final.x,
+        y: final.y,
         width: dragSession.startSize.width,
         height: dragSession.startSize.height,
       });
+      dragSession.lastAppliedPos = final;
     } else {
       const clamped = clampIconForDrag({
         candidate: next,
@@ -460,7 +483,19 @@ function registerIpc(): void {
         { width: session.startSize.width, height: session.startSize.height },
         primaryBounds(),
       );
-      const final = snap?.position ?? dropped;
+      // Snap returns positions on the primary display (already
+      // on-screen). The unsnapped path uses the same drag clamp as
+      // drag:move so a release near a screen edge stays where the
+      // user actually saw the window during the drag.
+      const final =
+        snap?.position ??
+        clampWindowForDrag({
+          candidate: dropped,
+          size: session.startSize,
+          cursor,
+          prevPos: session.lastAppliedPos,
+          allDisplays: allDisplayBounds(),
+        });
       const newBounds: WindowBounds = {
         x: final.x,
         y: final.y,
