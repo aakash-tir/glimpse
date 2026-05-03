@@ -18,11 +18,12 @@ import { computeIconPosFromCursor, type ScreenPoint } from '../shared/drag';
 import { snapToCorner } from '../shared/snap';
 import {
   clampWindowForDrag,
-  collapseTargetFromWindow,
+  iconForCollapsedWindow,
   maxSizeForResize,
   maxWindowSize,
   resolveWindowBoundsForExpand,
   snapWindowToCorner,
+  snapWindowToEdge,
   squareResize,
   WINDOW_MIN_SIZE_PX,
   type ResizeCorner,
@@ -164,14 +165,31 @@ let resizeSession: ResizeSession | null = null;
 // the next expand to reuse the size at the icon's location even when
 // trackWindowPosition is off. Disk persistence still gated by the
 // toggle. Reset on app start (this is intentionally NOT in
-// settings.json).
+// settings.json) and cleared by reset-to-default collapse.
 let lastWindowSize: number | null = null;
+
+// Captured at expandToWindow: where the icon was when the user opened
+// the panel. Used by nextIconPositionForCollapse for cases B1 and B2
+// (no drag → return exact original spot). Cleared on collapse.
+let expandTimeIconPosition: IconPosition | null = null;
+// Set true when a window-mode drag completes; reset to false on each
+// expand. Resize does NOT set this — per spec B2, resizing alone
+// keeps the icon at its expand-time spot. drag:end sets it.
+let windowDragged = false;
+// The last bounds we've SET on the window in window mode, in content
+// coords. iconForCollapsedWindow uses this instead of
+// getContentBounds() because the Windows DWM frame correction shifts
+// getContentBounds by a few pixels on the read-back, breaking the
+// "flush against edge" detection (a window we set to x=0 reads back
+// as x=12 or so). Updated on every applyWindowBounds /
+// drag-end-setBounds / resize-end-setBounds. Reset on collapse.
+let lastWindowBounds: WindowBounds | null = null;
 
 function currentIconPosition(): IconPosition {
   if (!iconWindow) {
     return defaultIconPosition(primaryBounds());
   }
-  const bounds = iconWindow.getBounds();
+  const bounds = iconWindow.getContentBounds();
   return {
     x: bounds.x + ICON_OFFSET_X,
     y: bounds.y + ICON_OFFSET_Y,
@@ -182,11 +200,15 @@ function applyIconPosition(pos: IconPosition): void {
   if (!iconWindow) return;
   // Callers are responsible for clamping (drag handlers use
   // clampIconForDrag for cross-display behavior; collapse paths use
-  // collapseTargetFromWindow which clamps to the window's display).
-  // This helper stays pure-positional so multi-monitor placements
-  // aren't yanked back to the primary.
+  // iconForCollapsedWindow which clamps to the window's display).
+  // setContentBounds (rather than setBounds) so the icon-mode
+  // window's CONTENT area lands at the requested position even when
+  // a chunk of the (transparent) window extends off-screen — e.g.
+  // for B3b left-edge midpoint, the window extends to x=-164 but
+  // only the painted icon glyph (at internal offset 180) needs to
+  // be on-screen.
   const win = windowPositionForIcon(pos);
-  iconWindow.setBounds({
+  iconWindow.setContentBounds({
     x: win.x,
     y: win.y,
     width: ICON_WINDOW_WIDTH,
@@ -197,6 +219,7 @@ function applyIconPosition(pos: IconPosition): void {
 function applyWindowBounds(bounds: WindowBounds): void {
   if (!iconWindow) return;
   iconWindow.setBounds(bounds);
+  lastWindowBounds = bounds;
 }
 
 function modeChangePayload(
@@ -223,7 +246,7 @@ function expandToWindow(): ModeChange {
     };
   }
   if (mode === 'window') {
-    const b = iconWindow.getBounds();
+    const b = iconWindow.getContentBounds();
     return modeChangePayload('window', b, null);
   }
   const iconPos = currentIconPosition();
@@ -241,6 +264,10 @@ function expandToWindow(): ModeChange {
     sessionSize: lastWindowSize ?? undefined,
   });
   applyWindowBounds(bounds);
+  // Capture the icon's pre-expand position for the no-drag /
+  // resize-only collapse cases (B1 / B2).
+  expandTimeIconPosition = iconPos;
+  windowDragged = false;
   mode = 'window';
   // Anchor: where the icon's center was on screen.
   const anchorScreen = {
@@ -255,31 +282,44 @@ function expandToWindow(): ModeChange {
 type CollapseOpts = { resetToDefault?: boolean };
 
 // Returns where the icon should land when the panel collapses.
-//   - Relocate (resetToDefault): always default top-right (primary).
-//   - Otherwise: derived from the window's CURRENT bounds via
-//     collapseTargetFromWindow — icon-center aligns with window-
-//     center, clamped to whichever display the window's center is
-//     on. This naturally handles BOTH drag (window moved → icon
-//     follows to new center) AND resize (window center shifted →
-//     icon appears at new center).
-//   - Fallback: pre-M3 behavior (icon at the icon's current location)
-//     in the unlikely event we're collapsing without a window.
+// See manual-tests-review.md (and plan/window.md) for the spec — A1
+// for reset-to-default, B1/B2/B3 for in-place.
+//
+//   - A1 (resetToDefault): always default top-right of primary.
+//   - B1/B2 (no drag since expand): exact expand-time icon position.
+//     Resize alone never relocates the icon; only an actual window
+//     drag does (windowDragged flag).
+//   - B3 (drag occurred): iconForCollapsedWindow inspects the final
+//     window bounds — flush against two edges → corner; one edge →
+//     edge midpoint; otherwise → window center. All on whichever
+//     display the window's center is on (multi-monitor aware).
+//   - Fallback: icon at the icon's current location in the unlikely
+//     event we're collapsing without an active window-mode session.
 function nextIconPositionForCollapse(opts: CollapseOpts): IconPosition {
   if (!iconWindow) return defaultIconPosition(primaryBounds());
   if (opts.resetToDefault) return defaultIconPosition(primaryBounds());
   if (mode === 'window') {
-    return collapseTargetFromWindow(
-      iconWindow.getBounds(),
-      primaryBounds(),
-      allDisplayBounds(),
-    );
+    if (!windowDragged && expandTimeIconPosition) {
+      return expandTimeIconPosition;
+    }
+    // Use the LAST BOUNDS WE SET, not the OS read-back. Windows DWM
+    // shifts getContentBounds by ~7 px from the set value on
+    // frameless transparent windows; the snap targets are computed
+    // from set bounds so the flush-against-edge check has to match
+    // the same reference frame.
+    const bounds = lastWindowBounds ?? iconWindow.getContentBounds();
+    return iconForCollapsedWindow({
+      bounds,
+      primary: primaryBounds(),
+      allDisplays: allDisplayBounds(),
+    });
   }
   return currentIconPosition();
 }
 
 function previewCollapseAnchor(opts: CollapseOpts): { x: number; y: number } {
   if (!iconWindow || mode !== 'window') return { x: 0, y: 0 };
-  const winBounds = iconWindow.getBounds();
+  const winBounds = iconWindow.getContentBounds();
   const iconPos = nextIconPositionForCollapse(opts);
   // Local to current (still-window-mode) bounds: the icon's center as
   // it'll appear after the resize, expressed in the renderer's current
@@ -300,10 +340,10 @@ function collapseToIcon(opts: CollapseOpts = {}): ModeChange {
     };
   }
   if (mode === 'icon') {
-    const b = iconWindow.getBounds();
+    const b = iconWindow.getContentBounds();
     return modeChangePayload('icon', b, null);
   }
-  const winBounds = iconWindow.getBounds();
+  const winBounds = iconWindow.getContentBounds();
   // If trackWindowPosition is on, snapshot the window's current bounds
   // before collapsing so the next expand restores exactly what the
   // user was looking at (in case they hadn't moved/resized since the
@@ -318,10 +358,17 @@ function collapseToIcon(opts: CollapseOpts = {}): ModeChange {
   // current default (which may shift if the display layout changes).
   // Otherwise persist the icon's new resting place.
   if (opts.resetToDefault) {
-    saveSettings({ iconPosition: null });
+    // A1: clear icon position AND in-session size so the next expand
+    // is fully default-default. Also clear saved windowBounds so a
+    // relaunch doesn't restore the prior size + position.
+    saveSettings({ iconPosition: null, windowBounds: null });
+    lastWindowSize = null;
   } else {
     saveSettings({ iconPosition: iconPos });
   }
+  expandTimeIconPosition = null;
+  windowDragged = false;
+  lastWindowBounds = null;
   mode = 'icon';
   // After resize, the new bounds describe the icon-mode window.
   const newBounds: WindowBounds = {
@@ -367,7 +414,7 @@ function registerIpc(): void {
       resizeSession = {
         corner: payload.corner,
         startCursor: payload.cursor,
-        origin: iconWindow.getBounds(),
+        origin: iconWindow.getContentBounds(),
       };
     },
   );
@@ -405,6 +452,7 @@ function registerIpc(): void {
       ),
     });
     iconWindow.setBounds(next);
+    lastWindowBounds = next;
     return next;
   }
 
@@ -429,7 +477,7 @@ function registerIpc(): void {
   ipcMain.on('drag:start', (_evt, cursor: ScreenPoint) => {
     if (!iconWindow) return;
     if (mode === 'window') {
-      const b = iconWindow.getBounds();
+      const b = iconWindow.getContentBounds();
       dragSession = {
         subject: 'window',
         startCursor: cursor,
@@ -470,12 +518,14 @@ function registerIpc(): void {
         prevPos: dragSession.lastAppliedPos,
         allDisplays: allDisplayBounds(),
       });
-      iconWindow.setBounds({
+      const moved: WindowBounds = {
         x: final.x,
         y: final.y,
         width: dragSession.startSize.width,
         height: dragSession.startSize.height,
-      });
+      };
+      iconWindow.setBounds(moved);
+      lastWindowBounds = moved;
       dragSession.lastAppliedPos = final;
     } else {
       const clamped = clampIconForDrag({
@@ -499,19 +549,34 @@ function registerIpc(): void {
     dragSession = null;
 
     if (session.subject === 'window') {
-      // Snap considers the corners of EVERY connected display, so a
-      // release near the secondary monitor's bottom-right snaps to
-      // that corner instead of being ignored. The unsnapped path uses
-      // the same drag clamp as drag:move so a release near a screen
-      // edge stays where the user actually saw the window during the
-      // drag.
-      const snap = snapWindowToCorner(
+      // A real window-drag gesture has now completed — flag it so
+      // the next collapse uses iconForCollapsedWindow (B3) rather
+      // than the expand-time position (B1).
+      windowDragged = true;
+      // Snap considers the corners + edges of EVERY connected
+      // display, so a release near the secondary monitor's bottom-
+      // right snaps there. Corner takes priority over edge because
+      // a corner is two-edges-flush — the more specific match.
+      // The unsnapped path uses the drag clamp so a release near a
+      // screen edge keeps the window where the user actually saw it.
+      const cornerSnap = snapWindowToCorner(
         dropped,
         { width: session.startSize.width, height: session.startSize.height },
         allDisplayBounds(),
       );
+      const edgeSnap = cornerSnap
+        ? null
+        : snapWindowToEdge(
+            dropped,
+            {
+              width: session.startSize.width,
+              height: session.startSize.height,
+            },
+            allDisplayBounds(),
+          );
       const final =
-        snap?.position ??
+        cornerSnap?.position ??
+        edgeSnap?.position ??
         clampWindowForDrag({
           candidate: dropped,
           size: session.startSize,
@@ -526,12 +591,13 @@ function registerIpc(): void {
         height: session.startSize.height,
       };
       iconWindow.setBounds(newBounds);
+      lastWindowBounds = newBounds;
       // Window position persistence is opt-in; only save when the
       // user has enabled it. Sub-feature 9 wires the setting UI; until
       // then, the toggle is set via settings.json directly for testing.
       // (Drag doesn't change size, so lastWindowSize doesn't need an
       // update here — the collapse target is now derived from window
-      // center via collapseTargetFromWindow, no per-tick state.)
+      // bounds via iconForCollapsedWindow.)
       const settings = loadSettings();
       if (settings.trackWindowPosition) {
         saveSettings({ windowBounds: newBounds });

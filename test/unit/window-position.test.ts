@@ -7,12 +7,14 @@ import {
   defaultWindowPosition,
   defaultWindowSize,
   expandFromIcon,
+  iconForCollapsedWindow,
   isWindowAtDefaultPosition,
   isWindowBoundsOnScreen,
   maxSizeForResize,
   maxWindowSize,
   resolveWindowBoundsForExpand,
   snapWindowToCorner,
+  snapWindowToEdge,
   squareResize,
   WINDOW_DEFAULT_SIZE_DENOM,
   WINDOW_MAX_MARGIN_PX,
@@ -967,5 +969,286 @@ describe('collapseTargetFromWindow — multi-display', () => {
         { x: 1920, y: 0, width: 1920, height: 1080 },
       ]),
     ).toEqual(defaultIconPosition(primary));
+  });
+});
+
+describe('snapWindowToEdge', () => {
+  const size = { width: 200, height: 200 };
+
+  it('snaps to top when drop is within radius of top edge (preserves x)', () => {
+    const result = snapWindowToEdge({ x: 600, y: 30 }, size, [primary]);
+    expect(result?.edge).toBe('top');
+    expect(result?.position).toEqual({ x: 600, y: 0 });
+  });
+
+  it('snaps to bottom when drop is within radius of bottom edge', () => {
+    // Drop's top-left near (any-x, displayH - size.height = 880).
+    const result = snapWindowToEdge({ x: 600, y: 870 }, size, [primary]);
+    expect(result?.edge).toBe('bottom');
+    expect(result?.position).toEqual({ x: 600, y: 1080 - 200 });
+  });
+
+  it('snaps to left when drop is within radius of left edge', () => {
+    const result = snapWindowToEdge({ x: 30, y: 400 }, size, [primary]);
+    expect(result?.edge).toBe('left');
+    expect(result?.position).toEqual({ x: 0, y: 400 });
+  });
+
+  it('snaps to right when drop is within radius of right edge', () => {
+    // Drop's top-left x near (displayW - size.width = 1720).
+    const result = snapWindowToEdge({ x: 1710, y: 400 }, size, [primary]);
+    expect(result?.edge).toBe('right');
+    expect(result?.position).toEqual({ x: 1920 - 200, y: 400 });
+  });
+
+  it('does not snap when drop is far from any edge', () => {
+    expect(snapWindowToEdge({ x: 800, y: 400 }, size, [primary])).toBeNull();
+  });
+
+  it('snaps when distance equals the radius (inclusive boundary)', () => {
+    expect(
+      snapWindowToEdge({ x: 600, y: WINDOW_SNAP_RADIUS_PX }, size, [primary])
+        ?.edge,
+    ).toBe('top');
+  });
+
+  it('does not snap when one pixel beyond the radius', () => {
+    expect(
+      snapWindowToEdge({ x: 600, y: WINDOW_SNAP_RADIUS_PX + 1 }, size, [
+        primary,
+      ]),
+    ).toBeNull();
+  });
+
+  it('honors a custom radius', () => {
+    expect(snapWindowToEdge({ x: 600, y: 30 }, size, [primary], 20)).toBeNull();
+    expect(snapWindowToEdge({ x: 600, y: 30 }, size, [primary], 40)?.edge).toBe(
+      'top',
+    );
+  });
+
+  it('snaps to the closer edge when two are within radius', () => {
+    // Drop near top: top distance 5, left distance 10. Top is closer.
+    expect(snapWindowToEdge({ x: 10, y: 5 }, size, [primary])?.edge).toBe(
+      'top',
+    );
+  });
+
+  it('considers the secondary display in multi-monitor setups', () => {
+    const dispB: DisplayBounds = {
+      x: 1920,
+      y: 0,
+      width: 1920,
+      height: 1080,
+    };
+    const result = snapWindowToEdge({ x: 2500, y: 870 }, size, [
+      primary,
+      dispB,
+    ]);
+    expect(result?.edge).toBe('bottom');
+    expect(result?.position).toEqual({ x: 2500, y: 1080 - 200 });
+  });
+});
+
+describe('iconForCollapsedWindow — B3a (corner)', () => {
+  const expectedTopLeftIcon = { x: ICON_PADDING, y: ICON_PADDING };
+  const expectedTopRightIcon = {
+    x: primary.width - ICON_SIZE - ICON_PADDING,
+    y: ICON_PADDING,
+  };
+  const expectedBottomLeftIcon = {
+    x: ICON_PADDING,
+    y: primary.height - ICON_SIZE - ICON_PADDING,
+  };
+  const expectedBottomRightIcon = {
+    x: primary.width - ICON_SIZE - ICON_PADDING,
+    y: primary.height - ICON_SIZE - ICON_PADDING,
+  };
+
+  it.each([
+    {
+      label: 'top-left',
+      bounds: { x: 0, y: 0, width: 200, height: 200 },
+      expected: expectedTopLeftIcon,
+    },
+    {
+      label: 'top-right',
+      bounds: { x: primary.width - 200, y: 0, width: 200, height: 200 },
+      expected: expectedTopRightIcon,
+    },
+    {
+      label: 'bottom-left',
+      bounds: { x: 0, y: primary.height - 200, width: 200, height: 200 },
+      expected: expectedBottomLeftIcon,
+    },
+    {
+      label: 'bottom-right',
+      bounds: {
+        x: primary.width - 200,
+        y: primary.height - 200,
+        width: 200,
+        height: 200,
+      },
+      expected: expectedBottomRightIcon,
+    },
+  ])(
+    'window at $label corner -> icon at $label corner padded',
+    ({ bounds, expected }) => {
+      expect(
+        iconForCollapsedWindow({ bounds, primary, allDisplays: [primary] }),
+      ).toEqual(expected);
+    },
+  );
+
+  it('tolerates ±2 px DWM rounding for "flush" detection', () => {
+    const slightlyOff: WindowBounds = {
+      x: 1,
+      y: -1,
+      width: 200,
+      height: 200,
+    };
+    expect(
+      iconForCollapsedWindow({
+        bounds: slightlyOff,
+        primary,
+        allDisplays: [primary],
+      }),
+    ).toEqual(expectedTopLeftIcon);
+  });
+});
+
+describe('iconForCollapsedWindow — B3b (edge midpoint)', () => {
+  it.each([
+    {
+      label: 'top edge',
+      bounds: { x: 600, y: 0, width: 200, height: 200 },
+      expected: {
+        x: Math.floor((primary.width - ICON_SIZE) / 2),
+        y: ICON_PADDING,
+      },
+    },
+    {
+      label: 'bottom edge',
+      bounds: { x: 600, y: primary.height - 200, width: 200, height: 200 },
+      expected: {
+        x: Math.floor((primary.width - ICON_SIZE) / 2),
+        y: primary.height - ICON_SIZE - ICON_PADDING,
+      },
+    },
+    {
+      label: 'left edge',
+      bounds: { x: 0, y: 400, width: 200, height: 200 },
+      expected: {
+        x: ICON_PADDING,
+        y: Math.floor((primary.height - ICON_SIZE) / 2),
+      },
+    },
+    {
+      label: 'right edge',
+      bounds: { x: primary.width - 200, y: 400, width: 200, height: 200 },
+      expected: {
+        x: primary.width - ICON_SIZE - ICON_PADDING,
+        y: Math.floor((primary.height - ICON_SIZE) / 2),
+      },
+    },
+  ])(
+    'window flush against $label -> icon at midpoint of that edge',
+    ({ bounds, expected }) => {
+      expect(
+        iconForCollapsedWindow({ bounds, primary, allDisplays: [primary] }),
+      ).toEqual(expected);
+    },
+  );
+});
+
+describe('iconForCollapsedWindow — B3c (window center)', () => {
+  it('returns the icon at the window center when no edges are flush', () => {
+    const bounds: WindowBounds = { x: 600, y: 400, width: 200, height: 200 };
+    const result = iconForCollapsedWindow({
+      bounds,
+      primary,
+      allDisplays: [primary],
+    });
+    // Window center = (700, 500), icon top-left = center - 32.
+    expect(result).toEqual({ x: 668, y: 468 });
+  });
+
+  it('clamps the window-center icon position to stay on display', () => {
+    // Window so wide its right edge is past the display: not flush
+    // (since right side is OFF the display, not on the edge), so we
+    // fall through to the center-clamp. Verify the icon stays fully
+    // on display.
+    const bounds: WindowBounds = {
+      x: 100,
+      y: 400,
+      width: primary.width + 100,
+      height: 200,
+    };
+    const result = iconForCollapsedWindow({
+      bounds,
+      primary,
+      allDisplays: [primary],
+    });
+    expect(result.x + ICON_SIZE).toBeLessThanOrEqual(primary.x + primary.width);
+    expect(result.x).toBeGreaterThanOrEqual(primary.x);
+  });
+});
+
+describe('iconForCollapsedWindow — multi-monitor', () => {
+  const dispB: DisplayBounds = {
+    x: 1920,
+    y: 0,
+    width: 1920,
+    height: 1080,
+  };
+
+  it('returns secondary corner icon when window is at secondary corner', () => {
+    const bounds: WindowBounds = {
+      x: dispB.x,
+      y: 0,
+      width: 200,
+      height: 200,
+    };
+    const result = iconForCollapsedWindow({
+      bounds,
+      primary,
+      allDisplays: [primary, dispB],
+    });
+    expect(result).toEqual({
+      x: dispB.x + ICON_PADDING,
+      y: ICON_PADDING,
+    });
+  });
+
+  it('returns secondary edge midpoint when window is flush against secondary edge', () => {
+    const bounds: WindowBounds = {
+      x: dispB.x + 600,
+      y: 0,
+      width: 200,
+      height: 200,
+    };
+    const result = iconForCollapsedWindow({
+      bounds,
+      primary,
+      allDisplays: [primary, dispB],
+    });
+    expect(result.y).toBe(ICON_PADDING);
+    expect(result.x).toBe(dispB.x + Math.floor((dispB.width - ICON_SIZE) / 2));
+  });
+
+  it('returns window-center icon on whichever display the window center is on', () => {
+    const bounds: WindowBounds = {
+      x: dispB.x + 600,
+      y: 400,
+      width: 200,
+      height: 200,
+    };
+    const result = iconForCollapsedWindow({
+      bounds,
+      primary,
+      allDisplays: [primary, dispB],
+    });
+    // Center = (dispB.x + 700, 500), icon top-left = center - 32.
+    expect(result).toEqual({ x: dispB.x + 668, y: 468 });
   });
 });

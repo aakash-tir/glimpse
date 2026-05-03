@@ -6,9 +6,27 @@ The weather panel that opens when the user clicks the [icon](./icon.md). Square,
 
 - Click icon → window **scales up out of the icon's current position over 200 ms ease-out**.
 - On collapse, window scales back down to icon position over the same duration.
-- When collapsed, the icon returns to the **window's last position** (window-center → icon-center). The icon is **clamped** to stay fully on-screen if the window's center was near a screen edge.
-- **Special case:** if the window was at the canonical default position (primary's top-right) when collapsed, the icon snaps to the default top-right padded position.
-- **Multi-monitor:** the window can be expanded on, dragged onto, and collapsed back from any connected display. `expandFromIcon` clamps the new bounds against the icon's display (not always primary), so an icon dragged onto the secondary monitor opens its window on the secondary too. Collapse mirrors this — the icon lands on whichever display the window's pending position resolves to. The "snap back to default" rule still uses the canonical primary default since that's THE default for the app.
+
+### Collapse paths and icon placement
+
+Two collapse paths from the title bar; the in-place path has a richer set of rules. Authoritative spec is mirrored in `manual-tests-review.md` and the test cases.
+
+- **Reset-to-default — minimize-to-icon button (2-square glyph).** Always restores both **size and position** to canonical defaults: icon at primary's top-right with 16 px padding; in-memory `lastWindowSize` cleared so the next expand uses default size; saved `windowBounds` cleared (when `trackWindowPosition` is on) so a relaunch doesn't restore the prior bounds. Independent of any drag/resize activity.
+
+- **In-place collapse — title-bar weather-icon button (sun glyph).** Behavior depends on what the user did between expand and collapse. "Drag" means the window-drag gesture (double-click panel → mouse-drag), **not resize**.
+  - **B1.** No drag, no resize → icon returns to the **exact same position it had at expand time**.
+  - **B2.** Resize only (no drag) → same as B1. Resizing from any corner — including those that shift the window's top-left — does not relocate the icon. The gesture was "resize", not "move".
+  - **B3.** Drag occurred (with or without resize) → icon position is derived from where the window ended up:
+    - **B3a.** Window flush at a screen corner (after corner snap, ±2 px tolerance) → icon at that corner with 16 px padding.
+    - **B3b.** Window flush against exactly one screen edge (after edge snap, not at a corner) → icon at that edge's midpoint with 16 px padding.
+    - **B3c.** Window elsewhere → icon at the window's center.
+
+- **Multi-monitor.** All B3 sub-rules apply on whichever display the window's center is on. Corners and edges in B3a / B3b refer to **that display's** corners and edges, not the primary's. `expandFromIcon` clamps the new bounds against the icon's display, so an icon dragged onto the secondary opens its window on the secondary. The reset-to-default rule still uses the canonical primary default since that's THE default for the app.
+
+### Window-side snap (drag-end)
+
+- **Corner snap** (40 px Euclidean): window flush against a screen corner, no padding.
+- **Edge snap** (40 px perpendicular): window flush against a screen edge, position along the parallel axis preserved. Corner takes priority over edge when both are in radius.
 
 ## Size
 

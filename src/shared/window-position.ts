@@ -40,6 +40,10 @@ export const WINDOW_MIN_SIZE_PX = 120;
 // padding does not apply to the window itself, only to the icon's
 // resting position.)"
 export const WINDOW_SNAP_RADIUS_PX = 40;
+// Tolerance in px for "is the window flush against an edge" detection
+// in iconForCollapsedWindow. Mirrors the ±2 px DWM rounding tolerance
+// used in E2E bounds assertions.
+export const WINDOW_FLUSH_TOLERANCE_PX = 2;
 
 export type WindowPoint = { x: number; y: number };
 
@@ -49,7 +53,10 @@ export type ResizeCorner =
   | 'bottom-left'
   | 'bottom-right';
 
+export type WindowEdge = 'top' | 'bottom' | 'left' | 'right';
+
 export type WindowCornerSnap = { corner: Corner; position: WindowPoint };
+export type WindowEdgeSnap = { edge: WindowEdge; position: WindowPoint };
 
 export function defaultWindowSize(primary: DisplayBounds): number {
   return Math.floor(
@@ -359,6 +366,139 @@ export function snapWindowToCorner(
     }
   }
   return best?.entry ?? null;
+}
+
+// Snap a dropped window to the nearest screen edge if the perpendicular
+// distance from the dropped position to that edge is within the snap
+// radius. Edge snap preserves the position along the parallel axis —
+// drop near the top edge → window flush against top, x unchanged.
+//
+// Caller resolution: corner snap takes priority when both fire (a
+// drop within the corner snap radius would also be within the edge
+// snap radius for two edges; the corner is the more specific match).
+// Returns null when no edge of any display is close enough.
+export function snapWindowToEdge(
+  topLeft: WindowPoint,
+  size: { width: number; height: number },
+  displays: DisplayBounds[],
+  radiusPx: number = WINDOW_SNAP_RADIUS_PX,
+): WindowEdgeSnap | null {
+  let best: { entry: WindowEdgeSnap; dist: number } | null = null;
+  for (const display of displays) {
+    const edgeTargets: WindowEdgeSnap[] = [
+      { edge: 'top', position: { x: topLeft.x, y: display.y } },
+      {
+        edge: 'bottom',
+        position: { x: topLeft.x, y: display.y + display.height - size.height },
+      },
+      { edge: 'left', position: { x: display.x, y: topLeft.y } },
+      {
+        edge: 'right',
+        position: { x: display.x + display.width - size.width, y: topLeft.y },
+      },
+    ];
+    for (const entry of edgeTargets) {
+      // Perpendicular distance — only one axis differs for any edge.
+      const dx = entry.position.x - topLeft.x;
+      const dy = entry.position.y - topLeft.y;
+      const dist = Math.abs(dx) + Math.abs(dy);
+      if (dist > radiusPx) continue;
+      if (best === null || dist < best.dist) best = { entry, dist };
+    }
+  }
+  return best?.entry ?? null;
+}
+
+// Icon position to use when an in-place collapse follows a window-drag
+// (case B3 in the collapse spec). Inspects the window's bounds for
+// flush-against-edge alignment within ±2 px DWM tolerance:
+//
+//   - flush against TWO adjacent edges  → corner (icon at corner with
+//                                          16 px padding, B3a)
+//   - flush against exactly ONE edge    → edge midpoint (16 px padding
+//                                          on the perpendicular axis,
+//                                          centered along the parallel
+//                                          axis, B3b)
+//   - flush against NO edges            → window center (B3c)
+//
+// All measurements are against the display containing the window's
+// center — so a window on the secondary monitor lands its icon on
+// the secondary monitor's corner / edge / center, not the primary's.
+export function iconForCollapsedWindow(args: {
+  bounds: WindowBounds;
+  primary: DisplayBounds;
+  allDisplays: DisplayBounds[];
+}): IconPosition {
+  const { bounds, primary, allDisplays } = args;
+  const winCenter = {
+    x: bounds.x + bounds.width / 2,
+    y: bounds.y + bounds.height / 2,
+  };
+  const display = displayForPoint(winCenter, allDisplays, primary);
+  const tol = WINDOW_FLUSH_TOLERANCE_PX;
+
+  const atLeft = Math.abs(bounds.x - display.x) <= tol;
+  const atRight =
+    Math.abs(bounds.x + bounds.width - (display.x + display.width)) <= tol;
+  const atTop = Math.abs(bounds.y - display.y) <= tol;
+  const atBottom =
+    Math.abs(bounds.y + bounds.height - (display.y + display.height)) <= tol;
+
+  // B3a — corner (two adjacent edges flush).
+  if (atTop && atLeft) return iconAtDisplayCorner('top-left', display);
+  if (atTop && atRight) return iconAtDisplayCorner('top-right', display);
+  if (atBottom && atLeft) return iconAtDisplayCorner('bottom-left', display);
+  if (atBottom && atRight) return iconAtDisplayCorner('bottom-right', display);
+
+  // B3b — exactly one edge flush.
+  if (atTop) return iconAtEdgeMidpoint('top', display);
+  if (atBottom) return iconAtEdgeMidpoint('bottom', display);
+  if (atLeft) return iconAtEdgeMidpoint('left', display);
+  if (atRight) return iconAtEdgeMidpoint('right', display);
+
+  // B3c — elsewhere; icon at window center, clamped to the display so
+  // a window center near a screen edge can't strand the icon
+  // partially off-screen.
+  return clampWindowToDisplay(
+    {
+      x: Math.round(winCenter.x - ICON_SIZE / 2),
+      y: Math.round(winCenter.y - ICON_SIZE / 2),
+    },
+    { width: ICON_SIZE, height: ICON_SIZE },
+    display,
+  );
+}
+
+function iconAtDisplayCorner(corner: Corner, d: DisplayBounds): IconPosition {
+  const left = d.x + ICON_PADDING;
+  const right = d.x + d.width - ICON_SIZE - ICON_PADDING;
+  const top = d.y + ICON_PADDING;
+  const bottom = d.y + d.height - ICON_SIZE - ICON_PADDING;
+  switch (corner) {
+    case 'top-left':
+      return { x: left, y: top };
+    case 'top-right':
+      return { x: right, y: top };
+    case 'bottom-left':
+      return { x: left, y: bottom };
+    case 'bottom-right':
+      return { x: right, y: bottom };
+  }
+}
+
+function iconAtEdgeMidpoint(edge: WindowEdge, d: DisplayBounds): IconPosition {
+  const midX = d.x + Math.floor((d.width - ICON_SIZE) / 2);
+  const midY = d.y + Math.floor((d.height - ICON_SIZE) / 2);
+  switch (edge) {
+    case 'top':
+      return { x: midX, y: d.y + ICON_PADDING };
+    case 'bottom':
+      return { x: midX, y: d.y + d.height - ICON_SIZE - ICON_PADDING };
+    case 'left':
+      return { x: d.x + ICON_PADDING, y: midY };
+    case 'right':
+      return { x: d.x + d.width - ICON_SIZE - ICON_PADDING, y: midY };
+  }
 }
 
 // Largest size the window can be resized to without spilling off the
