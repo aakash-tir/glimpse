@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { Settings } from '../shared/settings-store';
 import type { ScreenPoint } from '../shared/drag';
+import type { Mode, ModeChange } from '../shared/mode';
+import type { ResizeCorner } from '../shared/window-position';
 
 const api = {
   getSettings: (): Promise<Settings> => ipcRenderer.invoke('settings:get'),
@@ -11,6 +13,29 @@ const api = {
   dragMove: (cursor: ScreenPoint): void =>
     ipcRenderer.send('drag:move', cursor),
   dragEnd: (cursor: ScreenPoint): void => ipcRenderer.send('drag:end', cursor),
+  getMode: (): Promise<Mode> => ipcRenderer.invoke('mode:get'),
+  expand: (): Promise<ModeChange> => ipcRenderer.invoke('mode:expand'),
+  collapse: (opts?: { resetToDefault?: boolean }): Promise<ModeChange> =>
+    ipcRenderer.invoke('mode:collapse', opts),
+  previewCollapseAnchor: (opts?: {
+    resetToDefault?: boolean;
+  }): Promise<{ x: number; y: number }> =>
+    ipcRenderer.invoke('mode:preview-collapse-anchor', opts),
+  quit: (): void => ipcRenderer.send('app:quit'),
+  resizeStart: (corner: ResizeCorner, cursor: ScreenPoint): void =>
+    ipcRenderer.send('resize:start', { corner, cursor }),
+  resizeMove: (cursor: ScreenPoint): void =>
+    ipcRenderer.send('resize:move', cursor),
+  resizeEnd: (cursor: ScreenPoint): void =>
+    ipcRenderer.send('resize:end', cursor),
+  onModeChanged: (cb: (change: ModeChange) => void): (() => void) => {
+    const handler = (_e: Electron.IpcRendererEvent, change: ModeChange): void =>
+      cb(change);
+    ipcRenderer.on('mode:changed', handler);
+    return () => {
+      ipcRenderer.off('mode:changed', handler);
+    };
+  },
 };
 
 contextBridge.exposeInMainWorld('glimpse', api);

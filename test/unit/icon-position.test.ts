@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   defaultIconPosition,
+  displayForIcon,
   isPositionOnScreen,
   resolveIconPosition,
   shouldResetIconPosition,
@@ -134,4 +135,46 @@ describe('shouldResetIconPosition', () => {
       expect(shouldResetIconPosition(saved, displays)).toBe(true);
     },
   );
+});
+
+describe('displayForIcon', () => {
+  const displayB: DisplayBounds = {
+    x: 1920,
+    y: 0,
+    width: 1920,
+    height: 1080,
+  };
+
+  it('returns the display containing the icon center on a single display', () => {
+    expect(displayForIcon({ x: 500, y: 400 }, [primary], primary)).toEqual(
+      primary,
+    );
+  });
+
+  it('returns the secondary display when the icon center is on it', () => {
+    expect(
+      displayForIcon({ x: 2500, y: 400 }, [primary, displayB], primary),
+    ).toEqual(displayB);
+  });
+
+  it('returns the closest display when the icon center is in a gap', () => {
+    // Stacked displays with a 100 px vertical gap; icon center sits
+    // in the gap. Distance to top's center is shorter, so top wins.
+    const top: DisplayBounds = { x: 0, y: 0, width: 1920, height: 600 };
+    const bottom: DisplayBounds = {
+      x: 0,
+      y: 700,
+      width: 1920,
+      height: 600,
+    };
+    // Icon at y=620 → center at y=652. Top center=300, bottom center=1000.
+    // |652 - 300| = 352, |652 - 1000| = 348 → bottom is slightly closer.
+    expect(displayForIcon({ x: 100, y: 620 }, [top, bottom], primary)).toEqual(
+      bottom,
+    );
+  });
+
+  it('falls back to primary when displays is empty', () => {
+    expect(displayForIcon({ x: 500, y: 400 }, [], primary)).toEqual(primary);
+  });
 });

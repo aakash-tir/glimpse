@@ -11,7 +11,7 @@
 - **`tailwindcss`** + **`shadcn/ui`** — UI components and design system.
 - **`framer-motion`** — cube transitions, scale animations, coachmark spotlights, event-background motion.
 - **`react-icons/wi`** — wraps the `weather-icons` font by Erik Flowers — extensive day/night variants and Open-Meteo-friendly mapping.
-- **`lucide-react`** — bundled with shadcn/ui; used for the relocate button glyph (`CornerUpRight`) and other UI icons as needed.
+- **`lucide-react`** — bundled with shadcn/ui; used for the title-bar close button (`X`) and other UI icons as needed.
 - **`suncalc`** — local astronomical calculations: moon phase, illumination, eclipses (no network call).
 
 See [styling.md](./styling.md) for the visual / animation rules and [data-sources.md](./data-sources.md) for the data flow.

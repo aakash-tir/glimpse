@@ -24,12 +24,15 @@ async function getIconWindowBounds(
 }
 
 // Two clicks dispatched back-to-back via the locator API land well
-// under the 250 ms double-click threshold and avoid flakiness from
-// real-time scheduling in CI.
+// under the 250 ms double-click threshold. The trailing assertion
+// makes the helper deterministic — Playwright's auto-retry waits
+// until the React drag-mode state has propagated, so subsequent
+// mousedown / mousemove dispatches can't race the toggle.
 async function doubleClickIcon(page: Page): Promise<void> {
   const icon = page.getByTestId('icon-root');
   await icon.dispatchEvent('click');
   await icon.dispatchEvent('click');
+  await expect(icon).toHaveAttribute('data-drag-mode', 'on');
 }
 
 test('double-click enters drag mode and renders the glow', async () => {
@@ -58,7 +61,7 @@ test('clicking the transparent app area exits drag mode', async () => {
       'on',
     );
 
-    await page.getByTestId('app-root').dispatchEvent('click');
+    await page.getByTestId('icon-view').dispatchEvent('click');
 
     await expect(page.getByTestId('icon-root')).toHaveAttribute(
       'data-drag-mode',
@@ -101,19 +104,20 @@ test('mouse drag (mousedown → mousemove → mouseup) moves the icon window', a
 
     const before = await getIconWindowBounds(app);
 
-    // Synthesize a deterministic 100×50 drag using DOM events. This avoids
-    // race conditions between Playwright's real-mouse coordinates and the
-    // window jumping under the cursor while main calls setBounds.
+    // Synthesize a deterministic -100×+50 drag using DOM events. The
+    // icon starts at the default top-right; dragging LEFT keeps it on
+    // screen (a +100 X drag would push past the right edge and trip
+    // the clampIconForDrag guard, hiding the move under the clamp).
     const icon = page.getByTestId('icon-root');
     await icon.dispatchEvent('mousedown', { screenX: 1000, screenY: 500 });
     await page.evaluate(() => {
       window.dispatchEvent(
-        new MouseEvent('mousemove', { screenX: 1100, screenY: 550 }),
+        new MouseEvent('mousemove', { screenX: 900, screenY: 550 }),
       );
     });
     await page.evaluate(() => {
       window.dispatchEvent(
-        new MouseEvent('mouseup', { screenX: 1100, screenY: 550 }),
+        new MouseEvent('mouseup', { screenX: 900, screenY: 550 }),
       );
     });
 
@@ -121,7 +125,7 @@ test('mouse drag (mousedown → mousemove → mouseup) moves the icon window', a
     await page.waitForTimeout(200);
 
     const after = await getIconWindowBounds(app);
-    expect(after.x - before.x).toBe(100);
+    expect(after.x - before.x).toBe(-100);
     expect(after.y - before.y).toBe(50);
   } finally {
     await app.close();

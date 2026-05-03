@@ -75,7 +75,7 @@
 
 ## M3 — Window mode (expanded state)
 
-**Status:** Not started
+**Status:** Done (2026-05-04)
 
 **Scope.** Replace the icon with the window on click; drag, resize, collapse.
 
@@ -85,9 +85,9 @@
 - Window double-click toggles drag mode (same gesture as icon). Arrow buttons exempt from double-click.
 - Window drag bounds: free placement + snap to 4 screen corners (40 px radius).
 - Title bar auto-hide: invisible by default; reveals on top-edge (~24 px) hover with 150 ms fade-in / 300 ms fade-out.
-- Title bar layout: weather icon · "Glimpse" wordmark (centered, adaptive color) · minimize-to-icon · relocate (`CornerUpRight` from `lucide-react`) · close.
-- Title bar weather icon and minimize-to-icon button collapse the window to the **window's last position** (window-center → icon-center, clamped to screen). Special case: if window was at default position, icon snaps back to default top-right.
-- Relocate button resets icon position to default top-right.
+- Title bar layout: weather icon · "Glimpse" wordmark (centered, adaptive color) · minimize-to-icon · close.
+- Title bar **weather icon** collapses the window to the **window's last position** (window-center → icon-center, clamped to screen). Special case: if window was at default position, icon snaps back to default top-right.
+- Title bar **minimize-to-icon button** collapses AND resets the icon position to the default top-right (it absorbed the previously-planned standalone relocate button's behavior; the relocate button itself was removed since the weather-icon already covered the in-place collapse case).
 - Close button quits the app entirely.
 - Outside-click does NOT close the window. No Esc-to-close.
 - "Track window position" setting (default off): when on, persists window size + position.

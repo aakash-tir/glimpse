@@ -13,6 +13,15 @@ type GlimpseStub = {
   dragStart: ReturnType<typeof vi.fn>;
   dragMove: ReturnType<typeof vi.fn>;
   dragEnd: ReturnType<typeof vi.fn>;
+  getMode: ReturnType<typeof vi.fn>;
+  expand: ReturnType<typeof vi.fn>;
+  collapse: ReturnType<typeof vi.fn>;
+  previewCollapseAnchor: ReturnType<typeof vi.fn>;
+  quit: ReturnType<typeof vi.fn>;
+  onModeChanged: ReturnType<typeof vi.fn>;
+  resizeStart: ReturnType<typeof vi.fn>;
+  resizeMove: ReturnType<typeof vi.fn>;
+  resizeEnd: ReturnType<typeof vi.fn>;
 };
 
 function installGlimpseStub(): GlimpseStub {
@@ -20,6 +29,17 @@ function installGlimpseStub(): GlimpseStub {
     dragStart: vi.fn(),
     dragMove: vi.fn(),
     dragEnd: vi.fn(),
+    getMode: vi.fn().mockResolvedValue('icon'),
+    expand: vi.fn().mockResolvedValue('window'),
+    collapse: vi.fn().mockResolvedValue('icon'),
+    previewCollapseAnchor: vi.fn().mockResolvedValue({ x: 0, y: 0 }),
+    quit: vi.fn(),
+    onModeChanged: vi.fn().mockReturnValue(() => {
+      // unsubscribe noop
+    }),
+    resizeStart: vi.fn(),
+    resizeMove: vi.fn(),
+    resizeEnd: vi.fn(),
   };
   (window as unknown as { glimpse: GlimpseStub }).glimpse = stub;
   return stub;
@@ -44,7 +64,7 @@ function clickIcon(): void {
 }
 
 function clickAppContainer(): void {
-  fireEvent.click(screen.getByTestId('app-root'));
+  fireEvent.click(screen.getByTestId('icon-view'));
 }
 
 function fastForward(ms: number): void {
@@ -59,7 +79,7 @@ describe('drag mode (App-level)', () => {
     expect(screen.getByTestId('icon-root').getAttribute('data-drag-mode')).toBe(
       'off',
     );
-    expect(screen.getByTestId('app-root').getAttribute('data-drag-mode')).toBe(
+    expect(screen.getByTestId('icon-view').getAttribute('data-drag-mode')).toBe(
       'off',
     );
     expect(screen.queryByTestId('drag-mode-glow')).toBeNull();

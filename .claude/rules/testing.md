@@ -69,11 +69,10 @@ For each milestone below, every bullet is a test (or small group of related test
 - **Unit:** "default position" detection — collapse from default-positioned window snaps icon to default top-right (not window-center).
 - **Unit:** square-lock resize — corner drag scales both dimensions equally; min 120 px and max (display-min − margin) enforced.
 - **Component:** title bar hidden by default; revealed on top-edge (top ~24 px) hover with correct fade-in / fade-out timing.
-- **Component:** title bar layout — left weather icon · centered "Glimpse" wordmark (adaptive color) · right minimize / relocate / close.
+- **Component:** title bar layout — left weather icon · centered "Glimpse" wordmark (adaptive color) · right minimize / close. (No standalone relocate button — its behavior was absorbed into minimize.)
 - **E2E:** click icon → window expands with scale animation, anchored at icon position.
-- **E2E:** title-bar weather icon click collapses to icon mode.
-- **E2E:** minimize-to-icon button collapses to icon at the right position (with all the position rules).
-- **E2E:** relocate button resets icon to default top-right.
+- **E2E:** title-bar weather icon click collapses to icon **at the window's last position** (in-place collapse).
+- **E2E:** minimize-to-icon button collapses **and resets the icon to the default top-right** (the absorbed-relocate behavior).
 - **E2E:** × button quits the app (process exits).
 - **E2E:** outside-click does NOT close the window (clicking the desktop or another app's window leaves Glimpse open).
 - **E2E:** Esc does NOT close the window.
