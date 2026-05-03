@@ -101,7 +101,7 @@
 
 ## M4 — Slide framework + cube animation + dot indicator
 
-**Status:** Not started
+**Status:** Done (2026-05-03)
 
 **Scope.** The 6-slide skeleton with placeholder content. No real data wiring yet.
 
