@@ -36,6 +36,14 @@ export function WindowView({
   enterBounds,
 }: WindowViewProps): JSX.Element {
   const [collapse, setCollapse] = useState<CollapseRequest | null>(null);
+  // Hides the panel + title bar in the brief window between the scale
+  // animation finishing and `mode:changed` arriving from main. Without
+  // this, the BrowserWindow resizes to icon-mode bounds while WindowView
+  // is still mounted with `width: 100%`, and the transform-origin
+  // pixel values (computed in window-mode coords) resolve to a
+  // different on-screen position — producing a 1–2 frame visual
+  // "jump-then-readjust" right before IconView takes over.
+  const [hidden, setHidden] = useState(false);
   const [dragMode, setDragMode] = useState(false);
   const isDraggingRef = useRef(false);
 
@@ -52,6 +60,7 @@ export function WindowView({
 
   const handleAnimationComplete = useCallback(() => {
     if (!collapse) return;
+    setHidden(true);
     void window.glimpse?.collapse(collapse.opts);
   }, [collapse]);
 
@@ -119,9 +128,13 @@ export function WindowView({
     ? ICON_SIZE / Math.max(enterBounds.width, enterBounds.height)
     : 1;
 
-  // Animation target state. When collapsing, we shrink to the same
-  // icon-relative scale around the exit anchor; otherwise we sit at
-  // scale=1.
+  // Animation target state. When collapsing we shrink the panel
+  // toward the exit anchor (where the icon will land) AND fade the
+  // whole root to opacity 0 over the same duration. The fade is
+  // applied at the root (see motion.div in render) so the panel +
+  // title bar dissolve together; pure scale-down concentrates the
+  // visible mass at the transform-origin and can read as the panel
+  // being flung sideways, which the fade smooths over.
   const collapsing = collapse !== null;
   const targetScale = collapsing
     ? enterBounds
@@ -178,12 +191,18 @@ export function WindowView({
   );
 
   return (
-    <div
+    <motion.div
       data-testid="window-view-root"
+      data-hidden={hidden ? 'on' : 'off'}
+      animate={{ opacity: collapsing ? 0 : 1 }}
+      transition={{ duration: WINDOW_SCALE_DURATION_S, ease: 'easeOut' }}
       style={{
         position: 'relative',
         width: '100vw',
         height: '100vh',
+        // visibility (not display:none) so the still-running
+        // motion animation doesn't get yanked mid-frame.
+        visibility: hidden ? 'hidden' : 'visible',
       }}
     >
       {dragMode ? <DragModeGlow fill>{panelInner}</DragModeGlow> : panelInner}
@@ -196,6 +215,6 @@ export function WindowView({
         onClose={handleClose}
       />
       <ResizeHandles />
-    </div>
+    </motion.div>
   );
 }

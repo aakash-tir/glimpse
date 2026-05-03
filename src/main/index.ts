@@ -2,6 +2,8 @@ import { app, BrowserWindow, screen, ipcMain } from 'electron';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
+  clampIconForDrag,
+  clampIconToDisplay,
   defaultIconPosition,
   ICON_OFFSET_X,
   ICON_OFFSET_Y,
@@ -15,7 +17,6 @@ import {
 import { computeIconPosFromCursor, type ScreenPoint } from '../shared/drag';
 import { snapToCorner } from '../shared/snap';
 import {
-  collapseTargetFromWindow,
   maxWindowSize,
   resolveWindowBoundsForExpand,
   snapWindowToCorner,
@@ -88,8 +89,8 @@ function snapBackIfOffScreen(): void {
   if (!iconWindow) return;
   // Display changes only re-anchor the icon; if the user is currently in
   // window mode we leave the panel where it is (the user is actively
-  // looking at it). The next collapse will re-clamp via
-  // collapseTargetFromWindow.
+  // looking at it). The next collapse will re-clamp pendingIconPosition
+  // via clampIconToDisplay in nextIconPositionForCollapse.
   if (mode !== 'icon') return;
 
   const settings = loadSettings();
@@ -133,6 +134,17 @@ type ResizeSession = {
 
 let resizeSession: ResizeSession | null = null;
 
+// Where the icon will land on collapse. Captured at expand time and
+// shifted by the same delta whenever the user drags the window. Resize
+// does NOT move it (per user spec: dragging the window moves the icon
+// with it; resizing alone leaves the icon's resting position alone).
+// Cleared after collapse.
+let pendingIconPosition: IconPosition | null = null;
+// The window's top-left at the most recent expand / drag-end / resize-end.
+// Diffing against this on the next drag/resize gives us the move delta
+// without depending on what the renderer thinks the bounds are.
+let windowOriginAtExpand: { x: number; y: number } | null = null;
+
 function currentIconPosition(): IconPosition {
   if (!iconWindow) {
     return defaultIconPosition(primaryBounds());
@@ -146,6 +158,11 @@ function currentIconPosition(): IconPosition {
 
 function applyIconPosition(pos: IconPosition): void {
   if (!iconWindow) return;
+  // Callers are responsible for clamping (drag handlers use
+  // clampIconForDrag for cross-display behavior; collapse paths clamp
+  // via clampIconToDisplay against the primary). This keeps the helper
+  // pure-positional so multi-monitor placements aren't yanked back to
+  // the primary display.
   const win = windowPositionForIcon(pos);
   iconWindow.setBounds({
     x: win.x,
@@ -197,6 +214,11 @@ function expandToWindow(): ModeChange {
     allDisplays: allDisplayBounds(),
   });
   applyWindowBounds(bounds);
+  // Capture where the icon will return to on collapse. Window-mode
+  // drags shift this 1:1; resize leaves it alone. See comments at the
+  // declarations of pendingIconPosition / windowOriginAtExpand.
+  pendingIconPosition = iconPos;
+  windowOriginAtExpand = { x: bounds.x, y: bounds.y };
   mode = 'window';
   // Anchor: where the icon's center was on screen.
   const anchorScreen = {
@@ -210,11 +232,21 @@ function expandToWindow(): ModeChange {
 
 type CollapseOpts = { resetToDefault?: boolean };
 
+// Returns where the icon should land when the panel collapses.
+//   - Relocate (resetToDefault): always default top-right.
+//   - Otherwise: the pendingIconPosition captured at expand and
+//     shifted by any window drags since. Clamped to the primary
+//     display so a stale value (e.g. after a monitor disconnect)
+//     can't strand the icon off-screen.
+//   - Fallback: pre-M3 behavior (icon at the icon's current location)
+//     in the unlikely event we're collapsing without a pending value.
 function nextIconPositionForCollapse(opts: CollapseOpts): IconPosition {
   if (!iconWindow) return defaultIconPosition(primaryBounds());
   if (opts.resetToDefault) return defaultIconPosition(primaryBounds());
-  const winBounds = iconWindow.getBounds();
-  return collapseTargetFromWindow(winBounds, primaryBounds());
+  if (pendingIconPosition) {
+    return clampIconToDisplay(pendingIconPosition, primaryBounds());
+  }
+  return currentIconPosition();
 }
 
 function previewCollapseAnchor(opts: CollapseOpts): { x: number; y: number } {
@@ -262,6 +294,8 @@ function collapseToIcon(opts: CollapseOpts = {}): ModeChange {
   } else {
     saveSettings({ iconPosition: iconPos });
   }
+  pendingIconPosition = null;
+  windowOriginAtExpand = null;
   mode = 'icon';
   // After resize, the new bounds describe the icon-mode window.
   const newBounds: WindowBounds = {
@@ -334,6 +368,13 @@ function registerIpc(): void {
     const final = applyResize(cursor);
     resizeSession = null;
     if (!final) return;
+    // Resize from top-left / top-right shifts the window's top-left,
+    // but the icon's resting position should NOT follow a resize. Just
+    // re-anchor windowOriginAtExpand so the next drag delta is computed
+    // from the post-resize position.
+    if (windowOriginAtExpand) {
+      windowOriginAtExpand = { x: final.x, y: final.y };
+    }
     const settings = loadSettings();
     if (settings.trackWindowPosition) {
       saveSettings({ windowBounds: final });
@@ -374,7 +415,13 @@ function registerIpc(): void {
         height: b.height,
       });
     } else {
-      applyIconPosition(next);
+      const clamped = clampIconForDrag({
+        candidate: next,
+        cursor,
+        prevPos: currentIconPosition(),
+        allDisplays: allDisplayBounds(),
+      });
+      applyIconPosition(clamped);
     }
   });
 
@@ -403,6 +450,20 @@ function registerIpc(): void {
         height: b.height,
       };
       iconWindow.setBounds(newBounds);
+      // Shift pendingIconPosition by the same delta so the icon
+      // returns to its original spot offset by however much the window
+      // moved. (User spec: "when moved, move the icon position
+      // relatively"). Then re-anchor windowOriginAtExpand so the next
+      // drag delta is computed from the new position.
+      if (pendingIconPosition && windowOriginAtExpand) {
+        const dx = final.x - windowOriginAtExpand.x;
+        const dy = final.y - windowOriginAtExpand.y;
+        pendingIconPosition = {
+          x: pendingIconPosition.x + dx,
+          y: pendingIconPosition.y + dy,
+        };
+      }
+      windowOriginAtExpand = { x: final.x, y: final.y };
       // Window position persistence is opt-in; only save when the
       // user has enabled it. Sub-feature 9 wires the setting UI; until
       // then, the toggle is set via settings.json directly for testing.
@@ -412,7 +473,17 @@ function registerIpc(): void {
       }
     } else {
       const snapped = snapToCorner(dropped, primaryBounds());
-      const final = snapped?.position ?? dropped;
+      // Snap returns corner-padded positions on the primary display; the
+      // unsnapped path uses the cross-display drag clamp so a release
+      // near a monitor seam stays where the user actually sees the icon.
+      const final =
+        snapped?.position ??
+        clampIconForDrag({
+          candidate: dropped,
+          cursor,
+          prevPos: currentIconPosition(),
+          allDisplays: allDisplayBounds(),
+        });
       applyIconPosition(final);
       saveSettings({ iconPosition: final });
     }
