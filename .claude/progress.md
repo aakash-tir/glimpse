@@ -75,7 +75,7 @@
 
 ## M3 — Window mode (expanded state)
 
-**Status:** Not started
+**Status:** Done (2026-05-04)
 
 **Scope.** Replace the icon with the window on click; drag, resize, collapse.
 
