@@ -290,6 +290,63 @@ test('single-instance lock — 2nd launch in icon-drag mode exits drag and expan
   }
 });
 
+test('window-mode drag does not change the window size (regression)', async () => {
+  // Issue 4 from manual-tests-review: dragging the window in
+  // window-mode used to grow the window by a few px per mousemove
+  // because the dragMove handler re-read getBounds() (frame-inclusive
+  // on Windows DWM) and fed it back to setBounds() (which interprets
+  // the size differently). Snapshotting size at drag:start removes
+  // the round-trip; this test asserts the size stays put across many
+  // moves.
+  const app = await launch();
+  try {
+    const page = await app.firstWindow();
+    await expandToWindow(page);
+    const before = await getWindowBounds(app);
+
+    // Enter window-drag mode (double-click panel body).
+    const panel = page.getByTestId('window-view');
+    await panel.dispatchEvent('click');
+    await panel.dispatchEvent('click');
+    await page.waitForTimeout(50);
+    await expect(panel).toHaveAttribute('data-drag-mode', 'on');
+
+    // Synthesize a long sequence of mousemoves so any per-tick drift
+    // accumulates into something measurable. mousedown anchors the
+    // drag at the cursor's start position; each mousemove streams
+    // drag:move IPCs that previously called getBounds()+setBounds().
+    await panel.dispatchEvent('mousedown', { screenX: 600, screenY: 400 });
+    for (let i = 0; i < 20; i++) {
+      await page.evaluate((step) => {
+        window.dispatchEvent(
+          new MouseEvent('mousemove', {
+            screenX: 600 + step * 5,
+            screenY: 400 + step * 3,
+          }),
+        );
+      }, i);
+    }
+    await page.evaluate(() => {
+      window.dispatchEvent(
+        new MouseEvent('mouseup', { screenX: 700, screenY: 460 }),
+      );
+    });
+    await page.waitForTimeout(200);
+
+    const after = await getWindowBounds(app);
+    // Width and height MUST be unchanged across the drag. ±2 px
+    // tolerates Windows DWM rounding on a single setBounds, which is
+    // already covered by the bounds-rounding workaround in commit
+    // 737f299; anything beyond that is the per-tick drift bug.
+    expect(Math.abs(after.width - before.width)).toBeLessThanOrEqual(2);
+    expect(Math.abs(after.height - before.height)).toBeLessThanOrEqual(2);
+    // The window did move (sanity check that the drag actually fired).
+    expect(after.x).not.toBe(before.x);
+  } finally {
+    await app.close();
+  }
+});
+
 test('Esc does NOT close the window', async () => {
   const app = await launch();
   try {

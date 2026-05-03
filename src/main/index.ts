@@ -118,11 +118,27 @@ function snapBackIfOffScreen(): void {
   }
 }
 
-type DragSession = {
-  startCursor: ScreenPoint;
-  startPos: { x: number; y: number };
-  subject: 'icon' | 'window';
-};
+// Window-subject drags carry the window's size captured at drag:start
+// so drag:move can reapply it byte-for-byte without re-reading
+// getBounds() each tick. On Windows 11 frameless windows, the
+// getBounds() / setBounds() round-trip drifts by a few pixels per
+// call (the same DWM frame quirk worked around in commit 737f299).
+// Re-reading and re-writing every mousemove accumulated that drift
+// into a visible expansion over the course of a long drag — Issue 4
+// in the manual-tests-review.md write-up. Snapshotting once removes
+// the round-trip entirely.
+type DragSession =
+  | {
+      subject: 'icon';
+      startCursor: ScreenPoint;
+      startPos: { x: number; y: number };
+    }
+  | {
+      subject: 'window';
+      startCursor: ScreenPoint;
+      startPos: { x: number; y: number };
+      startSize: { width: number; height: number };
+    };
 
 let dragSession: DragSession | null = null;
 
@@ -386,15 +402,19 @@ function registerIpc(): void {
     if (mode === 'window') {
       const b = iconWindow.getBounds();
       dragSession = {
+        subject: 'window',
         startCursor: cursor,
         startPos: { x: b.x, y: b.y },
-        subject: 'window',
+        // Capture size ONCE here. drag:move / drag:end reuse this
+        // value rather than calling getBounds() again — see the
+        // DragSession type comment for the DWM-drift rationale.
+        startSize: { width: b.width, height: b.height },
       };
     } else {
       dragSession = {
+        subject: 'icon',
         startCursor: cursor,
         startPos: currentIconPosition(),
-        subject: 'icon',
       };
     }
   });
@@ -407,12 +427,11 @@ function registerIpc(): void {
       cursor,
     );
     if (dragSession.subject === 'window') {
-      const b = iconWindow.getBounds();
       iconWindow.setBounds({
         x: next.x,
         y: next.y,
-        width: b.width,
-        height: b.height,
+        width: dragSession.startSize.width,
+        height: dragSession.startSize.height,
       });
     } else {
       const clamped = clampIconForDrag({
@@ -432,22 +451,21 @@ function registerIpc(): void {
       dragSession.startPos,
       cursor,
     );
-    const subject = dragSession.subject;
+    const session = dragSession;
     dragSession = null;
 
-    if (subject === 'window') {
-      const b = iconWindow.getBounds();
+    if (session.subject === 'window') {
       const snap = snapWindowToCorner(
         dropped,
-        { width: b.width, height: b.height },
+        { width: session.startSize.width, height: session.startSize.height },
         primaryBounds(),
       );
       const final = snap?.position ?? dropped;
       const newBounds: WindowBounds = {
         x: final.x,
         y: final.y,
-        width: b.width,
-        height: b.height,
+        width: session.startSize.width,
+        height: session.startSize.height,
       };
       iconWindow.setBounds(newBounds);
       // Shift pendingIconPosition by the same delta so the icon
