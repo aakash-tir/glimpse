@@ -187,9 +187,16 @@ export function WindowView({
       style={{
         width: '100%',
         height: '100%',
-        // Background lives on each slide (per plan/styling.md), not on
-        // the panel container — the slide framework owns the surface.
-        // The container only carries the entry / collapse animation.
+        // Solid panel backdrop so the desktop wallpaper does NOT show
+        // through during slide transitions. The BrowserWindow is
+        // `transparent: true`; without a stable backdrop, the cube
+        // rotation tilts each slide edge-on at 90° and the unpainted
+        // pixels behind it expose the wallpaper for ~1 frame. The
+        // slide-specific backgrounds (per plan/styling.md) layer on
+        // top of this — Moon's deep navy and the others' dark glass
+        // remain unchanged. This matches the M3 panel surface that
+        // the SlideDeck replaced.
+        background: 'rgba(15, 23, 42, 0.92)',
         position: 'relative',
         userSelect: 'none',
         WebkitUserSelect: 'none',

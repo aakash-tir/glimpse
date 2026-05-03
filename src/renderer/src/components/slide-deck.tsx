@@ -191,9 +191,12 @@ export function SlideDeck({
         position: 'absolute',
         inset: 0,
         // 3D perspective so rotateY reads as a cube-face turn rather
-        // than a flat skew. The deck container hosts the perspective;
-        // each slide gets transform-style: preserve-3d.
-        perspective: '1200px',
+        // than a flat skew. Tighter perspective (smaller value) gives
+        // a more pronounced 3D foreshortening — at 1200 px the rotation
+        // looked nearly flat; 600 px exaggerates the cube reading
+        // without crossing into fish-eye territory.
+        perspective: '600px',
+        transformStyle: 'preserve-3d',
         overflow: 'hidden',
       }}
     >
@@ -231,7 +234,12 @@ export function SlideDeck({
             paddingBottom: SLIDE_BOTTOM_PADDING_PX,
             fontSize: 14,
             fontFamily: 'system-ui, sans-serif',
-            transformStyle: 'preserve-3d',
+            // Hide the back of each slide as it rotates past 90°. Without
+            // this, the viewer sees the slide's mirror-image content while
+            // it spins, which breaks the cube illusion (a real cube face
+            // is opaque from behind).
+            backfaceVisibility: 'hidden',
+            WebkitBackfaceVisibility: 'hidden',
             // Rotation pivots around the deck's vertical axis so each
             // face turns about the deck's center rather than its own
             // edge — matches the physical cube reading in the plan.
@@ -283,18 +291,26 @@ export function SlideDeck({
   );
 }
 
+// Cube-rotation variants. The entering slide starts rotated 90° (its
+// far edge facing the viewer, body off-screen behind the cube) and
+// rotates to face front. The exiting slide rotates the opposite way
+// from face-front to edge-on. With backface-visibility: hidden on the
+// slide, the rotated-past-90° face is invisible, so the entering slide
+// only "appears" once it crosses 90° — which is the cube illusion.
+//
+// No opacity fade: a real cube face doesn't dissolve, it turns. The
+// solid panel backdrop on window-view.tsx covers the brief moment when
+// neither face is past 90° (both invisible due to backface-visibility),
+// so the user sees the panel surface, not the desktop wallpaper.
 const slideVariants = {
   enter: (direction: WrapDirection) => ({
     rotateY: direction === 'next' ? 90 : -90,
-    opacity: 0,
   }),
   center: {
     rotateY: 0,
-    opacity: 1,
   },
   exit: (direction: WrapDirection) => ({
     rotateY: direction === 'next' ? -90 : 90,
-    opacity: 0,
   }),
 };
 
