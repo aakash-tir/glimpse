@@ -23,6 +23,19 @@ type GlimpseStub = {
   resizeStart: ReturnType<typeof vi.fn>;
   resizeMove: ReturnType<typeof vi.fn>;
   resizeEnd: ReturnType<typeof vi.fn>;
+  getSettings: ReturnType<typeof vi.fn>;
+  setSettings: ReturnType<typeof vi.fn>;
+};
+
+const STUB_SETTINGS = {
+  units: 'metric',
+  timeFormat: '24h',
+  iconPosition: null,
+  moonPhaseSlideEnabled: false,
+  themeOverride: 'auto',
+  trackWindowPosition: false,
+  windowBounds: null,
+  onboardingCompleted: false,
 };
 
 function installGlimpseStub(): GlimpseStub {
@@ -39,6 +52,8 @@ function installGlimpseStub(): GlimpseStub {
     resizeStart: vi.fn(),
     resizeMove: vi.fn(),
     resizeEnd: vi.fn(),
+    getSettings: vi.fn().mockResolvedValue(STUB_SETTINGS),
+    setSettings: vi.fn().mockResolvedValue(STUB_SETTINGS),
   };
   (window as unknown as { glimpse: GlimpseStub }).glimpse = stub;
   return stub;
