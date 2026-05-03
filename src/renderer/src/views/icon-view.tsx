@@ -1,12 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
+import { flushSync } from 'react-dom';
 import { WeatherIcon } from '../components/weather-icon';
 import { useClickClassifier } from '../components/use-click-classifier';
-
-// Mirror of WindowView's WINDOW_SCALE_DURATION_S. The IconView
-// opacity-fade-out timing matches WindowView's collapse fade so the two
-// directions feel symmetric.
-const ICON_FADE_DURATION_S = 0.2;
 
 // IconView — the collapsed, icon-mode renderer. Owns its own drag-mode
 // state and the icon's click handlers. Single-click asks main to
@@ -14,37 +9,57 @@ const ICON_FADE_DURATION_S = 0.2;
 export function IconView(): JSX.Element {
   const [dragMode, setDragMode] = useState(false);
   // Latched when the click classifier commits a single-click that
-  // triggers expand. Drives an opacity fade-out on the IconView root —
-  // mirror of the M3 polish (commit 92396c3) that opacity-fades
-  // WindowView during collapse to mask the 1–2 frame paint race
-  // between mode:changed and the OS resizing the BrowserWindow. The
-  // expand direction has the same race (renderer's last paint of
-  // IconView, with the glyph at icon-mode local (16, 16), gets
-  // stretched into the freshly-resized window — visible as the glyph
-  // flashing at the new window's top-left), and the fix is the
-  // same: fade the source view to opacity 0 over ~200 ms so even if
-  // the OS uses a stale framebuffer mid-fade, what it stretches is
-  // already partially transparent and dissolves into the wallpaper
-  // rather than reading as a sharp glyph at top-left.
+  // triggers expand. Snap-hides the glyph and gates the deferred
+  // expand IPC (see handleSingleClick for the timing rationale).
   const [expanding, setExpanding] = useState(false);
-  // Set true after the fade-out animation completes. Adds a hard
-  // visibility:hidden on top of opacity:0 so a stale paint after the
-  // animation finishes can't reintroduce the glyph.
-  const [hidden, setHidden] = useState(false);
   const isDraggingRef = useRef(false);
 
   const handleSingleClick = useCallback(() => {
     // Single-click only expands when not in drag mode (drag mode swallows
     // single clicks per plan/icon.md). Also gated on `expanding` so a
-    // stray click during the fade-out doesn't fire a second expand IPC.
+    // stray click during the deferred IPC doesn't fire a second expand.
     if (dragMode || expanding) return;
-    setExpanding(true);
-    void window.glimpse?.expand();
+    // flushSync forces React to commit the `expanding=true` update to
+    // the DOM synchronously before this function returns. Without it,
+    // the commit lands in a microtask after the click handler — the
+    // first rAF below could in principle run before the commit on a
+    // bad scheduling tick. flushSync removes that variable from the
+    // race so the rAF chain is purely waiting on the paint pipeline.
+    flushSync(() => {
+      setExpanding(true);
+    });
+    // Defer the expand IPC long enough for the entire render pipeline
+    // to publish the glyph-hidden frame to the OS swap chain BEFORE
+    // main resizes the BrowserWindow. The pipeline is:
+    //
+    //   React commit  →  paint (renderer)
+    //                 →  composite (GPU process)
+    //                 →  swap chain present (OS / DXGI)
+    //                 →  DWM displays at next vsync
+    //
+    // Two RAFs only covers the paint step. The GPU → swap-chain →
+    // DWM legs run on separate processes/threads; under load or just
+    // unlucky vsync alignment they can still be showing the frame
+    // BEFORE setExpanding when the IPC arrives in main. main calls
+    // iconWindow.setBounds(<window-mode bounds>) synchronously, and
+    // DWM uses whatever surface the swap chain holds at that instant
+    // as the source for the resize — so a stale frame produces the
+    // glyph-at-top-left flash.
+    //
+    // Three RAFs (~48 ms) gives the GPU composite + swap chain
+    // present a full extra frame to catch up. This empirically
+    // eliminates the residual flash that two RAFs leaves on busy /
+    // hardware-accelerated machines. The added ~16 ms is below
+    // perceptual threshold on top of the click classifier's existing
+    // 250 ms double-click wait.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          void window.glimpse?.expand();
+        });
+      });
+    });
   }, [dragMode, expanding]);
-
-  const handleFadeAnimationComplete = useCallback(() => {
-    if (expanding) setHidden(true);
-  }, [expanding]);
 
   const handleDoubleClick = useCallback(() => {
     setDragMode((on) => !on);
@@ -128,15 +143,10 @@ export function IconView(): JSX.Element {
   );
 
   return (
-    <motion.div
+    <div
       data-testid="icon-view"
       data-drag-mode={dragMode ? 'on' : 'off'}
       data-expanding={expanding ? 'on' : 'off'}
-      data-hidden={hidden ? 'on' : 'off'}
-      data-icon-fade-duration-s={ICON_FADE_DURATION_S}
-      animate={{ opacity: expanding ? 0 : 1 }}
-      transition={{ duration: ICON_FADE_DURATION_S, ease: 'easeOut' }}
-      onAnimationComplete={handleFadeAnimationComplete}
       onClick={handleOutsideClick}
       style={
         {
@@ -145,49 +155,36 @@ export function IconView(): JSX.Element {
           background: 'transparent',
           position: 'relative',
           WebkitAppRegion: 'no-drag',
-          // visibility (not display:none) so the still-running fade
-          // animation doesn't get yanked mid-frame. Only kicks in after
-          // the fade completes; until then the opacity animation does
-          // the work.
-          visibility: hidden ? 'hidden' : 'visible',
         } as React.CSSProperties
       }
     >
+      {/* The glyph is snap-hidden via visibility:hidden the moment
+          the user single-clicks to expand, so the next paint
+          contains no glyph pixels. Combined with the double-RAF
+          defer in handleSingleClick, this guarantees the OS resizes
+          the BrowserWindow against a framebuffer that no longer
+          contains the glyph — eliminating the flash at the new
+          window's top-left.
+
+          visibility:hidden (rather than unmounting / display:none)
+          keeps the element in the DOM so test queries against
+          icon-root remain valid through the brief expanding window,
+          and so a queued single-click whose subsequent click event
+          arrives between setExpanding(true) and the IPC firing
+          still hits a real element (the gate in handleSingleClick
+          short-circuits the second expand). */}
       <div
         style={{
           position: 'absolute',
-          // Anchor the glyph to the WINDOW CENTER rather than to the
-          // icon-mode top-left offset. In icon mode (96 × 96) the
-          // window center is (48, 48) which equals ICON_PADDING +
-          // ICON_SIZE / 2 — so the visual position is identical to
-          // the previous (16, 16) top-left + 64×64 glyph anchoring.
-          //
-          // The reason this matters: when main calls setBounds() to
-          // expand, the BrowserWindow both *resizes* and *moves* to
-          // new screen bounds. The OS reuses the renderer's stale
-          // framebuffer to fill the new window with content anchored
-          // to the new top-left. Local (16, 16) of a 200×200 window
-          // is at a completely different screen position than local
-          // (16, 16) of the 96×96 window — visible as the glyph
-          // "moving to top-left" of the new window.
-          //
-          // expandFromIcon() (in shared/window-position.ts) centers
-          // the new window on the icon's pre-expand center, so the
-          // window CENTER stays at the same screen position before
-          // and after the resize. Center-anchoring the glyph means
-          // it stays at the same screen position too, regardless of
-          // the window resize. The glyph just sits there until
-          // WindowView mounts and covers it.
-          //
-          // Edge case: when the icon is at the canonical default
-          // top-right position, expandFromIcon returns the default
-          // window bounds (a fixed screen location, not centered on
-          // the icon). The glyph would jump to the new window's
-          // center in that case — the opacity-fade animation on the
-          // IconView root masks that.
+          // Anchor the glyph to the WINDOW CENTER. In icon mode
+          // (96 × 96) this resolves to (48, 48) — equal to
+          // ICON_PADDING + ICON_SIZE / 2 — so the visual position
+          // is identical to the previous top-left + 64 × 64
+          // anchoring.
           left: '50%',
           top: '50%',
           transform: 'translate(-50%, -50%)',
+          visibility: expanding ? 'hidden' : 'visible',
         }}
         onClick={handleIconClickWithStop}
         onMouseDown={handleIconMouseDown}
@@ -197,6 +194,6 @@ export function IconView(): JSX.Element {
           dragMode={dragMode}
         />
       </div>
-    </motion.div>
+    </div>
   );
 }
