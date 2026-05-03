@@ -92,56 +92,43 @@ test('single-click on icon expands to window mode at expected bounds with anchor
   }
 });
 
-test('title-bar weather-icon click collapses back to icon mode', async () => {
+test('title-bar weather-icon click collapses to icon at the window position', async () => {
   const app = await launch();
   try {
     const page = await app.firstWindow();
+
+    // Snapshot the icon's pre-expand bounds — that's where the in-place
+    // collapse should return it. Comparing against the expanded
+    // window's center would be wrong: the window may get nudged inward
+    // by the on-screen clamp at expand time, and the new collapse model
+    // (pendingIconPosition) returns the icon to its expand-time spot,
+    // not to the clamped window's center.
+    const preExpand = await getWindowBounds(app);
+    const preExpandIconScreenX = preExpand.x + 180;
+    const preExpandIconScreenY = preExpand.y + 16;
+
     await expandToWindow(page);
 
     await clickTitleBarButton(page, 'title-bar-weather-icon');
     // Collapse animation (~200 ms) + IPC + setBounds + mode-change round-trip.
     await page.waitForTimeout(500);
 
-    const bounds = await getWindowBounds(app);
-    expect(bounds.width).toBe(260);
-    expect(bounds.height).toBe(112);
-    await expect(page.getByTestId('icon-view')).toBeVisible();
-  } finally {
-    await app.close();
-  }
-});
-
-test('minimize-to-icon button collapses to the right position', async () => {
-  const app = await launch();
-  try {
-    const page = await app.firstWindow();
-    await expandToWindow(page);
-    const expanded = await getWindowBounds(app);
-
-    await clickTitleBarButton(page, 'title-bar-minimize');
-    await page.waitForTimeout(500);
-
     const collapsed = await getWindowBounds(app);
     expect(collapsed.width).toBe(260);
     expect(collapsed.height).toBe(112);
-    // The icon-mode window's icon glyph sits at offset (180, 16)
-    // inside the 260x112 bounds. From the default-icon ↔ default-window
-    // round-trip rule, expanding from default and collapsing without
-    // moving must place the icon back at the default top-right.
-    const bounds = collapsed;
-    const iconCenterX = bounds.x + 180 + 32;
-    const iconCenterY = bounds.y + 16 + 32;
-    const expandedCenterX = expanded.x + expanded.width / 2;
-    const expandedCenterY = expanded.y + expanded.height / 2;
-    // Centers should align (within a couple of pixels for rounding).
-    expect(Math.abs(iconCenterX - expandedCenterX)).toBeLessThanOrEqual(2);
-    expect(Math.abs(iconCenterY - expandedCenterY)).toBeLessThanOrEqual(2);
+    await expect(page.getByTestId('icon-view')).toBeVisible();
+
+    // Icon glyph at offset (180, 16) inside 260x112 icon-mode bounds.
+    const iconScreenX = collapsed.x + 180;
+    const iconScreenY = collapsed.y + 16;
+    expect(Math.abs(iconScreenX - preExpandIconScreenX)).toBeLessThanOrEqual(2);
+    expect(Math.abs(iconScreenY - preExpandIconScreenY)).toBeLessThanOrEqual(2);
   } finally {
     await app.close();
   }
 });
 
-test('relocate button resets the icon to the default top-right position', async () => {
+test('minimize-to-icon button resets the icon to the default top-right position', async () => {
   const app = await launch();
   try {
     const page = await app.firstWindow();
@@ -167,7 +154,7 @@ test('relocate button resets the icon to the default top-right position', async 
     // Click outside to exit drag mode.
     await page.getByTestId('icon-view').dispatchEvent('click');
 
-    // Snapshot the relocate target (default top-right of the primary
+    // Snapshot the reset target (default top-right of the primary
     // display) before expanding.
     const expectedDefault = await app.evaluate(async ({ screen }) => {
       const work = screen.getPrimaryDisplay().workArea;
@@ -175,10 +162,13 @@ test('relocate button resets the icon to the default top-right position', async 
       return { x: work.x + work.width - 64 - 16, y: work.y + 16 };
     });
 
-    // Expand and click relocate.
+    // Expand and click minimize. The minimize button now does what the
+    // (removed) relocate button used to: collapse + reset icon to the
+    // default top-right corner. The weather-icon button is the only
+    // in-place collapse path now.
     await page.getByTestId('icon-root').dispatchEvent('click');
     await page.waitForTimeout(400);
-    await clickTitleBarButton(page, 'title-bar-relocate');
+    await clickTitleBarButton(page, 'title-bar-minimize');
     await page.waitForTimeout(500);
 
     const bounds = await getWindowBounds(app);

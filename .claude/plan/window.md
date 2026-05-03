@@ -44,11 +44,12 @@ The weather panel that opens when the user clicks the [icon](./icon.md). Square,
 
 | Position | Element | Action |
 |---|---|---|
-| Left | Weather icon (current condition, day/night variant) | Click → collapse to icon mode |
+| Left | Weather icon (current condition, day/night variant) | Click → collapse to icon mode **at the window's last position** (in-place collapse) |
 | Center | "**Glimpse**" wordmark — regular weight, **adaptive** (white-70 % on dark slides, slate-70 % on light Settings slide), 14 px | Decorative |
-| Right | Minimize-to-icon button (square with smaller square in top-right) | Collapse to icon mode |
-| Right | Relocate button (`CornerUpRight` from `lucide-react`) | Reset icon position to default top-right |
+| Right | Minimize-to-icon button (square with smaller square in top-right) | Collapse to icon mode **AND reset icon to default top-right** |
 | Right | Close button (×) | Quit the app |
+
+The two collapse paths are deliberately split: the **weather icon** keeps the icon where the window was; the **minimize button** sends it back to the default position. The previous design had a separate `CornerUpRight` "relocate" button alongside an in-place minimize, but the in-place behavior was duplicated by the weather icon, so the minimize button absorbed the relocate function and the standalone relocate button was removed.
 
 ### Title bar / drag-mode interaction
 

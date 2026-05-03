@@ -11,14 +11,16 @@ import {
 afterEach(cleanup);
 
 describe('TitleBar layout', () => {
-  it('renders the weather icon, wordmark, and three right-side buttons', () => {
+  it('renders the weather icon, wordmark, and two right-side buttons', () => {
     render(<TitleBar />);
     expect(screen.getByTestId('title-bar-weather-icon')).toBeInTheDocument();
     expect(screen.getByTestId('title-bar-wordmark')).toBeInTheDocument();
     expect(screen.getByText('Glimpse')).toBeInTheDocument();
     expect(screen.getByTestId('title-bar-minimize')).toBeInTheDocument();
-    expect(screen.getByTestId('title-bar-relocate')).toBeInTheDocument();
     expect(screen.getByTestId('title-bar-close')).toBeInTheDocument();
+    // The relocate button was removed; its function (collapse + reset
+    // to default) was absorbed into the minimize button.
+    expect(screen.queryByTestId('title-bar-relocate')).toBeNull();
   });
 
   it('renders the minimize-to-icon glyph as a custom SVG (not a stock lucide icon)', () => {
@@ -128,13 +130,6 @@ describe('TitleBar click handlers', () => {
     expect(cb).toHaveBeenCalledTimes(1);
   });
 
-  it('relocate click invokes onRelocate', () => {
-    const cb = vi.fn();
-    render(<TitleBar onRelocate={cb} />);
-    fireEvent.click(screen.getByTestId('title-bar-relocate'));
-    expect(cb).toHaveBeenCalledTimes(1);
-  });
-
   it('close click invokes onClose', () => {
     const cb = vi.fn();
     render(<TitleBar onClose={cb} />);
@@ -146,7 +141,6 @@ describe('TitleBar click handlers', () => {
     render(<TitleBar />);
     fireEvent.click(screen.getByTestId('title-bar-weather-icon'));
     fireEvent.click(screen.getByTestId('title-bar-minimize'));
-    fireEvent.click(screen.getByTestId('title-bar-relocate'));
     fireEvent.click(screen.getByTestId('title-bar-close'));
     expect(true).toBe(true);
   });

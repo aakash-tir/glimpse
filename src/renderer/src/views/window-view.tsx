@@ -210,8 +210,7 @@ export function WindowView({
         background="dark"
         disabled={dragMode}
         onWeatherIconClick={() => void startCollapse()}
-        onMinimize={() => void startCollapse()}
-        onRelocate={() => void startCollapse({ resetToDefault: true })}
+        onMinimize={() => void startCollapse({ resetToDefault: true })}
         onClose={handleClose}
       />
       <ResizeHandles />

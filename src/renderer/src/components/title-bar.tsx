@@ -1,6 +1,6 @@
 import { useState, type CSSProperties } from 'react';
 import { motion } from 'framer-motion';
-import { CornerUpRight, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import type { Condition } from '../../../shared/condition';
 import { conditionToGlyph } from '../../../shared/condition';
 import { IconGlyph } from './icon-glyph';
@@ -41,11 +41,12 @@ export type TitleBarProps = {
   // plan/window.md ("Title bar is not accessible while in drag mode
   // (must exit drag first).").
   disabled?: boolean;
-  // Click handlers — wired in a follow-up commit. Stubs for now keep
-  // the test surface stable.
+  // Click handlers. The minimize-to-icon button collapses the panel
+  // AND resets the icon to the default top-right (it absorbed the old
+  // relocate button's behavior — the relocate button itself was removed
+  // since the weather-icon already covers the in-place collapse case).
   onWeatherIconClick?: () => void;
   onMinimize?: () => void;
-  onRelocate?: () => void;
   onClose?: () => void;
 };
 
@@ -56,7 +57,6 @@ export function TitleBar({
   disabled = false,
   onWeatherIconClick,
   onMinimize,
-  onRelocate,
   onClose,
 }: TitleBarProps): JSX.Element {
   const [visible, setVisible] = useState(false);
@@ -159,20 +159,11 @@ export function TitleBar({
           <button
             data-testid="title-bar-minimize"
             type="button"
-            aria-label="Minimize to icon"
+            aria-label="Minimize to icon (resets to default position)"
             onClick={onMinimize}
             style={iconButtonStyle}
           >
             <MinimizeToIconGlyph color={wordmarkColor} />
-          </button>
-          <button
-            data-testid="title-bar-relocate"
-            type="button"
-            aria-label="Reset icon position"
-            onClick={onRelocate}
-            style={iconButtonStyle}
-          >
-            <CornerUpRight size={16} color={wordmarkColor} />
           </button>
           <button
             data-testid="title-bar-close"
