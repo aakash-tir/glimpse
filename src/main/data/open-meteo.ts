@@ -15,8 +15,20 @@
 // resolved Condition (via wmoToCondition) so renderer code never has
 // to look up WMO codes itself.
 
-import type { Condition } from '../../shared/condition';
+import type {
+  Forecast,
+  ForecastCurrent,
+  ForecastDay,
+  ForecastHour,
+} from '../../shared/forecast';
 import { wmoToCondition } from '../../shared/wmo';
+
+export type {
+  Forecast,
+  ForecastCurrent,
+  ForecastDay,
+  ForecastHour,
+} from '../../shared/forecast';
 
 const BASE = 'https://api.open-meteo.com/v1/forecast';
 
@@ -32,49 +44,6 @@ const defaultFetcher: Fetcher = (url) =>
     status: res.status,
     json: () => res.json() as Promise<unknown>,
   }));
-
-export type ForecastCurrent = {
-  /** Local time (zone implied by Forecast.timezone) "YYYY-MM-DDTHH:mm". */
-  time: string;
-  temperature: number;
-  apparentTemperature: number;
-  humidity: number;
-  weatherCode: number;
-  condition: Condition;
-  windSpeed: number;
-  /** Wind direction in degrees (0 = N, 90 = E). */
-  windDirection: number;
-  precipitation: number;
-};
-
-export type ForecastHour = {
-  time: string;
-  temperature: number;
-  weatherCode: number;
-  condition: Condition;
-  precipitationProbability: number;
-};
-
-export type ForecastDay = {
-  /** Local calendar date "YYYY-MM-DD". */
-  date: string;
-  weatherCode: number;
-  condition: Condition;
-  high: number;
-  low: number;
-  precipitationProbability: number;
-  /** Local-zone "YYYY-MM-DDTHH:mm" sunrise / sunset times. */
-  sunrise: string;
-  sunset: string;
-};
-
-export type Forecast = {
-  /** IANA timezone string returned by the API (e.g. America/Los_Angeles). */
-  timezone: string;
-  current: ForecastCurrent;
-  hourly: ForecastHour[];
-  daily: ForecastDay[];
-};
 
 export function buildForecastUrl(input: {
   latitude: number;
