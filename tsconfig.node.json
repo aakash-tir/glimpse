@@ -18,6 +18,7 @@
     "src/main/**/*.ts",
     "src/preload/**/*.ts",
     "src/shared/**/*.ts",
+    "src/data/**/*.json",
     "electron.vite.config.ts",
     "tailwind.config.ts",
     "postcss.config.js",

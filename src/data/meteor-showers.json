@@ -1,0 +1,72 @@
+[
+  {
+    "name": "Quadrantids",
+    "peakDate": "2026-01-04",
+    "zhr": 110,
+    "bestViewingTime": "Pre-dawn hours",
+    "radiantConstellation": "Boötes"
+  },
+  {
+    "name": "Lyrids",
+    "peakDate": "2026-04-22",
+    "zhr": 18,
+    "bestViewingTime": "Late evening to dawn",
+    "radiantConstellation": "Lyra"
+  },
+  {
+    "name": "Eta Aquariids",
+    "peakDate": "2026-05-06",
+    "zhr": 50,
+    "bestViewingTime": "Pre-dawn hours",
+    "radiantConstellation": "Aquarius"
+  },
+  {
+    "name": "Southern Delta Aquariids",
+    "peakDate": "2026-07-30",
+    "zhr": 25,
+    "bestViewingTime": "Late night to pre-dawn",
+    "radiantConstellation": "Aquarius"
+  },
+  {
+    "name": "Perseids",
+    "peakDate": "2026-08-12",
+    "zhr": 100,
+    "bestViewingTime": "Late night to pre-dawn",
+    "radiantConstellation": "Perseus"
+  },
+  {
+    "name": "Draconids",
+    "peakDate": "2026-10-08",
+    "zhr": 10,
+    "bestViewingTime": "Early evening",
+    "radiantConstellation": "Draco"
+  },
+  {
+    "name": "Orionids",
+    "peakDate": "2026-10-21",
+    "zhr": 20,
+    "bestViewingTime": "After midnight to dawn",
+    "radiantConstellation": "Orion"
+  },
+  {
+    "name": "Leonids",
+    "peakDate": "2026-11-17",
+    "zhr": 15,
+    "bestViewingTime": "After midnight to dawn",
+    "radiantConstellation": "Leo"
+  },
+  {
+    "name": "Geminids",
+    "peakDate": "2026-12-14",
+    "zhr": 150,
+    "bestViewingTime": "All night",
+    "radiantConstellation": "Gemini"
+  },
+  {
+    "name": "Ursids",
+    "peakDate": "2026-12-22",
+    "zhr": 10,
+    "bestViewingTime": "All night",
+    "radiantConstellation": "Ursa Minor"
+  }
+]
