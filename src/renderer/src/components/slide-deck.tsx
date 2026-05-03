@@ -1,11 +1,12 @@
 import {
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
   type CSSProperties,
 } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, useAnimationControls } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   computeVisibleSlides,
@@ -19,10 +20,10 @@ import {
   type SlideBackgroundLuminance,
 } from './slide-indicator';
 
-// Plan/styling.md: "Cube slide transition: 350 ms ease-in-out, rotates
+// Plan/styling.md: "Cube slide transition: 500 ms ease-in-out, rotates
 // in the direction of the arrow click. No reverse-spin on wrap (loops
 // continue in click direction)."
-export const SLIDE_TRANSITION_DURATION_S = 0.35;
+export const SLIDE_TRANSITION_DURATION_S = 0.5;
 
 // Title bar trigger zone sits at the top, dot indicator hugs the
 // bottom; slide content reserves space for both so placeholder text
@@ -108,6 +109,11 @@ export type SlideDeckProps = {
   themeMode?: ThemeMode;
 };
 
+type Transition = {
+  fromSlideId: SlideId;
+  direction: WrapDirection;
+};
+
 export function SlideDeck({
   moonEnabled = false,
   eventsActive = false,
@@ -152,12 +158,84 @@ export function SlideDeck({
   const currentMeta = SLIDE_META[currentSlideId];
   const currentBackground = currentMeta.background(themeMode);
 
+  // ---- Cube transition machinery ----
+  //
+  // PowerPoint-style cube transition: from-slide and to-slide live on
+  // adjacent faces of a shared cube. The cube wrapper rotates as a
+  // whole; faces stay statically positioned in cube-local space. This
+  // is a hinge transition (faces share an edge), not a per-slide flip.
+  //
+  // Layout in cube-local space:
+  //   - cube origin sits at z = -W/2 (pushed back behind the deck plane)
+  //   - front face: translateZ(W/2)              → world z = 0 (deck plane)
+  //   - right face: rotateY(90) translateZ(W/2)  → world (W/2, 0, -W/2)
+  //   - left  face: rotateY(-90) translateZ(W/2) → world (-W/2, 0, -W/2)
+  //
+  // For a 'next' click, cube rotates from rotateY(0) → rotateY(-90):
+  //   - front face (from-slide) sweeps from world center to (-W/2, 0, -W/2)
+  //   - right face (to-slide) sweeps from (W/2, 0, -W/2) to world center
+  // After the rotation completes we snap the cube back to rotateY(0)
+  // and re-render with the to-slide alone on the front face — no
+  // visual jump because the to-slide's world transform is identical
+  // before and after the snap (cube -90 + slide-on-right is the same
+  // as cube 0 + slide-on-front).
+
+  const deckRef = useRef<HTMLDivElement>(null);
+  const [deckWidth, setDeckWidth] = useState(0);
+
+  useEffect(() => {
+    const node = deckRef.current;
+    if (!node) return;
+    const update = (): void => setDeckWidth(node.clientWidth);
+    update();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(update);
+    ro.observe(node);
+    return () => ro.disconnect();
+  }, []);
+
+  const [transition, setTransition] = useState<Transition | null>(null);
+  const cubeControls = useAnimationControls();
+  const animTokenRef = useRef(0);
+
+  // Keep the cube origin push-back current as the deck resizes. Snap
+  // (no animation) so a window resize doesn't accidentally trigger a
+  // mid-flight rotation.
+  useEffect(() => {
+    cubeControls.set({ z: -deckWidth / 2 });
+  }, [deckWidth, cubeControls]);
+
   const navigate = useCallback(
     (dir: WrapDirection) => {
+      const fromSlideId = visibleSlides[safeIndex] ?? 'today';
+      const token = ++animTokenRef.current;
       setDirection(dir);
       setCurrentIndex((idx) => wrapStep(idx, visibleSlides.length, dir));
+      setTransition({ fromSlideId, direction: dir });
+      // Reset cube rotation in case a previous animation is still
+      // in-flight (rapid clicks). The new rotation always starts from
+      // rotateY(0) so the from-slide is at the front face position.
+      cubeControls.set({ rotateY: 0, z: -deckWidth / 2 });
+      void cubeControls
+        .start(
+          {
+            rotateY: dir === 'next' ? -90 : 90,
+            z: -deckWidth / 2,
+          },
+          {
+            duration: SLIDE_TRANSITION_DURATION_S,
+            ease: [0.42, 0, 0.58, 1],
+          },
+        )
+        .then(() => {
+          // Stale animation guard: if a newer click superseded this
+          // one, leave its state alone.
+          if (animTokenRef.current !== token) return;
+          cubeControls.set({ rotateY: 0, z: -deckWidth / 2 });
+          setTransition(null);
+        });
     },
-    [visibleSlides.length],
+    [visibleSlides, safeIndex, deckWidth, cubeControls],
   );
 
   const handlePrev = useCallback(
@@ -179,8 +257,20 @@ export function SlideDeck({
     [navigate],
   );
 
+  // Slide currently shown on the front face: from-slide while
+  // transitioning, current-slide when idle.
+  const frontSlideId = transition?.fromSlideId ?? currentSlideId;
+  // Side-face slide is the current (incoming) slide, only rendered
+  // during a transition.
+  const sideFaceSide = transition
+    ? transition.direction === 'next'
+      ? 'right'
+      : 'left'
+    : null;
+
   return (
     <div
+      ref={deckRef}
       data-testid="slide-deck"
       data-current-slide-id={currentSlideId}
       data-current-slide-index={String(safeIndex)}
@@ -190,65 +280,45 @@ export function SlideDeck({
       style={{
         position: 'absolute',
         inset: 0,
-        // 3D perspective so rotateY reads as a cube-face turn rather
-        // than a flat skew. Tighter perspective (smaller value) gives
-        // a more pronounced 3D foreshortening — at 1200 px the rotation
-        // looked nearly flat; 600 px exaggerates the cube reading
-        // without crossing into fish-eye territory.
+        // 3D perspective so the cube rotation reads as a true 3D turn
+        // rather than a flat skew. Tighter perspective (smaller value)
+        // gives more pronounced foreshortening — at 1200 px the
+        // rotation looked nearly flat; 600 px exaggerates the cube
+        // reading without crossing into fish-eye territory.
         perspective: '600px',
         transformStyle: 'preserve-3d',
         overflow: 'hidden',
       }}
     >
-      {/* Default mode (no `mode="wait"`): the outgoing slide and the
-          incoming slide render concurrently for the duration of the
-          rotateY animation, which is what a cube turn physically looks
-          like — both faces visible during the rotation. */}
-      <AnimatePresence initial={false} custom={direction}>
-        <motion.div
-          key={currentSlideId}
-          data-testid={`slide-${currentSlideId}`}
-          data-slide-id={currentSlideId}
-          data-slide-luminance={currentBackground.luminance}
-          custom={direction}
-          variants={slideVariants}
-          initial="enter"
-          animate="center"
-          exit="exit"
-          transition={{
-            duration: SLIDE_TRANSITION_DURATION_S,
-            ease: [0.42, 0, 0.58, 1], // cubic-bezier ease-in-out
-          }}
-          style={{
-            position: 'absolute',
-            inset: 0,
-            background: currentBackground.color,
-            color:
-              currentBackground.luminance === 'light'
-                ? 'rgba(15, 23, 42, 0.85)'
-                : 'rgba(255, 255, 255, 0.85)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            paddingTop: SLIDE_TOP_PADDING_PX,
-            paddingBottom: SLIDE_BOTTOM_PADDING_PX,
-            fontSize: 14,
-            fontFamily: 'system-ui, sans-serif',
-            // Hide the back of each slide as it rotates past 90°. Without
-            // this, the viewer sees the slide's mirror-image content while
-            // it spins, which breaks the cube illusion (a real cube face
-            // is opaque from behind).
-            backfaceVisibility: 'hidden',
-            WebkitBackfaceVisibility: 'hidden',
-            // Rotation pivots around the deck's vertical axis so each
-            // face turns about the deck's center rather than its own
-            // edge — matches the physical cube reading in the plan.
-            transformOrigin: 'center center',
-          }}
-        >
-          {currentMeta.label}
-        </motion.div>
-      </AnimatePresence>
+      {/* The cube wrapper. Stays mounted across transitions so the
+          rotation animation isn't restarted by a remount. The wrapper's
+          rotateY is driven by `cubeControls`; faces inside it are
+          positioned statically in cube-local space. */}
+      <motion.div
+        data-testid="slide-deck-cube"
+        animate={cubeControls}
+        initial={{ rotateY: 0, z: 0 }}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          transformStyle: 'preserve-3d',
+        }}
+      >
+        <SlideFace
+          slideId={frontSlideId}
+          themeMode={themeMode}
+          face="front"
+          deckWidth={deckWidth}
+        />
+        {transition && sideFaceSide ? (
+          <SlideFace
+            slideId={currentSlideId}
+            themeMode={themeMode}
+            face={sideFaceSide}
+            deckWidth={deckWidth}
+          />
+        ) : null}
+      </motion.div>
 
       <button
         type="button"
@@ -291,28 +361,69 @@ export function SlideDeck({
   );
 }
 
-// Cube-rotation variants. The entering slide starts rotated 90° (its
-// far edge facing the viewer, body off-screen behind the cube) and
-// rotates to face front. The exiting slide rotates the opposite way
-// from face-front to edge-on. With backface-visibility: hidden on the
-// slide, the rotated-past-90° face is invisible, so the entering slide
-// only "appears" once it crosses 90° — which is the cube illusion.
-//
-// No opacity fade: a real cube face doesn't dissolve, it turns. The
-// solid panel backdrop on window-view.tsx covers the brief moment when
-// neither face is past 90° (both invisible due to backface-visibility),
-// so the user sees the panel surface, not the desktop wallpaper.
-const slideVariants = {
-  enter: (direction: WrapDirection) => ({
-    rotateY: direction === 'next' ? 90 : -90,
-  }),
-  center: {
-    rotateY: 0,
-  },
-  exit: (direction: WrapDirection) => ({
-    rotateY: direction === 'next' ? -90 : 90,
-  }),
+type SlideFaceProps = {
+  slideId: SlideId;
+  themeMode: ThemeMode;
+  // Which face of the cube this slide is mounted on.
+  face: 'front' | 'right' | 'left';
+  deckWidth: number;
 };
+
+function SlideFace({
+  slideId,
+  themeMode,
+  face,
+  deckWidth,
+}: SlideFaceProps): JSX.Element {
+  const meta = SLIDE_META[slideId];
+  const bg = meta.background(themeMode);
+  const halfW = deckWidth / 2;
+  const transform =
+    face === 'front'
+      ? `translateZ(${halfW}px)`
+      : face === 'right'
+        ? `rotateY(90deg) translateZ(${halfW}px)`
+        : `rotateY(-90deg) translateZ(${halfW}px)`;
+
+  return (
+    <div
+      data-testid={`slide-${slideId}`}
+      data-slide-id={slideId}
+      data-slide-luminance={bg.luminance}
+      data-slide-face={face}
+      style={{
+        position: 'absolute',
+        inset: 0,
+        background: bg.color,
+        color:
+          bg.luminance === 'light'
+            ? 'rgba(15, 23, 42, 0.85)'
+            : 'rgba(255, 255, 255, 0.85)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingTop: SLIDE_TOP_PADDING_PX,
+        paddingBottom: SLIDE_BOTTOM_PADDING_PX,
+        fontSize: 14,
+        fontFamily: 'system-ui, sans-serif',
+        // White outline on each slide's edges so the cube rotation is
+        // visually traceable — without this, identical dark backgrounds
+        // on adjacent slides make the rotation hard to perceive. Box-
+        // sizing border-box keeps the border inside the slide's bounds
+        // so it doesn't expand the rotation footprint.
+        border: '1px solid rgba(255, 255, 255, 0.9)',
+        boxSizing: 'border-box',
+        // Hide the back of each face so a face rotated past 90° doesn't
+        // render its mirror image (which would break the cube illusion).
+        backfaceVisibility: 'hidden',
+        WebkitBackfaceVisibility: 'hidden',
+        transform,
+      }}
+    >
+      {meta.label}
+    </div>
+  );
+}
 
 const arrowButtonBaseStyle: CSSProperties = {
   position: 'absolute',

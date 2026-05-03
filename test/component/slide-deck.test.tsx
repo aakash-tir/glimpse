@@ -24,7 +24,7 @@ describe('SlideDeck — placeholder slide rendering', () => {
     expect(getDeck().getAttribute('data-transition-duration-s')).toBe(
       String(SLIDE_TRANSITION_DURATION_S),
     );
-    expect(SLIDE_TRANSITION_DURATION_S).toBeCloseTo(0.35);
+    expect(SLIDE_TRANSITION_DURATION_S).toBeCloseTo(0.5);
   });
 
   it('renders 4 visible slides with both flags off (no moon, no events)', () => {

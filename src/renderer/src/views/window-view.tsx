@@ -187,16 +187,12 @@ export function WindowView({
       style={{
         width: '100%',
         height: '100%',
-        // Solid panel backdrop so the desktop wallpaper does NOT show
-        // through during slide transitions. The BrowserWindow is
-        // `transparent: true`; without a stable backdrop, the cube
-        // rotation tilts each slide edge-on at 90° and the unpainted
-        // pixels behind it expose the wallpaper for ~1 frame. The
-        // slide-specific backgrounds (per plan/styling.md) layer on
-        // top of this — Moon's deep navy and the others' dark glass
-        // remain unchanged. This matches the M3 panel surface that
-        // the SlideDeck replaced.
-        background: 'rgba(15, 23, 42, 0.92)',
+        // No panel backdrop — the BrowserWindow's `transparent: true`
+        // surface is intentionally exposed during cube transitions, so
+        // the desktop wallpaper shows through the gaps between the
+        // rotating cube faces. In idle state each slide's background
+        // covers the panel; the wallpaper only peeks through during
+        // the rotation, which is the desired effect.
         position: 'relative',
         userSelect: 'none',
         WebkitUserSelect: 'none',
