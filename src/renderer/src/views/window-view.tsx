@@ -81,7 +81,7 @@ export function WindowView({
   // Single-click on the panel does nothing in window mode; the click
   // classifier is here purely to disambiguate double-clicks for drag
   // mode and to absorb stray single clicks.
-  const handlePanelClick = useClickClassifier({
+  const { click: handlePanelClick } = useClickClassifier({
     onSingleClick: () => {
       // Intentionally no-op; outside-click does NOT collapse the window
       // and a panel click should be inert.

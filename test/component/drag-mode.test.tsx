@@ -184,6 +184,42 @@ describe('drag mode (App-level)', () => {
     );
   });
 
+  it('clicking on icon then off-icon while in drag mode does NOT trigger expand', () => {
+    // Regression: a click on the icon during drag mode queues a 250 ms
+    // single-click timer in the click classifier. If the user then
+    // clicks off-icon (which exits drag mode) within that window, the
+    // queued timer used to fire onSingleClick *after* dragMode had
+    // already flipped to false — calling expand() and incorrectly
+    // opening window mode. The fix cancels any queued click when the
+    // off-icon click exits drag mode.
+    const stub = installGlimpseStub();
+    render(<App />);
+
+    // Enter drag mode (double-click within threshold).
+    clickIcon();
+    fastForward(50);
+    clickIcon();
+    expect(screen.getByTestId('icon-root').getAttribute('data-drag-mode')).toBe(
+      'on',
+    );
+
+    // Click on icon — queues a single-click timer in the classifier.
+    clickIcon();
+    // Click off-icon BEFORE the threshold elapses — exits drag mode and
+    // must cancel the queued click.
+    fastForward(100);
+    clickAppContainer();
+
+    // Drain past the original single-click threshold from the on-icon
+    // click. If cancellation didn't happen, expand() would fire here.
+    fastForward(DOUBLE_CLICK_THRESHOLD_MS + 50);
+
+    expect(stub.expand).not.toHaveBeenCalled();
+    expect(screen.getByTestId('icon-view').getAttribute('data-expanding')).toBe(
+      'off',
+    );
+  });
+
   it('clicks on the icon do not bubble to the app container (no spurious exit)', () => {
     render(<App />);
     // Enter drag mode.
