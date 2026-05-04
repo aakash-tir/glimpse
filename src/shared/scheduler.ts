@@ -11,6 +11,12 @@
 // scheduler relies on `powerMonitor.on('resume')` (wired in main) to
 // call `notifyResume`. If at least one full tick window was missed
 // while asleep, an immediate refresh fires and the schedule realigns.
+//
+// Per-tick delay override: the callback may return `{ nextDelayMs }`
+// to ask for a non-default delay before the next tick. Used by the
+// data layer to retry on the exponential backoff schedule (5 → 10 →
+// 20 → 40 → 60 min) after a failed refresh. Returning `void` (the
+// happy path) keeps the default :05 cadence.
 
 export const TICK_OFFSET_MIN = 5;
 
@@ -29,7 +35,8 @@ export function msUntilNextTick(now: Date): number {
   return target.getTime() - now.getTime();
 }
 
-export type TickCallback = () => void | Promise<void>;
+export type TickResult = { nextDelayMs: number } | void;
+export type TickCallback = () => TickResult | Promise<TickResult>;
 
 export type SchedulerDeps = {
   // Pluggable for tests — defaults to the host wall clock and host
@@ -99,9 +106,9 @@ export class TickScheduler {
     return elapsedMs > 60 * 60 * 1000 + 60 * 1000;
   }
 
-  private scheduleNext(): void {
+  private scheduleNext(overrideMs?: number): void {
     if (!this.running) return;
-    const delay = msUntilNextTick(this.now());
+    const delay = overrideMs ?? msUntilNextTick(this.now());
     this.timer = this.setTimer(() => {
       void this.fireTick(this.now());
     }, delay);
@@ -116,10 +123,19 @@ export class TickScheduler {
       this.clearTimer(this.timer);
       this.timer = null;
     }
+    let override: number | undefined;
     try {
-      await this.onTick();
+      const result = await this.onTick();
+      if (
+        result &&
+        typeof result === 'object' &&
+        typeof result.nextDelayMs === 'number' &&
+        result.nextDelayMs >= 0
+      ) {
+        override = result.nextDelayMs;
+      }
     } finally {
-      this.scheduleNext();
+      this.scheduleNext(override);
     }
   }
 }

@@ -241,3 +241,115 @@ describe('TickScheduler — sleep / wake', () => {
     expect(onTick).not.toHaveBeenCalled();
   });
 });
+
+describe('TickScheduler — per-tick delay override', () => {
+  it('honors { nextDelayMs } from the callback for the next tick', async () => {
+    const h = makeHarness('2026-05-03T14:00:00.000Z');
+    const onTick = vi.fn().mockResolvedValue({ nextDelayMs: 5 * 60 * 1000 });
+    const sched = new TickScheduler(onTick, {
+      now: h.now,
+      setTimer: h.setTimer,
+      clearTimer: h.clearTimer,
+    });
+    sched.start();
+    // Fire the initial 14:05 tick.
+    h.advance(5 * 60 * 1000);
+    h.fireLatest();
+    await Promise.resolve();
+    await Promise.resolve();
+    // Override should win over the default :05 cadence — next timer
+    // is 5 minutes out, not the full hour.
+    const live = h.timers().filter((t) => !t.cancelled);
+    expect(live.length).toBe(1);
+    expect(live[0]!.delay).toBe(5 * 60 * 1000);
+  });
+
+  it('returns to the :05 cadence when the next callback returns void', async () => {
+    const h = makeHarness('2026-05-03T14:00:00.000Z');
+    // First tick fails (5 min override), second succeeds (no override).
+    const onTick = vi
+      .fn()
+      .mockResolvedValueOnce({ nextDelayMs: 5 * 60 * 1000 })
+      .mockResolvedValueOnce(undefined);
+    const sched = new TickScheduler(onTick, {
+      now: h.now,
+      setTimer: h.setTimer,
+      clearTimer: h.clearTimer,
+    });
+    sched.start();
+    // Fire first tick at 14:05 → backoff schedules retry in 5 min.
+    h.advance(5 * 60 * 1000);
+    h.fireLatest();
+    await Promise.resolve();
+    await Promise.resolve();
+    // Fire retry at 14:10 → success returns to default cadence.
+    h.advance(5 * 60 * 1000);
+    h.fireLatest();
+    await Promise.resolve();
+    await Promise.resolve();
+    // We're now at 14:10. msUntilNextTick → 55 min until 15:05.
+    const live = h.timers().filter((t) => !t.cancelled);
+    expect(live.length).toBe(1);
+    expect(live[0]!.delay).toBe(55 * 60 * 1000);
+  });
+
+  it('drives the spec backoff sequence 5 → 10 → 20 → 40 → 60 across consecutive failures', async () => {
+    const h = makeHarness('2026-05-03T14:00:00.000Z');
+    // Simulate the data store on consecutive failures returning the
+    // backoff sequence from backoffMinutesForAttempt(0..4).
+    const overrides = [5, 10, 20, 40, 60].map((min) => ({
+      nextDelayMs: min * 60 * 1000,
+    }));
+    let i = 0;
+    const onTick = vi.fn().mockImplementation(() => {
+      const next = overrides[i] ?? overrides[overrides.length - 1];
+      i++;
+      return Promise.resolve(next);
+    });
+    const sched = new TickScheduler(onTick, {
+      now: h.now,
+      setTimer: h.setTimer,
+      clearTimer: h.clearTimer,
+    });
+    sched.start();
+    const observed: number[] = [];
+    // Initial schedule is to :05 — fire it.
+    h.advance(5 * 60 * 1000);
+    h.fireLatest();
+    await Promise.resolve();
+    await Promise.resolve();
+    for (let step = 0; step < 5; step++) {
+      const live = h.timers().filter((t) => !t.cancelled);
+      observed.push(live[0]!.delay);
+      h.advance(live[0]!.delay);
+      h.fireLatest();
+      await Promise.resolve();
+      await Promise.resolve();
+    }
+    expect(observed).toEqual([
+      5 * 60 * 1000,
+      10 * 60 * 1000,
+      20 * 60 * 1000,
+      40 * 60 * 1000,
+      60 * 60 * 1000,
+    ]);
+  });
+
+  it('ignores a malformed override (negative ms) and falls back to default', async () => {
+    const h = makeHarness('2026-05-03T14:00:00.000Z');
+    const onTick = vi.fn().mockResolvedValue({ nextDelayMs: -1 });
+    const sched = new TickScheduler(onTick, {
+      now: h.now,
+      setTimer: h.setTimer,
+      clearTimer: h.clearTimer,
+    });
+    sched.start();
+    h.advance(5 * 60 * 1000);
+    h.fireLatest();
+    await Promise.resolve();
+    await Promise.resolve();
+    // We're at 14:05 → next default is one full hour.
+    const live = h.timers().filter((t) => !t.cancelled);
+    expect(live[0]!.delay).toBe(60 * 60 * 1000);
+  });
+});

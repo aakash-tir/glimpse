@@ -54,7 +54,15 @@ const dataStore = new DataStore({
   fetchKp,
 });
 const dataScheduler = new TickScheduler(async () => {
-  await dataStore.refresh();
+  const result = await dataStore.refresh();
+  // On weather failure, retry on the exponential-backoff schedule
+  // (5 → 10 → 20 → 40 → 60 min) instead of waiting for the next
+  // hourly :05 tick. Recovery on success returns void here so the
+  // scheduler resumes its default cadence.
+  if (!result.weatherOk && result.nextRetryMinutes !== null) {
+    return { nextDelayMs: result.nextRetryMinutes * 60_000 };
+  }
+  return undefined;
 });
 
 function primaryBounds(): DisplayBounds {
