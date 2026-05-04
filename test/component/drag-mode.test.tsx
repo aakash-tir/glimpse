@@ -8,6 +8,7 @@ import {
 } from '@testing-library/react';
 import { App } from '../../src/renderer/src/App';
 import { DOUBLE_CLICK_THRESHOLD_MS } from '../../src/shared/click-classifier';
+import { EMPTY_SNAPSHOT } from '../../src/shared/data-snapshot';
 
 type GlimpseStub = {
   dragStart: ReturnType<typeof vi.fn>;
@@ -22,6 +23,8 @@ type GlimpseStub = {
   resizeStart: ReturnType<typeof vi.fn>;
   resizeMove: ReturnType<typeof vi.fn>;
   resizeEnd: ReturnType<typeof vi.fn>;
+  getData: ReturnType<typeof vi.fn>;
+  onDataChanged: ReturnType<typeof vi.fn>;
 };
 
 function installGlimpseStub(): GlimpseStub {
@@ -40,6 +43,10 @@ function installGlimpseStub(): GlimpseStub {
     resizeStart: vi.fn(),
     resizeMove: vi.fn(),
     resizeEnd: vi.fn(),
+    getData: vi.fn().mockResolvedValue(EMPTY_SNAPSHOT),
+    onDataChanged: vi.fn().mockReturnValue(() => {
+      // unsubscribe noop
+    }),
   };
   (window as unknown as { glimpse: GlimpseStub }).glimpse = stub;
   return stub;
