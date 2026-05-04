@@ -6,12 +6,14 @@ All four data sources are free and require no API key.
 |---|---|---|
 | Forecast (hourly + 7-day), wind, humidity, feels-like, sunrise / sunset | **Open-Meteo** | None |
 | Aurora visibility (Kp index, filtered by user latitude) | NOAA SWPC | None |
-| Moon phase, eclipses | Local astronomical calculation (SunCalc) | n/a |
+| Moon phase | Local astronomical calculation (SunCalc) | n/a |
+| Eclipses | Static bundled JSON at `src/data/eclipses.json` (sourced from NASA catalog) | n/a |
 | Meteor showers | Static bundled JSON of annual peak dates (sourced from IMO calendar) | n/a |
 
 ## Location
 
 - Auto-detect via **IP geolocation** on every launch.
+- Provider: `geojs.io` (keyless, HTTPS). Provider history and rationale for the choice live in the `src/main/data/geolocation.ts` header.
 - ~city-level accuracy.
 - No permission prompt, no Google API key, no Windows Location Services involvement.
 
@@ -43,6 +45,12 @@ Visibility text on the slide is user-aware:
 - **Schema per entry:** `{name, peakDate (YYYY-MM-DD), zhr, bestViewingTime, radiantConstellation}`.
 - Bundled at build time, sourced from the IMO annual calendar.
 - Refreshed at version bumps (a yearly lag is acceptable since major showers — Perseids, Geminids, Quadrantids — have stable peak dates).
+
+## Eclipse data
+
+- **File:** `src/data/eclipses.json`.
+- Bundled at build time, sourced from the NASA eclipse catalog.
+- SunCalc itself does not compute eclipses, hence the static catalog. Same yearly-lag tradeoff as meteor showers — major eclipse dates are well known years out, so refresh-at-version-bumps is fine.
 
 ## Refresh policy
 
