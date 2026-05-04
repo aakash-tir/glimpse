@@ -352,4 +352,47 @@ describe('TickScheduler — per-tick delay override', () => {
     const live = h.timers().filter((t) => !t.cancelled);
     expect(live[0]!.delay).toBe(60 * 60 * 1000);
   });
+
+  it('resume during a backoff window honors a fresh override on the resume tick', async () => {
+    // Scenario from gaps.md O3: the laptop sleeps DURING a backoff
+    // wait. On resume the catch-up tick fires, and if THAT tick also
+    // returns a backoff override (e.g. the network is still down),
+    // the next timer must use the resume tick's override, not the
+    // default :05 cadence. This protects callers that compose backoff
+    // with the sleep-resume catch-up — the data store's typical
+    // pattern.
+    const h = makeHarness('2026-05-03T14:00:00.000Z');
+    // Tick 1 (14:05): fail → 5 min backoff. Tick 2 (resume): still
+    // failing → 10 min backoff. After that we don't need more.
+    const onTick = vi
+      .fn()
+      .mockResolvedValueOnce({ nextDelayMs: 5 * 60 * 1000 })
+      .mockResolvedValueOnce({ nextDelayMs: 10 * 60 * 1000 });
+    const sched = new TickScheduler(onTick, {
+      now: h.now,
+      setTimer: h.setTimer,
+      clearTimer: h.clearTimer,
+    });
+    sched.start();
+    // Fire the initial 14:05 tick — gets 5 min backoff override.
+    h.advance(5 * 60 * 1000);
+    h.fireLatest();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(onTick).toHaveBeenCalledTimes(1);
+    // Live timer is now scheduled for 14:10. Sleep for 6 hours
+    // through several backoff windows; on resume the catch-up should
+    // fire the tick (lastTickAt=14:05, elapsed > 1h+60s threshold).
+    h.advance(6 * 60 * 60 * 1000);
+    sched.notifyResume();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(onTick).toHaveBeenCalledTimes(2);
+    // The resume tick returned { nextDelayMs: 10 min }. The next
+    // timer must reflect that, not the default :05 cadence (which at
+    // 20:05 would compute msUntilNextTick → ~1h to 21:05).
+    const live = h.timers().filter((t) => !t.cancelled);
+    expect(live.length).toBe(1);
+    expect(live[0]!.delay).toBe(10 * 60 * 1000);
+  });
 });
