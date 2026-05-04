@@ -13,7 +13,7 @@ const FIXTURE_PATH = join(
   '..',
   'fixtures',
   'ip-geolocation',
-  'ipapi-co-success.json',
+  'geojs-io-success.json',
 );
 
 function fixture(): unknown {
@@ -31,11 +31,21 @@ function fetcherReturning(payload: unknown, ok = true, status = 200): Fetcher {
 }
 
 describe('parseGeolocation', () => {
-  it('parses the canonical ipapi.co payload', () => {
+  it('parses the canonical geojs.io payload (string lat/lon)', () => {
     const result = parseGeolocation(fixture());
     expect(result.latitude).toBeCloseTo(37.4056);
     expect(result.longitude).toBeCloseTo(-122.0775);
     expect(result.city).toBe('Mountain View');
+  });
+
+  it('also accepts numeric lat/lon (defensive against future schema changes)', () => {
+    const result = parseGeolocation({
+      latitude: 51.5,
+      longitude: -0.1,
+      city: 'London',
+    });
+    expect(result.latitude).toBeCloseTo(51.5);
+    expect(result.longitude).toBeCloseTo(-0.1);
   });
 
   it('returns city = null when the field is missing', () => {
@@ -85,12 +95,12 @@ describe('fetchGeolocation', () => {
     ).rejects.toThrow();
   });
 
-  it('hits the ipapi.co JSON endpoint exactly once', async () => {
+  it('hits the geojs.io endpoint exactly once', async () => {
     const fetcher = fetcherReturning(fixture());
     await fetchGeolocation(fetcher);
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(vi.mocked(fetcher).mock.calls[0]?.[0]).toBe(
-      'https://ipapi.co/json/',
+      'https://get.geojs.io/v1/ip/geo.json',
     );
   });
 });

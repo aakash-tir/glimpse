@@ -4,11 +4,22 @@
 // no Google service, no Windows Location Services prompt. Accuracy is
 // ~city-level which is fine for forecast and aurora-band lookups.
 //
-// Provider: ipapi.co — free tier (1k/day), HTTPS, returns lat/lon as
-// numbers in a single GET. Personal-use Glimpse won't get anywhere
-// near the rate cap.
+// Provider: geojs.io — keyless, HTTPS, no documented rate limit for
+// personal use. Returns lat/lon as strings (we coerce to numbers) and
+// city as a string.
+//
+// Provider history:
+//   - Started on ipapi.co. Free tier rate-limited aggressively during
+//     dev (HTTP 429 within ~50 launches) so we swapped.
+//   - Tried ipwho.is. Their Cloudflare zone runs bot-fight mode that
+//     rejects Node's fetch TLS fingerprint with HTTP 403 even with a
+//     real User-Agent. curl works (different fingerprint) but Node /
+//     undici doesn't.
+//   - Settled on geojs.io. Cloudflare-fronted but the zone is
+//     configured for keyless backend use (CORS open, no bot-fight) so
+//     Node fetch reaches it cleanly.
 
-const ENDPOINT = 'https://ipapi.co/json/';
+const ENDPOINT = 'https://get.geojs.io/v1/ip/geo.json';
 
 export type GeolocationResult = {
   latitude: number;
@@ -35,16 +46,27 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
+// geojs.io returns lat/lon as strings (e.g. "50.0528"), but defensive
+// against a future schema change we accept either strings or numbers.
+function coerceCoord(v: unknown): number | null {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  if (typeof v === 'string') {
+    const n = Number.parseFloat(v);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
 export function parseGeolocation(raw: unknown): GeolocationResult {
   if (!isPlainObject(raw)) {
     throw new Error('geolocation: response was not a JSON object');
   }
-  const lat = raw['latitude'];
-  const lon = raw['longitude'];
-  if (typeof lat !== 'number' || !Number.isFinite(lat)) {
+  const lat = coerceCoord(raw['latitude']);
+  const lon = coerceCoord(raw['longitude']);
+  if (lat === null) {
     throw new Error('geolocation: missing or invalid latitude');
   }
-  if (typeof lon !== 'number' || !Number.isFinite(lon)) {
+  if (lon === null) {
     throw new Error('geolocation: missing or invalid longitude');
   }
   if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
