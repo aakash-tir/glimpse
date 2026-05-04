@@ -3,13 +3,14 @@
 // Endpoint:
 //   https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json
 //
-// Response is a CSV-like 2D array with a header row, then one row per
-// 3-hour observation:
+// Response is an array of objects, one per 3-hour observation:
 //   [
-//     ["time_tag", "Kp", "a_running", "station_count"],
-//     ["2024-01-01 00:00:00.000", "2.33", "5", "8"],
+//     { "time_tag": "2026-04-27T00:00:00", "Kp": 3.00,
+//       "a_running": 15, "station_count": 8 },
 //     ...
 //   ]
+//
+// time_tag is UTC by convention (no trailing "Z"), Kp is a number.
 //
 // We only need the most recent Kp — the latest entry feeds the aurora
 // visibility filter.
@@ -37,26 +38,21 @@ const defaultFetcher: Fetcher = (url) =>
     json: () => res.json() as Promise<unknown>,
   }));
 
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
 export function parseKpResponse(raw: unknown): KpReading {
-  if (!Array.isArray(raw) || raw.length < 2) {
+  if (!Array.isArray(raw) || raw.length < 1) {
     throw new Error('noaa-swpc: response was not a non-empty array');
   }
-  const header = raw[0];
-  if (!Array.isArray(header)) {
-    throw new Error('noaa-swpc: header row missing');
-  }
-  const timeIdx = header.indexOf('time_tag');
-  const kpIdx = header.indexOf('Kp');
-  if (timeIdx < 0 || kpIdx < 0) {
-    throw new Error('noaa-swpc: header missing time_tag or Kp column');
-  }
-  // Last row is the most recent observation.
+  // Last entry is the most recent observation.
   const last = raw[raw.length - 1];
-  if (!Array.isArray(last)) {
-    throw new Error('noaa-swpc: last row was not an array');
+  if (!isPlainObject(last)) {
+    throw new Error('noaa-swpc: last entry was not an object');
   }
-  const rawKp = last[kpIdx];
-  const rawTime = last[timeIdx];
+  const rawKp = last['Kp'];
+  const rawTime = last['time_tag'];
   if (typeof rawKp !== 'string' && typeof rawKp !== 'number') {
     throw new Error('noaa-swpc: latest Kp value missing');
   }
@@ -67,10 +63,9 @@ export function parseKpResponse(raw: unknown): KpReading {
   if (!Number.isFinite(kp) || kp < 0 || kp > 9) {
     throw new Error(`noaa-swpc: Kp out of range (${rawKp})`);
   }
-  // NOAA's time_tag uses "YYYY-MM-DD HH:mm:ss.sss" without a "T" or
-  // explicit "Z". They're all UTC by convention; normalise into a
-  // standard ISO string so downstream consumers can pass it to Date.
-  const observedAtUtc = `${rawTime.replace(' ', 'T')}Z`;
+  // time_tag is UTC by convention but missing the trailing "Z". Append
+  // it so downstream consumers can hand the string to Date directly.
+  const observedAtUtc = rawTime.endsWith('Z') ? rawTime : `${rawTime}Z`;
   return { kp, observedAtUtc };
 }
 

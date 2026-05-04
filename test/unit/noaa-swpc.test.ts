@@ -34,13 +34,12 @@ describe('parseKpResponse', () => {
   it('returns the latest Kp from the bundled NOAA fixture', () => {
     const result = parseKpResponse(fixture());
     expect(result.kp).toBeCloseTo(5.33);
-    expect(result.observedAtUtc).toBe('2026-05-03T09:00:00.000Z');
+    expect(result.observedAtUtc).toBe('2026-05-03T09:00:00Z');
   });
 
-  it('handles numeric Kp cells (some NOAA mirrors return numbers)', () => {
+  it('handles string Kp cells (some NOAA mirrors return strings)', () => {
     const result = parseKpResponse([
-      ['time_tag', 'Kp', 'a_running', 'station_count'],
-      ['2026-05-03 09:00:00.000', 4.5, 6, 8],
+      { time_tag: '2026-05-03T09:00:00', Kp: '4.5' },
     ]);
     expect(result.kp).toBe(4.5);
   });
@@ -48,27 +47,21 @@ describe('parseKpResponse', () => {
   it('throws when the response is empty / not an array', () => {
     expect(() => parseKpResponse(null)).toThrow();
     expect(() => parseKpResponse([])).toThrow();
-    expect(() => parseKpResponse([['time_tag', 'Kp']])).toThrow(); // header only
   });
 
-  it('throws when expected columns are missing', () => {
+  it('throws when the latest entry is missing required fields', () => {
     expect(() =>
-      parseKpResponse([['time_tag'], ['2026-05-03 09:00:00.000']]),
+      parseKpResponse([{ time_tag: '2026-05-03T09:00:00' }]),
     ).toThrow();
+    expect(() => parseKpResponse([{ Kp: 3.0 }])).toThrow();
   });
 
   it('throws when the latest Kp is non-finite or out of range', () => {
     expect(() =>
-      parseKpResponse([
-        ['time_tag', 'Kp', 'a_running', 'station_count'],
-        ['2026-05-03 09:00:00.000', '99', '6', '8'],
-      ]),
+      parseKpResponse([{ time_tag: '2026-05-03T09:00:00', Kp: 99 }]),
     ).toThrow();
     expect(() =>
-      parseKpResponse([
-        ['time_tag', 'Kp', 'a_running', 'station_count'],
-        ['2026-05-03 09:00:00.000', 'NaN', '6', '8'],
-      ]),
+      parseKpResponse([{ time_tag: '2026-05-03T09:00:00', Kp: 'NaN' }]),
     ).toThrow();
   });
 });
