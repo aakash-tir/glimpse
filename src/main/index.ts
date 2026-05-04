@@ -297,6 +297,14 @@ function expandToWindow(): ModeChange {
   expandTimeIconPosition = iconPos;
   windowDragged = false;
   mode = 'window';
+  // Per plan/data-sources.md § Refresh policy: "On window open, fetch
+  // all data immediately." "Window" here means the expanded panel
+  // (per the project glossary), not the icon. Kicked off async so the
+  // expand animation isn't blocked; the renderer receives the fresh
+  // snapshot via the data:changed listener when fetch completes. No
+  // debounce — rapid toggle is uncommon and personal-use APIs are all
+  // generous.
+  void dataStore.refresh();
   // Anchor: where the icon's center was on screen.
   const anchorScreen = {
     x: iconPos.x + ICON_SIZE / 2,
