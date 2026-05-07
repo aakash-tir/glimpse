@@ -59,3 +59,16 @@
     overflow: hidden;
   }
 }
+
+/* Loading-skeleton shimmer sweep used by the M6 hourly + 7-day slides
+   while the first forecast is mid-fetch. Plan/slides.md: "muted-grey
+   skeleton placeholders shaped like the real content, with a subtle
+   horizontal sweep shimmer repeating every ~1.5 s." */
+@keyframes glimpse-skeleton-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
