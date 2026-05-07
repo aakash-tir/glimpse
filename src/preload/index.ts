@@ -3,6 +3,7 @@ import type { Settings } from '../shared/settings-store';
 import type { ScreenPoint } from '../shared/drag';
 import type { Mode, ModeChange } from '../shared/mode';
 import type { ResizeCorner } from '../shared/window-position';
+import type { DataSnapshot } from '../shared/data-snapshot';
 
 const api = {
   getSettings: (): Promise<Settings> => ipcRenderer.invoke('settings:get'),
@@ -34,6 +35,17 @@ const api = {
     ipcRenderer.on('mode:changed', handler);
     return () => {
       ipcRenderer.off('mode:changed', handler);
+    };
+  },
+  getData: (): Promise<DataSnapshot> => ipcRenderer.invoke('data:get'),
+  onDataChanged: (cb: (snapshot: DataSnapshot) => void): (() => void) => {
+    const handler = (
+      _e: Electron.IpcRendererEvent,
+      snapshot: DataSnapshot,
+    ): void => cb(snapshot);
+    ipcRenderer.on('data:changed', handler);
+    return () => {
+      ipcRenderer.off('data:changed', handler);
     };
   },
 };

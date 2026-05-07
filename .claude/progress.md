@@ -121,7 +121,7 @@
 
 ## M5 — Data layer (location + Open-Meteo + NOAA + SunCalc + meteor JSON)
 
-**Status:** Not started
+**Status:** Done (2026-05-07)
 
 **Scope.** All data fetches, refresh scheduling, failure handling. UI still shows placeholders — wired into a single in-memory store accessible from the renderer via IPC.
 
@@ -235,6 +235,7 @@
 - Build: NSIS installer producing `Glimpse Setup.exe`. Start-menu entry: "Glimpse". Installed binary: `Glimpse.exe`.
 - `app.setLoginItemSettings({ openAtLogin: true })` registered on installed-build first run.
 - Manual install / uninstall test on a clean Windows 11 user profile.
+- **Cached-location fallback (resilience polish).** Persist the most recent successful `{lat, lon, city}` to `settings.json` and reuse it when the IP-geolocation provider fails (rate limit, transient outage). Primary path is still detect-on-launch per `plan/data-sources.md` — cache is fallback only. Skip on first-ever launch when no cache exists; that case still surfaces as a fetch failure → error state. Deferred from M5 because the in-dev rate-limit was solved by switching providers (ipapi.co → ipwho.is); the cache is for production resilience.
 - Final QA pass against the plan: every behavior in `plan/` is reproducible end-to-end.
 
 **Refs:** [`plan/packaging.md`](./plan/packaging.md), [`plan/tech-stack.md`](./plan/tech-stack.md). **Tests:** [`rules/testing.md` § M10](./rules/testing.md#m10--polish--packaging).

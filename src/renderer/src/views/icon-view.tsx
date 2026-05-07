@@ -1,12 +1,36 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { WeatherIcon } from '../components/weather-icon';
+import { WeatherIcon, type IconState } from '../components/weather-icon';
 import { useClickClassifier } from '../components/use-click-classifier';
+import { useDataSnapshot } from '../components/use-data-snapshot';
+import type { DataSnapshot } from '../../../shared/data-snapshot';
+
+// Maps the data store's snapshot to the icon's visual state.
+//   null              → loading (haven't received the first snapshot yet)
+//   errorState=error  → sad cloud + error tooltip
+//   forecast=null     → loading (snapshot received but no successful
+//                       fetch yet; same visual as the pre-snapshot gap)
+//   otherwise         → ready, with the current condition.
+//
+// isDay is hard-coded to true here — proper sunrise/sunset comparison
+// is M6 scope (see rules/testing.md § M6).
+function snapshotToIconState(snapshot: DataSnapshot | null): IconState {
+  if (snapshot === null) return { kind: 'loading' };
+  if (snapshot.errorState === 'error') return { kind: 'error' };
+  if (snapshot.forecast === null) return { kind: 'loading' };
+  return {
+    kind: 'ready',
+    condition: snapshot.forecast.current.condition,
+    isDay: true,
+  };
+}
 
 // IconView — the collapsed, icon-mode renderer. Owns its own drag-mode
 // state and the icon's click handlers. Single-click asks main to
 // expand to window mode; double-click toggles drag mode.
 export function IconView(): JSX.Element {
+  const snapshot = useDataSnapshot();
+  const iconState = useMemo(() => snapshotToIconState(snapshot), [snapshot]);
   const [dragMode, setDragMode] = useState(false);
   // Latched when the click classifier commits a single-click that
   // triggers expand. Snap-hides the glyph and gates the deferred
@@ -189,10 +213,7 @@ export function IconView(): JSX.Element {
         onClick={handleIconClickWithStop}
         onMouseDown={handleIconMouseDown}
       >
-        <WeatherIcon
-          state={{ kind: 'ready', condition: 'clear', isDay: true }}
-          dragMode={dragMode}
-        />
+        <WeatherIcon state={iconState} dragMode={dragMode} />
       </div>
     </div>
   );

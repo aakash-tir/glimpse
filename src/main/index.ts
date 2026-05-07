@@ -1,6 +1,12 @@
-import { app, BrowserWindow, screen, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, powerMonitor, screen } from 'electron';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { fetchGeolocation } from './data/geolocation';
+import { fetchForecast } from './data/open-meteo';
+import { fetchKp } from './data/noaa-swpc';
+import { DataStore } from './data/store';
+import { TickScheduler } from '../shared/scheduler';
+import type { DataSnapshot } from '../shared/data-snapshot';
 import {
   clampIconForDrag,
   defaultIconPosition,
@@ -36,6 +42,28 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 let iconWindow: BrowserWindow | null = null;
 let mode: Mode = 'icon';
+
+// Data layer — composed at app.whenReady so the constructors don't
+// run during test imports of this module. The store fans out to the
+// renderer via IPC ('data:get' / 'data:changed'). The scheduler runs
+// the refresh loop on the :05 cadence with sleep/wake catch-up wired
+// to powerMonitor.
+const dataStore = new DataStore({
+  fetchGeolocation,
+  fetchForecast,
+  fetchKp,
+});
+const dataScheduler = new TickScheduler(async () => {
+  const result = await dataStore.refresh();
+  // On weather failure, retry on the exponential-backoff schedule
+  // (5 → 10 → 20 → 40 → 60 min) instead of waiting for the next
+  // hourly :05 tick. Recovery on success returns void here so the
+  // scheduler resumes its default cadence.
+  if (!result.weatherOk && result.nextRetryMinutes !== null) {
+    return { nextDelayMs: result.nextRetryMinutes * 60_000 };
+  }
+  return undefined;
+});
 
 function primaryBounds(): DisplayBounds {
   return screen.getPrimaryDisplay().workArea;
@@ -269,6 +297,14 @@ function expandToWindow(): ModeChange {
   expandTimeIconPosition = iconPos;
   windowDragged = false;
   mode = 'window';
+  // Per plan/data-sources.md § Refresh policy: "On window open, fetch
+  // all data immediately." "Window" here means the expanded panel
+  // (per the project glossary), not the icon. Kicked off async so the
+  // expand animation isn't blocked; the renderer receives the fresh
+  // snapshot via the data:changed listener when fetch completes. No
+  // debounce — rapid toggle is uncommon and personal-use APIs are all
+  // generous.
+  void dataStore.refresh();
   // Anchor: where the icon's center was on screen.
   const anchorScreen = {
     x: iconPos.x + ICON_SIZE / 2,
@@ -393,6 +429,14 @@ function collapseToIcon(opts: CollapseOpts = {}): ModeChange {
 function registerIpc(): void {
   ipcMain.handle('settings:get', () => loadSettings());
   ipcMain.handle('settings:set', (_evt, patch) => saveSettings(patch));
+
+  ipcMain.handle('data:get', () => dataStore.getSnapshot());
+
+  // Renderer subscribes via the preload's onDataChanged. We forward
+  // every snapshot push to whichever window is currently showing.
+  dataStore.subscribe((snapshot: DataSnapshot) => {
+    iconWindow?.webContents.send('data:changed', snapshot);
+  });
 
   ipcMain.handle('mode:get', () => mode);
   ipcMain.handle('mode:expand', () => expandToWindow());
@@ -659,6 +703,16 @@ if (!gotLock) {
     screen.on('display-metrics-changed', snapBackIfOffScreen);
     screen.on('display-removed', snapBackIfOffScreen);
     screen.on('display-added', snapBackIfOffScreen);
+
+    // Kick off the immediate first fetch and start the :05 cadence.
+    // Per spec: fetch all data immediately on app start (covers the
+    // "fetch on window open" requirement since the icon window is
+    // always present), then refresh on the hourly clock-aligned tick.
+    void dataStore.refresh();
+    dataScheduler.start();
+    // Fire an extra refresh on resume if the system slept past at
+    // least one tick window — see TickScheduler.notifyResume.
+    powerMonitor.on('resume', () => dataScheduler.notifyResume());
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createIconWindow();
