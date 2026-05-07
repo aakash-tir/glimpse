@@ -25,6 +25,18 @@ type GlimpseStub = {
   resizeEnd: ReturnType<typeof vi.fn>;
   getSettings: ReturnType<typeof vi.fn>;
   setSettings: ReturnType<typeof vi.fn>;
+  getData: ReturnType<typeof vi.fn>;
+  onDataChanged: ReturnType<typeof vi.fn>;
+};
+
+const STUB_SNAPSHOT = {
+  location: null,
+  forecast: null,
+  kp: null,
+  lastUpdated: null,
+  errorState: 'ok' as const,
+  eventsHidden: false,
+  auroraVisibleFromUserLocation: false,
 };
 
 const STUB_SETTINGS = {
@@ -54,6 +66,8 @@ function installGlimpseStub(): GlimpseStub {
     resizeEnd: vi.fn(),
     getSettings: vi.fn().mockResolvedValue(STUB_SETTINGS),
     setSettings: vi.fn().mockResolvedValue(STUB_SETTINGS),
+    getData: vi.fn().mockResolvedValue(STUB_SNAPSHOT),
+    onDataChanged: vi.fn().mockReturnValue(() => {}),
   };
   (window as unknown as { glimpse: GlimpseStub }).glimpse = stub;
   return stub;
