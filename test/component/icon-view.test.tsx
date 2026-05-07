@@ -108,9 +108,9 @@ describe('IconView — data-snapshot wiring', () => {
     render(<IconView />);
     await flushGetData();
     expect(screen.getByTestId('icon-sad-cloud')).toBeInTheDocument();
-    expect(screen.getByTestId('icon-root').getAttribute('data-icon-state')).toBe(
-      'error',
-    );
+    expect(
+      screen.getByTestId('icon-root').getAttribute('data-icon-state'),
+    ).toBe('error');
   });
 
   it('renders the ready glyph driven by forecast.current.condition', async () => {

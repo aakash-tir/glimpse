@@ -117,9 +117,9 @@ describe('Data-flow integration — fetcher → store → IconView', () => {
     await flushAsync();
     // Pre-refresh the snapshot is EMPTY_SNAPSHOT (errorState 'ok',
     // forecast null) → loading.
-    expect(screen.getByTestId('icon-root').getAttribute('data-icon-state')).toBe(
-      'loading',
-    );
+    expect(
+      screen.getByTestId('icon-root').getAttribute('data-icon-state'),
+    ).toBe('loading');
 
     // Drive the actual fetch — store transitions errorState=error,
     // emits via subscribe, listeners push to IconView, IconView
@@ -128,9 +128,9 @@ describe('Data-flow integration — fetcher → store → IconView', () => {
       await store.refresh();
     });
     expect(screen.getByTestId('icon-sad-cloud')).toBeInTheDocument();
-    expect(screen.getByTestId('icon-root').getAttribute('data-icon-state')).toBe(
-      'error',
-    );
+    expect(
+      screen.getByTestId('icon-root').getAttribute('data-icon-state'),
+    ).toBe('error');
   });
 
   it('a failing geolocation fetch (no prior location) also surfaces as the icon error visual', async () => {
