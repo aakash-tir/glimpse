@@ -121,7 +121,7 @@
 
 ## M5 — Data layer (location + Open-Meteo + NOAA + SunCalc + meteor JSON)
 
-**Status:** Not started
+**Status:** Done (2026-05-07)
 
 **Scope.** All data fetches, refresh scheduling, failure handling. UI still shows placeholders — wired into a single in-memory store accessible from the renderer via IPC.
 
