@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import type { TimeFormat } from '../../../shared/settings-store';
+import type { TimeFormat, Units } from '../../../shared/settings-store';
 import { ICON_SIZE } from '../../../shared/icon-position';
 import { TitleBar } from '../components/title-bar';
 import { useClickClassifier } from '../components/use-click-classifier';
@@ -48,6 +48,9 @@ export function WindowView({
   // Sourced from settings on mount; live updates land in M7 alongside
   // the Settings-slide toggle.
   const [timeFormat, setTimeFormat] = useState<TimeFormat>('24h');
+  // Metric / imperial units, used by the M7 current-conditions slide
+  // for wind speed + feels-like temperature display.
+  const [units, setUnits] = useState<Units>('metric');
   // Forecast snapshot streamed from main via the data-snapshot hook.
   // Null while the first fetch is in flight — slide content components
   // swap in a loading skeleton in that case.
@@ -110,6 +113,7 @@ export function WindowView({
       if (cancelled) return;
       setMoonEnabled(settings.moonPhaseSlideEnabled);
       setTimeFormat(settings.timeFormat);
+      setUnits(settings.units);
     });
     return () => {
       cancelled = true;
@@ -218,6 +222,7 @@ export function WindowView({
         eventsActive={false}
         forecast={forecast}
         timeFormat={timeFormat}
+        units={units}
       />
     </motion.div>
   );

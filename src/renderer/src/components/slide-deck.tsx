@@ -9,7 +9,7 @@ import {
 import { motion, useAnimationControls } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Forecast } from '../../../shared/forecast';
-import type { TimeFormat } from '../../../shared/settings-store';
+import type { TimeFormat, Units } from '../../../shared/settings-store';
 import {
   computeVisibleSlides,
   reconcileCurrentSlideIndex,
@@ -17,6 +17,7 @@ import {
   type SlideId,
   type WrapDirection,
 } from '../../../shared/slides';
+import { CurrentSlide } from './current-slide';
 import { SevenDaySlide } from './seven-day-slide';
 import {
   SlideIndicator,
@@ -121,6 +122,9 @@ export type SlideDeckProps = {
   // User's 12 h / 24 h preference. Forwarded to TodaySlide for the
   // hourly time labels.
   timeFormat?: TimeFormat;
+  // Metric / imperial unit preference. Forwarded to CurrentSlide for
+  // wind speed + feels-like temperature unit suffix.
+  units?: Units;
 };
 
 type Transition = {
@@ -134,6 +138,7 @@ export function SlideDeck({
   themeMode = 'dark',
   forecast = null,
   timeFormat = '24h',
+  units = 'metric',
 }: SlideDeckProps): JSX.Element {
   const visibleSlides = useMemo(
     () => computeVisibleSlides({ moonEnabled, eventsActive }),
@@ -327,6 +332,7 @@ export function SlideDeck({
           deckWidth={deckWidth}
           forecast={forecast}
           timeFormat={timeFormat}
+          units={units}
         />
         {transition && sideFaceSide ? (
           <SlideFace
@@ -336,6 +342,7 @@ export function SlideDeck({
             deckWidth={deckWidth}
             forecast={forecast}
             timeFormat={timeFormat}
+            units={units}
           />
         ) : null}
       </motion.div>
@@ -401,6 +408,7 @@ type SlideFaceProps = {
   deckWidth: number;
   forecast: Forecast | null;
   timeFormat: TimeFormat;
+  units: Units;
 };
 
 function SlideFace({
@@ -410,6 +418,7 @@ function SlideFace({
   deckWidth,
   forecast,
   timeFormat,
+  units,
 }: SlideFaceProps): JSX.Element {
   const meta = SLIDE_META[slideId];
   const bg = meta.background(themeMode);
@@ -421,13 +430,14 @@ function SlideFace({
         ? `rotateY(90deg) translateZ(${halfW}px)`
         : `rotateY(-90deg) translateZ(${halfW}px)`;
 
-  // M6 wires the today + seven-day slides to real forecast data. The
-  // remaining slides (current, moon, events, settings) keep their M4
-  // placeholder label until their respective milestones land.
+  // M6 wires the today + seven-day slides to real forecast data. M7
+  // adds current conditions; the remaining slides (moon, events,
+  // settings) keep their M4 placeholder label until their milestone.
   const body = renderSlideBody({
     slideId,
     forecast,
     timeFormat,
+    units,
     label: meta.label,
   });
 
@@ -475,11 +485,13 @@ function renderSlideBody({
   slideId,
   forecast,
   timeFormat,
+  units,
   label,
 }: {
   slideId: SlideId;
   forecast: Forecast | null;
   timeFormat: TimeFormat;
+  units: Units;
   label: string;
 }): JSX.Element | string {
   switch (slideId) {
@@ -487,6 +499,14 @@ function renderSlideBody({
       return <TodaySlide forecast={forecast} timeFormat={timeFormat} />;
     case 'seven-day':
       return <SevenDaySlide forecast={forecast} />;
+    case 'current':
+      return (
+        <CurrentSlide
+          forecast={forecast}
+          timeFormat={timeFormat}
+          units={units}
+        />
+      );
     default:
       return label;
   }
