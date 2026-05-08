@@ -143,7 +143,7 @@
 
 ## M6 — Slides: Today (hourly) + Next 7 days
 
-**Status:** Not started
+**Status:** Done (2026-05-08)
 
 **Scope.** Wire real Open-Meteo data into slides 1 and 2 with their horizontal-scroll layouts.
 
