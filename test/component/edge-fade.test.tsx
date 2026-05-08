@@ -36,12 +36,21 @@ describe('EdgeFade', () => {
     const { rerender } = render(<EdgeFade side="right" visible />);
     let bg = screen.getByTestId('edge-fade-right').style.background;
     // Right side → origin at 100% 50%.
-    expect(bg).toContain('100% 50%');
+    expect(bg).toMatch(/at\s+100%\s+50%/);
 
     rerender(<EdgeFade side="left" visible />);
     bg = screen.getByTestId('edge-fade-left').style.background;
     // Left side → origin at 0% 50%.
-    expect(bg).toContain('0% 50%');
+    expect(bg).toMatch(/at\s+0%\s+50%/);
+  });
+
+  it('sizes the ellipse so the boundary traces a parenthesis curve (horiz=strip width, vert=½ slide height)', () => {
+    render(<EdgeFade side="right" visible />);
+    const bg = screen.getByTestId('edge-fade-right').style.background;
+    // ellipse 100% × 50% — horizontal radius matches the strip width
+    // (boundary touches inner edge at the middle); vertical radius is
+    // half the strip height (boundary touches panel edge at corners).
+    expect(bg).toMatch(/ellipse\s+100%\s+50%/);
   });
 
   it('peaks at the target alpha at 0% (panel edge) and fades to 0 at 100% (inner end)', () => {

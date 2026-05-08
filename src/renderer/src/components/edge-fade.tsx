@@ -53,11 +53,15 @@ export function EdgeFade({
 }
 
 // Build a radial gradient anchored at the slide-edge midpoint. The
-// horizontal radius matches the fade strip's width (so the gradient
-// fully transparents-out at the inner end); the vertical radius is
-// stretched well past the strip's height so iso-alpha lines stay
-// gently curved across the slide rather than collapsing to a small
-// circle. Three stops give a noticeable mid-curve falloff.
+// ellipse is sized so its t=1 iso-alpha line traces the parenthesis
+// curve from the user sketch (scroll-identi.png):
+//   - horizontal radius = 100% of strip width → boundary touches the
+//     inner edge of the strip at the vertical middle;
+//   - vertical radius   =  50% of strip height → boundary touches
+//     the panel edge at the top + bottom corners.
+// That makes the visible alpha region a parenthesis-shaped sliver,
+// brightest at the edge midpoint and fading to the background along
+// the curved boundary.
 //
 // Falls back to a plain two-stop linear gradient if `fadeToColor`
 // isn't parseable rgba — the component keeps working even though the
@@ -74,16 +78,11 @@ function buildRadialGradient(
   const { r, g, b, a } = parsed;
   // Origin sits exactly at the slide edge, vertically centered.
   const origin = side === 'right' ? '100% 50%' : '0% 50%';
-  // Ellipse 100% × 220% — width matches the strip so transparency
-  // hits exactly at the inner edge; height oversize stretches the
-  // ellipse vertically so the top / bottom corners of the strip
-  // still get a strong glow rather than fading too early.
   const stops = [
     `rgba(${r}, ${g}, ${b}, ${roundAlpha(a)}) 0%`,
-    `rgba(${r}, ${g}, ${b}, ${roundAlpha(a * 0.35)}) 55%`,
     `rgba(${r}, ${g}, ${b}, 0) 100%`,
   ].join(', ');
-  return `radial-gradient(ellipse 100% 220% at ${origin}, ${stops})`;
+  return `radial-gradient(ellipse 100% 50% at ${origin}, ${stops})`;
 }
 
 function parseRgba(
