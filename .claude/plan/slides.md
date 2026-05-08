@@ -33,7 +33,9 @@ When the window is opened before the first successful fetch, slides display **mu
 - **Range:** rolling next 24 hours, **starting at the next full hour** from now.
 - **Layout:** horizontal scroll inside the slide; the cells are vertically centered in the visible area between the title and the bottom nav bar. **Visible cell count is responsive** — chosen so each cell stays roughly **48 px wide**: 5 cells at the default ~240 px window, more on wider windows, fewer on narrower (clamped to 3–8). **Snap-to-cell** — each scroll step advances by **one hour**, so the seen items shift one column rather than the whole page sliding off.
 - **Side breathing room:** ~12 px of padding on the left and right of the scroll track so cells don't hug the panel edge.
-- **Scroll affordance:** 24 px gradient fade on the right edge whenever there's more content to scroll to (and on the left edge once the user has scrolled past the start). Fades disappear at the boundary, and they sit just inside the side padding so they overlay the first / last visible cell rather than the empty padding zone.
+- **Scroll affordances (two cues):**
+  1. **Edge-fade gradient** — 24 px gradient fade on the right edge whenever there's more content to scroll to (and on the left edge once the user has scrolled past the start). Fades disappear at the boundary, and they sit just inside the side padding so they overlay the first / last visible cell rather than the empty padding zone.
+  2. **Progress bar** — thin horizontal bar pinned to the bottom of the slide content (just above the nav-bar reserve). The thumb's width represents the visible portion of total content; its left position represents the current scroll position. Visible only when content overflows.
 - **Background:** default dark glass.
 
 ## Slide 2 — Next 7 days
@@ -43,7 +45,7 @@ When the window is opened before the first successful fetch, slides display **mu
 - **Day labels:** "Today" in row 1, then weekday abbreviations (Mon, Tue, …) for the rest.
 - **Range:** today + next 6 days.
 - **Layout:** horizontal scroll; cells vertically centered in the visible area between the title and the bottom nav bar. **Visible cell count is responsive** — chosen so each cell stays roughly **80 px wide**: 3 days at the default ~240 px window, up to all 7 on wider windows (clamped to 2–7). **Snap-to-cell** — each scroll step advances by **one day**.
-- **Scroll affordance:** same 24 px edge-fade pattern as the hourly slide.
+- **Scroll affordances:** same edge-fade gradient + progress bar as the hourly slide. Both are hidden when all 7 days fit in the visible viewport (no overflow).
 - **Background:** default dark glass.
 
 ## Slide 3 — Current conditions

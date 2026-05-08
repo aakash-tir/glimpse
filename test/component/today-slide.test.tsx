@@ -289,6 +289,111 @@ describe('TodaySlide — time format', () => {
   });
 });
 
+describe('TodaySlide — scroll progress indicator', () => {
+  function stubScrollMetrics(
+    track: HTMLElement,
+    metrics: { clientWidth: number; scrollWidth: number; scrollLeft: number },
+  ): void {
+    Object.defineProperty(track, 'clientWidth', {
+      value: metrics.clientWidth,
+      configurable: true,
+    });
+    Object.defineProperty(track, 'scrollWidth', {
+      value: metrics.scrollWidth,
+      configurable: true,
+    });
+    Object.defineProperty(track, 'scrollLeft', {
+      value: metrics.scrollLeft,
+      writable: true,
+      configurable: true,
+    });
+  }
+
+  it('renders the progress bar when content overflows', () => {
+    render(<TodaySlide forecast={buildForecast()} timeFormat="24h" />);
+    const track = screen.getByTestId('scroll-track');
+    stubScrollMetrics(track, {
+      clientWidth: 240,
+      scrollWidth: 1152,
+      scrollLeft: 0,
+    });
+    act(() => {
+      fireEvent.scroll(track);
+    });
+    expect(screen.getByTestId('scroll-progress')).toBeInTheDocument();
+    expect(screen.getByTestId('scroll-progress-thumb')).toBeInTheDocument();
+  });
+
+  it('hides the progress bar when content fits in the viewport', () => {
+    render(<TodaySlide forecast={buildForecast()} timeFormat="24h" />);
+    const track = screen.getByTestId('scroll-track');
+    // No overflow: scrollWidth <= clientWidth.
+    stubScrollMetrics(track, {
+      clientWidth: 240,
+      scrollWidth: 240,
+      scrollLeft: 0,
+    });
+    act(() => {
+      fireEvent.scroll(track);
+    });
+    expect(screen.queryByTestId('scroll-progress')).not.toBeInTheDocument();
+  });
+
+  it('thumb width represents visible / total ratio', () => {
+    render(<TodaySlide forecast={buildForecast()} timeFormat="24h" />);
+    const track = screen.getByTestId('scroll-track');
+    // 24 hours / 5 visible per page = scrollWidth / clientWidth = 24/5 = 4.8.
+    stubScrollMetrics(track, {
+      clientWidth: 240,
+      scrollWidth: 1152, // 240 × 4.8
+      scrollLeft: 0,
+    });
+    act(() => {
+      fireEvent.scroll(track);
+    });
+    const thumb = screen.getByTestId('scroll-progress-thumb');
+    // visible/total = 240/1152 = 0.2083 → 20.83% × 240 = 50 px.
+    expect(parseFloat(thumb.getAttribute('data-thumb-px') ?? '0')).toBeCloseTo(
+      50,
+      0,
+    );
+  });
+
+  it('thumb position reflects current scrollLeft as a fraction of total range', () => {
+    render(<TodaySlide forecast={buildForecast()} timeFormat="24h" />);
+    const track = screen.getByTestId('scroll-track');
+    const clientWidth = 240;
+    const scrollWidth = 1152;
+    // Halfway through the scrollable range.
+    const scrollLeft = (scrollWidth - clientWidth) / 2; // 456
+    stubScrollMetrics(track, { clientWidth, scrollWidth, scrollLeft });
+    act(() => {
+      fireEvent.scroll(track);
+    });
+    const progress = screen
+      .getByTestId('scroll-progress')
+      .getAttribute('data-progress');
+    expect(parseFloat(progress ?? '0')).toBeCloseTo(0.5, 2);
+  });
+
+  it('clamps the thumb to a minimum visible width on tiny viewports', () => {
+    render(<TodaySlide forecast={buildForecast()} timeFormat="24h" />);
+    const track = screen.getByTestId('scroll-track');
+    // visible/total = 1/100 → ideal thumb = 1.2 px on a 120 px track.
+    // Min floor of 8 px should kick in.
+    stubScrollMetrics(track, {
+      clientWidth: 120,
+      scrollWidth: 12000,
+      scrollLeft: 0,
+    });
+    act(() => {
+      fireEvent.scroll(track);
+    });
+    const thumb = screen.getByTestId('scroll-progress-thumb');
+    expect(parseFloat(thumb.getAttribute('data-thumb-px') ?? '0')).toBe(8);
+  });
+});
+
 describe('TodaySlide — wheel-to-horizontal scroll', () => {
   function stubClientWidth(track: HTMLElement, value: number): void {
     Object.defineProperty(track, 'clientWidth', {

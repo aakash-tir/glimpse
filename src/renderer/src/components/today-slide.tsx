@@ -49,6 +49,17 @@ const BOTTOM_NAV_RESERVE_PX = 36;
 // fraction below scrollWidth.
 const SCROLL_END_TOLERANCE_PX = 2;
 
+// Vertical reserve at the bottom of the ScrollableSlide outer wrapper
+// for the scroll-progress bar (the second scrollability cue alongside
+// the edge-fade gradients). The track stops short by this much so the
+// progress bar has a clean home above the nav-bar reserve.
+const PROGRESS_BAR_AREA_PX = 10;
+const PROGRESS_BAR_HEIGHT_PX = 3;
+// Floor on the thumb's rendered width — keeps it visible even when
+// the visible-vs-total ratio gets very small (huge content, tiny
+// viewport). 8 px is enough to read as a control on a 120 px window.
+const PROGRESS_THUMB_MIN_PX = 8;
+
 export type TodaySlideProps = {
   forecast: Forecast | null;
   timeFormat: TimeFormat;
@@ -202,18 +213,31 @@ export function ScrollableSlide({
   children,
 }: ScrollableSlideProps): JSX.Element {
   const trackRef = useRef<HTMLDivElement | null>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
+  // Single state for everything derived from scroll position — the
+  // edge-fade visibility flags + the progress-bar thumb geometry both
+  // need scrollLeft / scrollWidth / clientWidth, so we keep them
+  // together and recompute as one unit on scroll / resize.
+  const [metrics, setMetrics] = useState({
+    scrollLeft: 0,
+    scrollWidth: 0,
+    clientWidth: 0,
+  });
 
   const recompute = useCallback(() => {
     const node = trackRef.current;
     if (!node) return;
-    const { scrollLeft, scrollWidth, clientWidth } = node;
-    setCanScrollLeft(scrollLeft > SCROLL_END_TOLERANCE_PX);
-    setCanScrollRight(
-      scrollLeft + clientWidth < scrollWidth - SCROLL_END_TOLERANCE_PX,
-    );
+    setMetrics({
+      scrollLeft: node.scrollLeft,
+      scrollWidth: node.scrollWidth,
+      clientWidth: node.clientWidth,
+    });
   }, []);
+
+  const canScrollLeft = metrics.scrollLeft > SCROLL_END_TOLERANCE_PX;
+  const canScrollRight =
+    metrics.scrollLeft + metrics.clientWidth <
+    metrics.scrollWidth - SCROLL_END_TOLERANCE_PX;
+  const overflows = canScrollLeft || canScrollRight;
 
   useEffect(() => {
     recompute();
@@ -282,17 +306,18 @@ export function ScrollableSlide({
           position: 'absolute',
           // Explicit left/right (instead of inset: 0) so the track is
           // pushed inward by sidePaddingPx, leaving breathing room at
-          // the slide edges. top/bottom unchanged.
+          // the slide edges. Bottom is shifted up by the progress-bar
+          // area so the cells don't overlap the indicator.
           top: 0,
-          bottom: 0,
+          bottom: PROGRESS_BAR_AREA_PX,
           left: sidePaddingPx,
           right: sidePaddingPx,
           display: 'flex',
           overflowX: 'auto',
           overflowY: 'hidden',
           scrollSnapType: 'x mandatory',
-          // Hide the scrollbar — the edge-fade is the only intended
-          // affordance per plan/slides.md.
+          // Hide the native scrollbar — the edge-fade + progress bar
+          // are the affordances per plan/slides.md.
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',
         }}
@@ -301,6 +326,72 @@ export function ScrollableSlide({
       </div>
       <EdgeFade side="left" visible={canScrollLeft} />
       <EdgeFade side="right" visible={canScrollRight} />
+      <ScrollProgressBar
+        metrics={metrics}
+        sidePaddingPx={sidePaddingPx}
+        visible={overflows}
+      />
+    </div>
+  );
+}
+
+type ScrollProgressBarProps = {
+  metrics: { scrollLeft: number; scrollWidth: number; clientWidth: number };
+  sidePaddingPx: number;
+  visible: boolean;
+};
+
+// Plan/slides.md scroll-affordance #2: thin horizontal bar pinned to
+// the bottom of the slide content. Thumb width = visible / total,
+// thumb position = scrollLeft / total. Hidden when the content fits
+// (no overflow → no need for the cue).
+function ScrollProgressBar({
+  metrics,
+  sidePaddingPx,
+  visible,
+}: ScrollProgressBarProps): JSX.Element | null {
+  const { scrollLeft, scrollWidth, clientWidth } = metrics;
+  if (!visible || scrollWidth <= 0 || clientWidth <= 0) return null;
+
+  const trackPx = clientWidth; // progress track spans the same inner width as the scroll track
+  const idealThumbPx = (clientWidth / scrollWidth) * trackPx;
+  const thumbPx = Math.max(PROGRESS_THUMB_MIN_PX, idealThumbPx);
+  // Available scroll range (in source coords) and progress 0..1.
+  const range = Math.max(1, scrollWidth - clientWidth);
+  const progress = Math.min(1, Math.max(0, scrollLeft / range));
+  // Project progress onto the available thumb travel within the track.
+  const thumbLeftPx = (trackPx - thumbPx) * progress;
+
+  return (
+    <div
+      data-testid="scroll-progress"
+      data-progress={progress.toFixed(3)}
+      style={{
+        position: 'absolute',
+        bottom: (PROGRESS_BAR_AREA_PX - PROGRESS_BAR_HEIGHT_PX) / 2,
+        left: sidePaddingPx,
+        right: sidePaddingPx,
+        height: PROGRESS_BAR_HEIGHT_PX,
+        borderRadius: PROGRESS_BAR_HEIGHT_PX / 2,
+        background: 'rgba(255, 255, 255, 0.15)',
+        pointerEvents: 'none',
+        zIndex: 4,
+      }}
+    >
+      <div
+        data-testid="scroll-progress-thumb"
+        data-thumb-px={thumbPx.toFixed(2)}
+        data-thumb-left-px={thumbLeftPx.toFixed(2)}
+        style={{
+          position: 'absolute',
+          top: 0,
+          height: '100%',
+          left: thumbLeftPx,
+          width: thumbPx,
+          borderRadius: PROGRESS_BAR_HEIGHT_PX / 2,
+          background: 'rgba(255, 255, 255, 0.55)',
+        }}
+      />
     </div>
   );
 }
