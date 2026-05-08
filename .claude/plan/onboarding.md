@@ -16,7 +16,7 @@ A short interactive tutorial that runs on the very first run and is replayable f
 - **Advancement:** **hybrid** — the user can either click "Next" in the callout, or perform the gesture being taught.
 - **Pacing:** user-paced; no auto-advance.
 - **Buttons:** primary "Next" button, ghost "Skip" link.
-- **Text format:** **bold title + one-line description** ("**Slide navigation** — use the arrows to flip between slides."). Steps **4 (drag mode)** and **6 (resize)** use **title + two-line description** to mention the gesture nuance.
+- **Text format:** **bold title + one-line description** ("**Slide navigation** — use the arrows to flip between slides."). Steps **4 (drag mode)** and **6 (resize)** use **title + two-line description** to mention the gesture nuance. Step **7 (offline preview)** also uses two lines.
 - **Implementation:** custom-built; **no third-party library** (`react-joyride` / `driver.js` etc.) — small overlay surface, design freedom for the dark-glass aesthetic, easy to integrate with Framer Motion.
 
 ## Steps (in order)
@@ -27,7 +27,8 @@ A short interactive tutorial that runs on the very first run and is replayable f
 4. **Drag mode** *(two-line):* Double-click the icon (or window) to enter drag mode. Click outside to exit. Demonstrated for both icon and window. Animated cursor performs a double-click.
 5. **Relocate button.** Coachmark on the title-bar relocate button. Brief explanation that it resets the icon to default top-right.
 6. **Resize** *(two-line):* Drag any of the four corner handles to resize the window. Width and height stay equal — it's always a square. Animated cursor grabs the bottom-right corner and drags outward (grow direction only — does not demonstrate the min-size limit).
-7. **Ends on the Settings slide.** Tutorial overlay disappears; window stays open. A brief "You're all set" toast appears for ~3 s.
+7. **Offline state preview** *(two-line):* Coachmark shows a sample sad-cloud icon (rendered inside the overlay — not the live icon, since the user is normally online during onboarding). Two lines: "If Glimpse can't reach the weather service, the icon will show a sad cloud. While it's like this, clicking the icon won't open the window — Glimpse will keep retrying in the background and recover on its own." Title bar is **not** force-visible during this step (the overlay carries the entire visual).
+8. **Ends on the Settings slide.** Tutorial overlay disappears; window stays open. A brief "You're all set" toast appears for ~3 s.
 
 ## Animations
 

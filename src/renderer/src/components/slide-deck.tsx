@@ -8,6 +8,8 @@ import {
 } from 'react';
 import { motion, useAnimationControls } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import type { Forecast } from '../../../shared/forecast';
+import type { TimeFormat } from '../../../shared/settings-store';
 import {
   computeVisibleSlides,
   reconcileCurrentSlideIndex,
@@ -15,10 +17,12 @@ import {
   type SlideId,
   type WrapDirection,
 } from '../../../shared/slides';
+import { SevenDaySlide } from './seven-day-slide';
 import {
   SlideIndicator,
   type SlideBackgroundLuminance,
 } from './slide-indicator';
+import { TodaySlide } from './today-slide';
 
 // Plan/styling.md: "Cube slide transition: 500 ms ease-in-out, rotates
 // in the direction of the arrow click. No reverse-spin on wrap (loops
@@ -31,10 +35,12 @@ export const SLIDE_TRANSITION_DURATION_S = 0.5;
 const SLIDE_TOP_PADDING_PX = 32;
 const SLIDE_BOTTOM_PADDING_PX = 32;
 
-// Plan/slides.md: "Left and right arrow buttons on the panel edges
-// (only these two — no other navigation, no keyboard)."
-const ARROW_INSET_PX = 6;
-const ARROW_SIZE_PX = 28;
+// Plan/slides.md: prev / next arrow buttons sit in the bottom
+// navigation bar, flanking the slide-indicator dots — not on the panel
+// side edges. Single horizontal control row pinned to the bottom.
+const NAV_BAR_BOTTOM_INSET_PX = 6;
+const NAV_BAR_GAP_PX = 14;
+const ARROW_SIZE_PX = 24;
 
 // Plan/styling.md: backgrounds per slide. Settings is the only
 // theme-adaptive surface; all others stay dark. Theme-resolution wires
@@ -107,6 +113,14 @@ export type SlideDeckProps = {
   // Theme mode used for the Settings slide's background. Real theme
   // resolution lands in M7; tests pass this directly.
   themeMode?: ThemeMode;
+  // Forecast snapshot driving the M6 hourly + 7-day slides. Null until
+  // the first successful fetch — slide content components handle that
+  // by swapping in their loading skeleton. Optional so M4 tests that
+  // exercise the placeholder deck don't have to fabricate a forecast.
+  forecast?: Forecast | null;
+  // User's 12 h / 24 h preference. Forwarded to TodaySlide for the
+  // hourly time labels.
+  timeFormat?: TimeFormat;
 };
 
 type Transition = {
@@ -118,6 +132,8 @@ export function SlideDeck({
   moonEnabled = false,
   eventsActive = false,
   themeMode = 'dark',
+  forecast = null,
+  timeFormat = '24h',
 }: SlideDeckProps): JSX.Element {
   const visibleSlides = useMemo(
     () => computeVisibleSlides({ moonEnabled, eventsActive }),
@@ -309,6 +325,8 @@ export function SlideDeck({
           themeMode={themeMode}
           face="front"
           deckWidth={deckWidth}
+          forecast={forecast}
+          timeFormat={timeFormat}
         />
         {transition && sideFaceSide ? (
           <SlideFace
@@ -316,47 +334,61 @@ export function SlideDeck({
             themeMode={themeMode}
             face={sideFaceSide}
             deckWidth={deckWidth}
+            forecast={forecast}
+            timeFormat={timeFormat}
           />
         ) : null}
       </motion.div>
 
-      <button
-        type="button"
-        data-testid="slide-deck-arrow-prev"
-        aria-label="Previous slide"
-        onClick={handlePrev}
+      <div
+        data-testid="slide-deck-nav-bar"
         style={{
-          ...arrowButtonBaseStyle,
-          left: ARROW_INSET_PX,
+          position: 'absolute',
+          bottom: NAV_BAR_BOTTOM_INSET_PX,
+          left: 0,
+          right: 0,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: NAV_BAR_GAP_PX,
+          zIndex: 5,
+          // Default pointer-events so the arrows are clickable; the
+          // SlideIndicator's container sets pointer-events: none on
+          // itself so dots don't intercept stray clicks between them.
         }}
       >
-        <ChevronLeft
-          size={ARROW_SIZE_PX - 8}
-          color={arrowGlyphColor(currentBackground.luminance)}
-        />
-      </button>
+        <button
+          type="button"
+          data-testid="slide-deck-arrow-prev"
+          aria-label="Previous slide"
+          onClick={handlePrev}
+          style={arrowButtonStyle}
+        >
+          <ChevronLeft
+            size={ARROW_SIZE_PX - 8}
+            color={arrowGlyphColor(currentBackground.luminance)}
+          />
+        </button>
 
-      <button
-        type="button"
-        data-testid="slide-deck-arrow-next"
-        aria-label="Next slide"
-        onClick={handleNext}
-        style={{
-          ...arrowButtonBaseStyle,
-          right: ARROW_INSET_PX,
-        }}
-      >
-        <ChevronRight
-          size={ARROW_SIZE_PX - 8}
-          color={arrowGlyphColor(currentBackground.luminance)}
+        <SlideIndicator
+          currentIndex={safeIndex}
+          slideCount={visibleSlides.length}
+          backgroundLuminance={currentBackground.luminance}
         />
-      </button>
 
-      <SlideIndicator
-        currentIndex={safeIndex}
-        slideCount={visibleSlides.length}
-        backgroundLuminance={currentBackground.luminance}
-      />
+        <button
+          type="button"
+          data-testid="slide-deck-arrow-next"
+          aria-label="Next slide"
+          onClick={handleNext}
+          style={arrowButtonStyle}
+        >
+          <ChevronRight
+            size={ARROW_SIZE_PX - 8}
+            color={arrowGlyphColor(currentBackground.luminance)}
+          />
+        </button>
+      </div>
     </div>
   );
 }
@@ -367,6 +399,8 @@ type SlideFaceProps = {
   // Which face of the cube this slide is mounted on.
   face: 'front' | 'right' | 'left';
   deckWidth: number;
+  forecast: Forecast | null;
+  timeFormat: TimeFormat;
 };
 
 function SlideFace({
@@ -374,6 +408,8 @@ function SlideFace({
   themeMode,
   face,
   deckWidth,
+  forecast,
+  timeFormat,
 }: SlideFaceProps): JSX.Element {
   const meta = SLIDE_META[slideId];
   const bg = meta.background(themeMode);
@@ -384,6 +420,16 @@ function SlideFace({
       : face === 'right'
         ? `rotateY(90deg) translateZ(${halfW}px)`
         : `rotateY(-90deg) translateZ(${halfW}px)`;
+
+  // M6 wires the today + seven-day slides to real forecast data. The
+  // remaining slides (current, moon, events, settings) keep their M4
+  // placeholder label until their respective milestones land.
+  const body = renderSlideBody({
+    slideId,
+    forecast,
+    timeFormat,
+    label: meta.label,
+  });
 
   return (
     <div
@@ -420,15 +466,33 @@ function SlideFace({
         transform,
       }}
     >
-      {meta.label}
+      {body}
     </div>
   );
 }
 
-const arrowButtonBaseStyle: CSSProperties = {
-  position: 'absolute',
-  top: '50%',
-  transform: 'translateY(-50%)',
+function renderSlideBody({
+  slideId,
+  forecast,
+  timeFormat,
+  label,
+}: {
+  slideId: SlideId;
+  forecast: Forecast | null;
+  timeFormat: TimeFormat;
+  label: string;
+}): JSX.Element | string {
+  switch (slideId) {
+    case 'today':
+      return <TodaySlide forecast={forecast} timeFormat={timeFormat} />;
+    case 'seven-day':
+      return <SevenDaySlide forecast={forecast} />;
+    default:
+      return label;
+  }
+}
+
+const arrowButtonStyle: CSSProperties = {
   width: ARROW_SIZE_PX,
   height: ARROW_SIZE_PX,
   borderRadius: '50%',
@@ -439,8 +503,9 @@ const arrowButtonBaseStyle: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   padding: 0,
-  // Above the slide content but below the title-bar overlay.
-  zIndex: 5,
+  // Buttons live inside the bottom nav bar's flex row — positioning is
+  // handled by the parent so no absolute coords here.
+  flex: '0 0 auto',
 };
 
 function arrowGlyphColor(luminance: SlideBackgroundLuminance): string {

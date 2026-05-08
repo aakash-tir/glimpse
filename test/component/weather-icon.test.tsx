@@ -1,14 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import {
-  render,
-  screen,
-  cleanup,
-  fireEvent,
-  act,
-} from '@testing-library/react';
+import { describe, it, expect, afterEach } from 'vitest';
+import { render, screen, cleanup } from '@testing-library/react';
 import {
   WeatherIcon,
-  ERROR_TOOLTIP_TEXT,
   HOVER_SCALE,
   CROSSFADE_DURATION_S,
 } from '../../src/renderer/src/components/weather-icon';
@@ -81,47 +74,18 @@ describe('WeatherIcon — loading state', () => {
 });
 
 describe('WeatherIcon — error state', () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-  });
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
   it('renders the sad cloud', () => {
     render(<WeatherIcon state={{ kind: 'error' }} />);
     expect(screen.getByTestId('icon-sad-cloud')).toBeInTheDocument();
     expect(screen.queryByTestId('icon-glyph')).not.toBeInTheDocument();
   });
 
-  it('shows the dark-glass tooltip after the 200 ms hover delay', () => {
+  // Per plan/icon.md § Error state: the icon's 96×96 BrowserWindow is
+  // too narrow to render the tooltip text without DWM clipping, and the
+  // sad face alone is sufficient signal. The onboarding tutorial
+  // previews this state instead.
+  it('renders no tooltip in the error state', () => {
     render(<WeatherIcon state={{ kind: 'error' }} />);
-    const root = screen.getByTestId('icon-root');
-    expect(screen.queryByTestId('tooltip')).not.toBeInTheDocument();
-
-    fireEvent.mouseEnter(root.parentElement!);
-    act(() => {
-      vi.advanceTimersByTime(199);
-    });
-    expect(screen.queryByTestId('tooltip')).not.toBeInTheDocument();
-
-    act(() => {
-      vi.advanceTimersByTime(2);
-    });
-    const tip = screen.getByTestId('tooltip');
-    expect(tip.textContent).toBe(ERROR_TOOLTIP_TEXT);
-    expect(tip.getAttribute('data-tooltip-delay-ms')).toBe('200');
-  });
-
-  it('hides the tooltip on mouse leave', () => {
-    render(<WeatherIcon state={{ kind: 'error' }} />);
-    const wrapper = screen.getByTestId('icon-root').parentElement!;
-    fireEvent.mouseEnter(wrapper);
-    act(() => {
-      vi.advanceTimersByTime(250);
-    });
-    expect(screen.getByTestId('tooltip')).toBeInTheDocument();
-    fireEvent.mouseLeave(wrapper);
     expect(screen.queryByTestId('tooltip')).not.toBeInTheDocument();
   });
 });

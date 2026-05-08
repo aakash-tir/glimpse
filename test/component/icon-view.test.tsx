@@ -1,5 +1,11 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render, screen, cleanup, act } from '@testing-library/react';
+import {
+  render,
+  screen,
+  cleanup,
+  act,
+  fireEvent,
+} from '@testing-library/react';
 import { IconView } from '../../src/renderer/src/views/icon-view';
 import {
   EMPTY_SNAPSHOT,
@@ -144,6 +150,36 @@ describe('IconView — data-snapshot wiring', () => {
       }
     });
     expect(screen.getByTestId('icon-sad-cloud')).toBeInTheDocument();
+  });
+
+  it('ignores single-click while in error state (no expand IPC)', async () => {
+    // Per plan/icon.md § Error state: clicking the sad cloud is a no-op
+    // — there's nothing useful to show in window mode while we can't
+    // reach the data layer. The onboarding tutorial previews this so
+    // the user isn't surprised.
+    vi.useFakeTimers();
+    const stub = installGlimpseStub({
+      ...EMPTY_SNAPSHOT,
+      errorState: 'error',
+    });
+    render(<IconView />);
+    await flushGetData();
+    expect(screen.getByTestId('icon-sad-cloud')).toBeInTheDocument();
+
+    const sad = screen.getByTestId('icon-sad-cloud');
+    // Click classifier waits 250 ms before committing a single-click
+    // (per plan/icon.md § Interactions); advance past that.
+    fireEvent.click(sad);
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    // The expand path also defers behind 3 RAFs — flush a few frames
+    // for safety. expand() must NOT have been called.
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+    expect(stub.expand).not.toHaveBeenCalled();
+    vi.useRealTimers();
   });
 
   it('recovers from error to ready on the next successful push', async () => {

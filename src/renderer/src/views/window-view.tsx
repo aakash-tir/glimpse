@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
+import type { TimeFormat } from '../../../shared/settings-store';
 import { ICON_SIZE } from '../../../shared/icon-position';
 import { TitleBar } from '../components/title-bar';
 import { useClickClassifier } from '../components/use-click-classifier';
 import { DragModeGlow } from '../components/drag-mode-glow';
 import { ResizeHandles } from '../components/resize-handles';
 import { SlideDeck } from '../components/slide-deck';
+import { useDataSnapshot } from '../components/use-data-snapshot';
 
 // Plan/styling.md: "Window open / close: scale animation, 200 ms
 // ease-out, anchored at the icon's position."
@@ -42,6 +44,15 @@ export function WindowView({
   // lands in M7. Events visibility is hard-coded false at M4 and
   // becomes data-driven in M5 / M8.
   const [moonEnabled, setMoonEnabled] = useState(false);
+  // 12 h / 24 h preference for the M6 hourly slide's time labels.
+  // Sourced from settings on mount; live updates land in M7 alongside
+  // the Settings-slide toggle.
+  const [timeFormat, setTimeFormat] = useState<TimeFormat>('24h');
+  // Forecast snapshot streamed from main via the data-snapshot hook.
+  // Null while the first fetch is in flight — slide content components
+  // swap in a loading skeleton in that case.
+  const snapshot = useDataSnapshot();
+  const forecast = snapshot?.forecast ?? null;
   // Hides the panel + title bar in the brief window between the scale
   // animation finishing and `mode:changed` arriving from main. Without
   // this, the BrowserWindow resizes to icon-mode bounds while WindowView
@@ -89,13 +100,16 @@ export function WindowView({
     onDoubleClick: handlePanelDoubleClick,
   });
 
-  // Pull moon-phase visibility from persisted settings on mount.
+  // Pull moon-phase visibility + time format from persisted settings on
+  // mount. Live updates from the Settings slide arrive in M7.
   useEffect(() => {
     let cancelled = false;
     const api = window.glimpse;
     if (!api) return;
     void api.getSettings().then((settings) => {
-      if (!cancelled) setMoonEnabled(settings.moonPhaseSlideEnabled);
+      if (cancelled) return;
+      setMoonEnabled(settings.moonPhaseSlideEnabled);
+      setTimeFormat(settings.timeFormat);
     });
     return () => {
       cancelled = true;
@@ -199,7 +213,12 @@ export function WindowView({
         transformOrigin,
       }}
     >
-      <SlideDeck moonEnabled={moonEnabled} eventsActive={false} />
+      <SlideDeck
+        moonEnabled={moonEnabled}
+        eventsActive={false}
+        forecast={forecast}
+        timeFormat={timeFormat}
+      />
     </motion.div>
   );
 

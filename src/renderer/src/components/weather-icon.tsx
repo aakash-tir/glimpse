@@ -6,9 +6,7 @@ import { DragModeGlow } from './drag-mode-glow';
 import { IconGlyph } from './icon-glyph';
 import { LoadingCloud } from './loading-cloud';
 import { SadCloud } from './sad-cloud';
-import { Tooltip } from './tooltip';
 
-export const ERROR_TOOLTIP_TEXT = 'weather could not be determined';
 export const HOVER_SCALE = 1.15;
 export const HOVER_DURATION_S = 0.15;
 export const CROSSFADE_DURATION_S = 0.2;
@@ -68,7 +66,7 @@ export function WeatherIcon({
 
   const innerWithGlow = dragMode ? <DragModeGlow>{inner}</DragModeGlow> : inner;
 
-  const wrapped = (
+  return (
     <motion.div
       data-testid="icon-root"
       data-icon-state={state.kind}
@@ -91,10 +89,4 @@ export function WeatherIcon({
       {innerWithGlow}
     </motion.div>
   );
-
-  // Tooltip wraps only the error state per plan/icon.md.
-  if (state.kind === 'error') {
-    return <Tooltip text={ERROR_TOOLTIP_TEXT}>{wrapped}</Tooltip>;
-  }
-  return wrapped;
 }

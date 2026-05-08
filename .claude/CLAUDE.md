@@ -17,7 +17,7 @@
 | [`plan/icon.md`](./plan/icon.md) | Icon (collapsed) state, drag mode, snap, loading & error visuals, hourly background refresh. |
 | [`plan/window.md`](./plan/window.md) | Window expanded state, scale animation, resize, title bar, position persistence, drag-mode interactions. |
 | [`plan/slides.md`](./plan/slides.md) | Slide content & layouts (hourly, 7-day, current, moon, events, settings), backgrounds, navigation, cube animation, dot indicator. |
-| [`plan/onboarding.md`](./plan/onboarding.md) | First-launch tutorial — coachmarks, 7 steps, gesture animations, skip/replay/interrupt behavior. |
+| [`plan/onboarding.md`](./plan/onboarding.md) | First-launch tutorial — coachmarks, 8 steps, gesture animations, skip/replay/interrupt behavior. |
 | [`plan/data-sources.md`](./plan/data-sources.md) | Open-Meteo, NOAA SWPC, SunCalc, meteor JSON, refresh policy, aurora filter, app-active, location. |
 | [`plan/tech-stack.md`](./plan/tech-stack.md) | Electron + React + TS, deps, storage schema, single-instance lock, auto-launch, app icon. |
 | [`plan/styling.md`](./plan/styling.md) | Tailwind + shadcn/ui, sunset accent palette, animations (Framer Motion), tooltips, theme behavior. |
