@@ -79,13 +79,31 @@ describe('TodaySlide — loading skeleton', () => {
 });
 
 describe('TodaySlide — hourly content', () => {
-  it('renders 24 hour cells across 4 pages of 6 (matches plan/slides.md 6/page snap)', () => {
+  it('renders 24 hour cells with no page wrapper (matches plan/slides.md snap-to-cell)', () => {
     render(<TodaySlide forecast={buildForecast()} timeFormat="24h" />);
     expect(screen.getAllByTestId('hourly-cell')).toHaveLength(24);
-    const pages = screen.getAllByTestId('hourly-page');
-    expect(pages).toHaveLength(4);
-    for (const page of pages) {
-      expect(page.getAttribute('data-cells-per-page')).toBe('6');
+    // Page-wrapper testid removed — each cell is now its own snap
+    // target so a scroll advances one hour, not six.
+    expect(screen.queryAllByTestId('hourly-page')).toHaveLength(0);
+  });
+
+  it('reports 24 items / 6 visible per page on the slide wrapper', () => {
+    render(<TodaySlide forecast={buildForecast()} timeFormat="24h" />);
+    const content = screen.getByTestId('slide-today-content');
+    expect(content.getAttribute('data-item-count')).toBe('24');
+    expect(content.getAttribute('data-visible-per-page')).toBe('6');
+  });
+
+  it('each cell has scroll-snap-align: start and a 1/6 flex basis', () => {
+    render(<TodaySlide forecast={buildForecast()} timeFormat="24h" />);
+    const cells = screen.getAllByTestId('hourly-cell');
+    for (const cell of cells) {
+      expect(cell.style.scrollSnapAlign).toBe('start');
+      // jsdom canonicalizes `calc(100% / 6)` to `calc(16.6667%)`.
+      // Match either form so the test isn't tied to one CSSOM impl.
+      expect(cell.style.flexBasis).toMatch(
+        /^calc\((?:100%\s*\/\s*6|16\.6667%)\)$/,
+      );
     }
   });
 

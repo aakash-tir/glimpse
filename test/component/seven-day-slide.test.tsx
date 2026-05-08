@@ -71,13 +71,27 @@ describe('SevenDaySlide — content', () => {
     expect(screen.getAllByTestId('seven-day-cell')).toHaveLength(7);
   });
 
-  it('groups rows into 3 pages of 3 (matches plan/slides.md 3/page snap)', () => {
+  it('renders cells with no page wrapper (matches plan/slides.md snap-to-cell)', () => {
     render(<SevenDaySlide forecast={buildForecast()} />);
-    const pages = screen.getAllByTestId('seven-day-page');
-    // 7 days → pages of [3, 3, 1].
-    expect(pages).toHaveLength(3);
-    for (const page of pages) {
-      expect(page.getAttribute('data-cells-per-page')).toBe('3');
+    expect(screen.queryAllByTestId('seven-day-page')).toHaveLength(0);
+  });
+
+  it('reports 7 items / 3 visible per page on the slide wrapper', () => {
+    render(<SevenDaySlide forecast={buildForecast()} />);
+    const content = screen.getByTestId('slide-seven-day-content');
+    expect(content.getAttribute('data-item-count')).toBe('7');
+    expect(content.getAttribute('data-visible-per-page')).toBe('3');
+  });
+
+  it('each cell has scroll-snap-align: start and a 1/3 flex basis', () => {
+    render(<SevenDaySlide forecast={buildForecast()} />);
+    const cells = screen.getAllByTestId('seven-day-cell');
+    for (const cell of cells) {
+      expect(cell.style.scrollSnapAlign).toBe('start');
+      // jsdom canonicalizes `calc(100% / 3)` to `calc(33.3333%)`.
+      expect(cell.style.flexBasis).toMatch(
+        /^calc\((?:100%\s*\/\s*3|33\.3333%)\)$/,
+      );
     }
   });
 

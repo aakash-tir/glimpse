@@ -30,7 +30,7 @@ When the window is opened before the first successful fetch, slides display **mu
 
 - **Each hour shows:** time (in user's 12 h / 24 h format) · condition icon (day/night variant) · temperature · precipitation %.
 - **Range:** rolling next 24 hours, **starting at the next full hour** from now.
-- **Layout:** horizontal scroll inside the slide; **6 hours visible at a time**, **snap-to-page** (each scroll step advances 6 hours).
+- **Layout:** horizontal scroll inside the slide; **6 hours visible at a time**. **Snap-to-cell** — each scroll step advances by **one hour**, so the seen items shift one column rather than the whole page sliding off.
 - **Scroll affordance:** 24 px gradient fade on the right edge whenever there's more content to scroll to (and on the left edge once the user has scrolled past the start). Fades disappear at the boundary.
 - **Background:** default dark glass.
 
@@ -39,7 +39,7 @@ When the window is opened before the first successful fetch, slides display **mu
 - **Each daily row:** day label · condition icon · high / low · precipitation %.
 - **Day labels:** "Today" in row 1, then weekday abbreviations (Mon, Tue, …) for the rest.
 - **Range:** today + next 6 days.
-- **Layout:** horizontal scroll; **3 days visible at a time**, snap-to-page (each scroll step advances 3 days).
+- **Layout:** horizontal scroll; **3 days visible at a time**. **Snap-to-cell** — each scroll step advances by **one day**.
 - **Scroll affordance:** same 24 px edge-fade pattern as the hourly slide.
 - **Background:** default dark glass.
 

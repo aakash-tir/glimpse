@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Forecast, ForecastHour } from '../../../shared/forecast';
+import type { Forecast } from '../../../shared/forecast';
 import type { TimeFormat } from '../../../shared/settings-store';
 import { conditionToGlyph } from '../../../shared/condition';
 import {
@@ -54,95 +54,75 @@ export function TodaySlide({
     ROLLING_WINDOW_HOURS,
   );
 
-  // Group the rolling hours into pages of HOURS_VISIBLE_PER_PAGE so
-  // CSS scroll-snap-align: start on each page snaps exactly one
-  // 6-hour chunk per scroll step (instead of snapping to the nearest
-  // individual cell, which doesn't match the spec's "snap-to-page").
-  const pages: ForecastHour[][] = [];
-  for (let i = 0; i < hours.length; i += HOURS_VISIBLE_PER_PAGE) {
-    pages.push(hours.slice(i, i + HOURS_VISIBLE_PER_PAGE));
-  }
+  // Each hour cell is its own snap target with width = 1/N of the
+  // visible viewport, so a wheel scroll advances one column at a time
+  // (plan/slides.md: snap-to-cell, not snap-to-page).
+  const cellFlexBasis = `calc(100% / ${HOURS_VISIBLE_PER_PAGE})`;
 
   return (
     <ScrollableSlide
       testId="slide-today-content"
-      pageCount={pages.length}
+      itemCount={hours.length}
       visiblePerPage={HOURS_VISIBLE_PER_PAGE}
     >
-      {pages.map((page, pi) => (
-        <div
-          key={pi}
-          data-testid="hourly-page"
-          data-cells-per-page={String(HOURS_VISIBLE_PER_PAGE)}
-          style={{
-            flex: '0 0 100%',
-            scrollSnapAlign: 'start',
-            scrollSnapStop: 'always',
-            display: 'flex',
-            height: '100%',
-          }}
-        >
-          {page.map((hour) => {
-            const isDay = isHourDaytime(hour.time, forecast.daily);
-            const glyph = conditionToGlyph(hour.condition, isDay);
-            return (
-              <div
-                key={hour.time}
-                data-testid="hourly-cell"
-                data-hour-time={hour.time}
-                data-is-day={isDay ? 'on' : 'off'}
-                data-glyph={glyph}
-                style={{
-                  flex: '1 1 0',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 4,
-                  padding: '4px 2px',
-                  color: 'rgba(255, 255, 255, 0.92)',
-                  fontFamily: 'system-ui, sans-serif',
-                  textAlign: 'center',
-                  minWidth: 0,
-                }}
-              >
-                <span style={{ fontSize: 10, opacity: 0.75 }}>
-                  {formatHourTime(hour.time, timeFormat)}
-                </span>
-                <IconGlyph name={glyph} size={26} />
-                <span style={{ fontSize: 13, fontWeight: 600 }}>
-                  {Math.round(hour.temperature)}°
-                </span>
-                <span style={{ fontSize: 9, opacity: 0.7 }}>
-                  {Math.round(hour.precipitationProbability)}%
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      ))}
+      {hours.map((hour) => {
+        const isDay = isHourDaytime(hour.time, forecast.daily);
+        const glyph = conditionToGlyph(hour.condition, isDay);
+        return (
+          <div
+            key={hour.time}
+            data-testid="hourly-cell"
+            data-hour-time={hour.time}
+            data-is-day={isDay ? 'on' : 'off'}
+            data-glyph={glyph}
+            style={{
+              flex: `0 0 ${cellFlexBasis}`,
+              scrollSnapAlign: 'start',
+              scrollSnapStop: 'always',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 4,
+              padding: '4px 2px',
+              color: 'rgba(255, 255, 255, 0.92)',
+              fontFamily: 'system-ui, sans-serif',
+              textAlign: 'center',
+              minWidth: 0,
+              boxSizing: 'border-box',
+            }}
+          >
+            <span style={{ fontSize: 10, opacity: 0.75 }}>
+              {formatHourTime(hour.time, timeFormat)}
+            </span>
+            <IconGlyph name={glyph} size={26} />
+            <span style={{ fontSize: 13, fontWeight: 600 }}>
+              {Math.round(hour.temperature)}°
+            </span>
+            <span style={{ fontSize: 9, opacity: 0.7 }}>
+              {Math.round(hour.precipitationProbability)}%
+            </span>
+          </div>
+        );
+      })}
     </ScrollableSlide>
   );
 }
 
-// Shared horizontal-scroll container used by the hourly slide (and, in
-// the next commit, the 7-day slide). Wraps a row of pages with
-// scroll-snap and tracks scroll position so the edge-fade gradient
-// can show / hide at boundaries.
-//
-// Exported for the seven-day slide; intentionally kept private to this
-// module via re-export from seven-day-slide.tsx to keep the surface
-// area narrow.
+// Shared horizontal-scroll container used by the hourly + 7-day slides.
+// Children are individual cells (each with its own scroll-snap-align)
+// so a scroll advances one cell at a time. Tracks scroll position so
+// the edge-fade gradient can show / hide at boundaries.
 type ScrollableSlideProps = {
   testId: string;
-  pageCount: number;
+  itemCount: number;
   visiblePerPage: number;
   children: React.ReactNode;
 };
 
 export function ScrollableSlide({
   testId,
-  pageCount,
+  itemCount,
   visiblePerPage,
   children,
 }: ScrollableSlideProps): JSX.Element {
@@ -168,7 +148,7 @@ export function ScrollableSlide({
     const ro = new ResizeObserver(recompute);
     ro.observe(node);
     return () => ro.disconnect();
-  }, [recompute, pageCount]);
+  }, [recompute, itemCount]);
 
   // Translate vertical mouse-wheel input into horizontal scroll on the
   // track. Without this the slider is functionally invisible on desktop
@@ -197,7 +177,7 @@ export function ScrollableSlide({
   return (
     <div
       data-testid={testId}
-      data-page-count={String(pageCount)}
+      data-item-count={String(itemCount)}
       data-visible-per-page={String(visiblePerPage)}
       style={{
         position: 'absolute',
