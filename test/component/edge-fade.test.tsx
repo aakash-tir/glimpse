@@ -8,12 +8,35 @@ import {
 afterEach(cleanup);
 
 describe('EdgeFade', () => {
-  it('renders the right-side fade with the spec-required 24 px width', () => {
+  it('renders the right-side fade with the spec-required ~14 px width', () => {
     render(<EdgeFade side="right" visible />);
     const fade = screen.getByTestId('edge-fade-right');
-    expect(EDGE_FADE_WIDTH_PX).toBe(24);
-    expect(fade.getAttribute('data-width-px')).toBe('24');
+    // Plan/slides.md: smaller, curved fade — narrower than the
+    // original 24 px linear stripe.
+    expect(EDGE_FADE_WIDTH_PX).toBe(14);
+    expect(fade.getAttribute('data-width-px')).toBe('14');
     expect(fade.getAttribute('data-side')).toBe('right');
+  });
+
+  it('reports a quadratic curve via data-curve', () => {
+    render(<EdgeFade side="right" visible />);
+    expect(
+      screen.getByTestId('edge-fade-right').getAttribute('data-curve'),
+    ).toBe('quadratic');
+  });
+
+  it('emits multiple gradient stops to approximate a curve (not just two-stop linear)', () => {
+    render(
+      <EdgeFade side="right" visible fadeToColor="rgba(255, 255, 255, 0.4)" />,
+    );
+    const bg = screen.getByTestId('edge-fade-right').style.background;
+    // A curve uses intermediate stops with non-extreme alpha values —
+    // assert at least a 25% and 75% stop are present.
+    expect(bg).toMatch(/25%/);
+    expect(bg).toMatch(/75%/);
+    // Inner end transparent, outer end at the target alpha.
+    expect(bg).toMatch(/rgba\(255,\s*255,\s*255,\s*0\)\s*0%/);
+    expect(bg).toMatch(/rgba\(255,\s*255,\s*255,\s*0\.4\)\s*100%/);
   });
 
   it('renders the left-side fade with the same width', () => {
