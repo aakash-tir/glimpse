@@ -30,8 +30,9 @@ When the window is opened before the first successful fetch, slides display **mu
 
 - **Each hour shows:** time (in user's 12 h / 24 h format) · condition icon (day/night variant) · temperature · precipitation %.
 - **Range:** rolling next 24 hours, **starting at the next full hour** from now.
-- **Layout:** horizontal scroll inside the slide; **6 hours visible at a time**. **Snap-to-cell** — each scroll step advances by **one hour**, so the seen items shift one column rather than the whole page sliding off.
-- **Scroll affordance:** 24 px gradient fade on the right edge whenever there's more content to scroll to (and on the left edge once the user has scrolled past the start). Fades disappear at the boundary.
+- **Layout:** horizontal scroll inside the slide; **5 hours visible at a time**. **Snap-to-cell** — each scroll step advances by **one hour**, so the seen items shift one column rather than the whole page sliding off.
+- **Side breathing room:** ~12 px of padding on the left and right of the scroll track so cells don't hug the panel edge.
+- **Scroll affordance:** 24 px gradient fade on the right edge whenever there's more content to scroll to (and on the left edge once the user has scrolled past the start). Fades disappear at the boundary, and they sit just inside the side padding so they overlay the first / last visible cell rather than the empty padding zone.
 - **Background:** default dark glass.
 
 ## Slide 2 — Next 7 days

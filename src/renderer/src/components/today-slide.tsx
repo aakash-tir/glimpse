@@ -23,8 +23,13 @@ import { LoadingSkeleton } from './loading-skeleton';
 // "Now" defaults to forecast.current.time so the component is
 // deterministic against a fixture; tests / future-callers can override.
 
-const HOURS_VISIBLE_PER_PAGE = 6;
+const HOURS_VISIBLE_PER_PAGE = 5;
 const ROLLING_WINDOW_HOURS = 24;
+// Horizontal breathing room around the hourly cells so they don't
+// hug the panel edges. Plan/slides.md slide 1 calls for ~12 px each
+// side. The 7-day slide currently uses 0 (its 1/3-viewport cells
+// already have plenty of internal room).
+const HOURLY_SIDE_PADDING_PX = 12;
 // Tolerance for fractional pixel scrollLeft values reported by some
 // browsers — without it, the right edge-fade flickers off at the very
 // end of a scroll because (scrollLeft + clientWidth) is reported a
@@ -64,6 +69,7 @@ export function TodaySlide({
       testId="slide-today-content"
       itemCount={hours.length}
       visiblePerPage={HOURS_VISIBLE_PER_PAGE}
+      sidePaddingPx={HOURLY_SIDE_PADDING_PX}
     >
       {hours.map((hour) => {
         const isDay = isHourDaytime(hour.time, forecast.daily);
@@ -113,10 +119,21 @@ export function TodaySlide({
 // Children are individual cells (each with its own scroll-snap-align)
 // so a scroll advances one cell at a time. Tracks scroll position so
 // the edge-fade gradient can show / hide at boundaries.
+//
+// `sidePaddingPx` puts breathing room on the left + right of the scroll
+// track. We can't use CSS `padding` on a positioned ancestor to push
+// the absolutely-positioned track inward — `inset: 0` resolves against
+// the padding box's *outer* edge per spec, so padding doesn't move
+// absolute children. Instead we set explicit `left: sidePaddingPx;
+// right: sidePaddingPx` on the track. clientWidth then naturally
+// reflects the inner padded area, so `cellWidth = clientWidth /
+// visiblePerPage` and `flex-basis: calc(100% / N)` both stay correct.
 type ScrollableSlideProps = {
   testId: string;
   itemCount: number;
   visiblePerPage: number;
+  /** Padding (px) applied on the left and right of the scroll track. */
+  sidePaddingPx?: number;
   children: React.ReactNode;
 };
 
@@ -124,6 +141,7 @@ export function ScrollableSlide({
   testId,
   itemCount,
   visiblePerPage,
+  sidePaddingPx = 0,
   children,
 }: ScrollableSlideProps): JSX.Element {
   const trackRef = useRef<HTMLDivElement | null>(null);
@@ -190,6 +208,7 @@ export function ScrollableSlide({
       data-testid={testId}
       data-item-count={String(itemCount)}
       data-visible-per-page={String(visiblePerPage)}
+      data-side-padding-px={String(sidePaddingPx)}
       style={{
         position: 'absolute',
         inset: 0,
@@ -204,7 +223,13 @@ export function ScrollableSlide({
         onScroll={recompute}
         style={{
           position: 'absolute',
-          inset: 0,
+          // Explicit left/right (instead of inset: 0) so the track is
+          // pushed inward by sidePaddingPx, leaving breathing room at
+          // the slide edges. top/bottom unchanged.
+          top: 0,
+          bottom: 0,
+          left: sidePaddingPx,
+          right: sidePaddingPx,
           display: 'flex',
           overflowX: 'auto',
           overflowY: 'hidden',

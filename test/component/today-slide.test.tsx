@@ -87,23 +87,26 @@ describe('TodaySlide — hourly content', () => {
     expect(screen.queryAllByTestId('hourly-page')).toHaveLength(0);
   });
 
-  it('reports 24 items / 6 visible per page on the slide wrapper', () => {
+  it('reports 24 items / 5 visible per page on the slide wrapper', () => {
     render(<TodaySlide forecast={buildForecast()} timeFormat="24h" />);
     const content = screen.getByTestId('slide-today-content');
     expect(content.getAttribute('data-item-count')).toBe('24');
-    expect(content.getAttribute('data-visible-per-page')).toBe('6');
+    expect(content.getAttribute('data-visible-per-page')).toBe('5');
   });
 
-  it('each cell has scroll-snap-align: start and a 1/6 flex basis', () => {
+  it('reports the side-padding so the slide has breathing room from the panel edges', () => {
+    render(<TodaySlide forecast={buildForecast()} timeFormat="24h" />);
+    const content = screen.getByTestId('slide-today-content');
+    expect(content.getAttribute('data-side-padding-px')).toBe('12');
+  });
+
+  it('each cell has scroll-snap-align: start and a 1/5 flex basis', () => {
     render(<TodaySlide forecast={buildForecast()} timeFormat="24h" />);
     const cells = screen.getAllByTestId('hourly-cell');
     for (const cell of cells) {
       expect(cell.style.scrollSnapAlign).toBe('start');
-      // jsdom canonicalizes `calc(100% / 6)` to `calc(16.6667%)`.
-      // Match either form so the test isn't tied to one CSSOM impl.
-      expect(cell.style.flexBasis).toMatch(
-        /^calc\((?:100%\s*\/\s*6|16\.6667%)\)$/,
-      );
+      // jsdom canonicalizes `calc(100% / 5)` to `calc(20%)`.
+      expect(cell.style.flexBasis).toMatch(/^calc\((?:100%\s*\/\s*5|20%)\)$/);
     }
   });
 
@@ -206,10 +209,10 @@ describe('TodaySlide — wheel-to-horizontal scroll', () => {
     });
   }
 
-  it('a downward wheel notch advances exactly one cell width (1/6 of viewport)', () => {
+  it('a downward wheel notch advances exactly one cell width (1/5 of viewport)', () => {
     render(<TodaySlide forecast={buildForecast()} timeFormat="24h" />);
     const track = screen.getByTestId('scroll-track');
-    // 240 px viewport → 40 px per cell on the hourly slide.
+    // 240 px track inner width → 48 px per cell on the hourly slide.
     stubClientWidth(track, 240);
     const e = new WheelEvent('wheel', {
       deltaY: 200,
@@ -221,7 +224,7 @@ describe('TodaySlide — wheel-to-horizontal scroll', () => {
       track.dispatchEvent(e);
     });
     // 200 px raw deltaY is ignored — only the sign matters.
-    expect(track.scrollLeft).toBe(40);
+    expect(track.scrollLeft).toBe(48);
   });
 
   it('a small wheel delta still advances a full cell (sign-based, not magnitude)', () => {
@@ -237,14 +240,14 @@ describe('TodaySlide — wheel-to-horizontal scroll', () => {
     act(() => {
       track.dispatchEvent(e);
     });
-    expect(track.scrollLeft).toBe(40);
+    expect(track.scrollLeft).toBe(48);
   });
 
   it('an upward wheel notch retreats exactly one cell width', () => {
     render(<TodaySlide forecast={buildForecast()} timeFormat="24h" />);
     const track = screen.getByTestId('scroll-track');
     stubClientWidth(track, 240);
-    track.scrollLeft = 120; // start mid-track at cell 3
+    track.scrollLeft = 144; // start at cell 3 (3 × 48)
     const e = new WheelEvent('wheel', {
       deltaY: -100,
       deltaX: 0,
@@ -254,7 +257,7 @@ describe('TodaySlide — wheel-to-horizontal scroll', () => {
     act(() => {
       track.dispatchEvent(e);
     });
-    expect(track.scrollLeft).toBe(80);
+    expect(track.scrollLeft).toBe(96);
   });
 
   it('leaves a predominantly-horizontal wheel event alone (trackpad gesture)', () => {
