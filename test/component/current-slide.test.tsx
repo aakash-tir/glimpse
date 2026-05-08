@@ -52,7 +52,9 @@ function buildForecast(overrides?: {
 describe('CurrentSlide — loading skeleton', () => {
   it('renders the loading skeleton when forecast is null', () => {
     render(<CurrentSlide forecast={null} timeFormat="24h" units="metric" />);
-    expect(screen.queryByTestId('slide-current-content')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('slide-current-content'),
+    ).not.toBeInTheDocument();
     expect(screen.getByTestId('slide-current-shell')).toBeInTheDocument();
   });
 

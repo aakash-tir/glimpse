@@ -42,9 +42,7 @@ describe('MoonSlide — rendering with mocked phase data', () => {
   });
 
   it('rounds illumination % for display (0.7361 → 74%)', () => {
-    render(
-      <MoonSlide phase={buildPhase(0.4, 'waxing-gibbous', 0.7361)} />,
-    );
+    render(<MoonSlide phase={buildPhase(0.4, 'waxing-gibbous', 0.7361)} />);
     expect(screen.getByTestId('moon-illumination')).toHaveTextContent(
       '74% illuminated',
     );
@@ -62,9 +60,7 @@ describe('MoonSlide — rendering with mocked phase data', () => {
       ['waning-crescent', 'Waning Crescent'],
     ];
     for (const [name, label] of cases) {
-      const { unmount } = render(
-        <MoonSlide phase={buildPhase(0, name, 0)} />,
-      );
+      const { unmount } = render(<MoonSlide phase={buildPhase(0, name, 0)} />);
       expect(screen.getByTestId('moon-phase-label')).toHaveTextContent(label);
       unmount();
     }

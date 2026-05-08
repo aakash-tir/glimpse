@@ -39,7 +39,9 @@ describe('SettingsSlide — loading', () => {
   it('renders a loading message when settings are null', () => {
     render(<SettingsSlide settings={null} luminance="dark" />);
     expect(screen.getByTestId('slide-settings-loading')).toBeInTheDocument();
-    expect(screen.queryByTestId('slide-settings-content')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('slide-settings-content'),
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -81,9 +83,7 @@ describe('SettingsSlide — control reads', () => {
   });
 
   it('lists rows in the spec-required order', () => {
-    render(
-      <SettingsSlide settings={buildSettings()} luminance="dark" />,
-    );
+    render(<SettingsSlide settings={buildSettings()} luminance="dark" />);
     const rows = screen.getAllByTestId('settings-row');
     const labels = rows.map((r) => r.getAttribute('data-row-label'));
     expect(labels).toEqual([
@@ -99,9 +99,7 @@ describe('SettingsSlide — control reads', () => {
   });
 
   it('renders the About section with the credits line', () => {
-    render(
-      <SettingsSlide settings={buildSettings()} luminance="dark" />,
-    );
+    render(<SettingsSlide settings={buildSettings()} luminance="dark" />);
     const about = screen.getByTestId('settings-about');
     expect(about.textContent).toContain('Glimpse');
     expect(about.textContent).toContain('Open-Meteo');
@@ -113,9 +111,7 @@ describe('SettingsSlide — control reads', () => {
 describe('SettingsSlide — control writes', () => {
   it('clicking the inactive Units segment writes back via setSettings', () => {
     const stub = installStub();
-    render(
-      <SettingsSlide settings={buildSettings()} luminance="dark" />,
-    );
+    render(<SettingsSlide settings={buildSettings()} luminance="dark" />);
     fireEvent.click(screen.getByTestId('settings-units-imperial'));
     expect(stub.setSettings).toHaveBeenCalledWith({ units: 'imperial' });
   });
@@ -134,18 +130,14 @@ describe('SettingsSlide — control writes', () => {
 
   it('writes timeFormat on segment click', () => {
     const stub = installStub();
-    render(
-      <SettingsSlide settings={buildSettings()} luminance="dark" />,
-    );
+    render(<SettingsSlide settings={buildSettings()} luminance="dark" />);
     fireEvent.click(screen.getByTestId('settings-time-format-12h'));
     expect(stub.setSettings).toHaveBeenCalledWith({ timeFormat: '12h' });
   });
 
   it('writes moonPhaseSlideEnabled true / false on toggle clicks', () => {
     const stub = installStub();
-    render(
-      <SettingsSlide settings={buildSettings()} luminance="dark" />,
-    );
+    render(<SettingsSlide settings={buildSettings()} luminance="dark" />);
     fireEvent.click(screen.getByTestId('settings-moon-toggle-on'));
     expect(stub.setSettings).toHaveBeenCalledWith({
       moonPhaseSlideEnabled: true,
@@ -168,9 +160,7 @@ describe('SettingsSlide — control writes', () => {
 
   it('writes trackWindowPosition on toggle click', () => {
     const stub = installStub();
-    render(
-      <SettingsSlide settings={buildSettings()} luminance="dark" />,
-    );
+    render(<SettingsSlide settings={buildSettings()} luminance="dark" />);
     fireEvent.click(screen.getByTestId('settings-track-window-on'));
     expect(stub.setSettings).toHaveBeenCalledWith({
       trackWindowPosition: true,
@@ -179,9 +169,7 @@ describe('SettingsSlide — control writes', () => {
 
   it('Reset icon position calls resetIconPosition (not setSettings)', () => {
     const stub = installStub();
-    render(
-      <SettingsSlide settings={buildSettings()} luminance="dark" />,
-    );
+    render(<SettingsSlide settings={buildSettings()} luminance="dark" />);
     fireEvent.click(screen.getByTestId('settings-reset-icon'));
     expect(stub.resetIconPosition).toHaveBeenCalledOnce();
     expect(stub.setSettings).not.toHaveBeenCalled();
@@ -189,17 +177,13 @@ describe('SettingsSlide — control writes', () => {
 
   it('Manual refresh calls refreshData', () => {
     const stub = installStub();
-    render(
-      <SettingsSlide settings={buildSettings()} luminance="dark" />,
-    );
+    render(<SettingsSlide settings={buildSettings()} luminance="dark" />);
     fireEvent.click(screen.getByTestId('settings-manual-refresh'));
     expect(stub.refreshData).toHaveBeenCalledOnce();
   });
 
   it('Replay tutorial button is rendered but disabled (M9 wires the actual flow)', () => {
-    render(
-      <SettingsSlide settings={buildSettings()} luminance="dark" />,
-    );
+    render(<SettingsSlide settings={buildSettings()} luminance="dark" />);
     const replay = screen.getByTestId(
       'settings-replay-tutorial',
     ) as HTMLButtonElement;
@@ -210,18 +194,14 @@ describe('SettingsSlide — control writes', () => {
 
 describe('SettingsSlide — luminance palette', () => {
   it('exposes the active luminance via data attribute (dark)', () => {
-    render(
-      <SettingsSlide settings={buildSettings()} luminance="dark" />,
-    );
+    render(<SettingsSlide settings={buildSettings()} luminance="dark" />);
     expect(
       screen.getByTestId('slide-settings-shell').getAttribute('data-luminance'),
     ).toBe('dark');
   });
 
   it('exposes the active luminance via data attribute (light)', () => {
-    render(
-      <SettingsSlide settings={buildSettings()} luminance="light" />,
-    );
+    render(<SettingsSlide settings={buildSettings()} luminance="light" />);
     expect(
       screen.getByTestId('slide-settings-shell').getAttribute('data-luminance'),
     ).toBe('light');
