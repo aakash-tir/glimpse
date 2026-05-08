@@ -156,6 +156,16 @@ export function ScrollableSlide({
   // overflow-x only. Trackpad horizontal swipes still work natively
   // (they produce deltaX directly, which we leave alone).
   //
+  // We advance exactly one cell width per wheel event, ignoring the
+  // raw deltaY magnitude. Why: the hourly slide's cell is clientWidth /
+  // 6 ≈ 40 px on a default-sized window, but a single wheel notch on
+  // Windows produces ~100 px of deltaY. Scrolling by raw deltaY lands
+  // 2–3 cells past the previous snap point and the mandatory CSS snap
+  // settles there — the user reads that as the slider "skipping a
+  // page" rather than nudging one column. Mapping each wheel event to
+  // exactly one cell gives the same one-step feel on the hourly slide
+  // (1/6 cells) as on the 7-day slide (1/3 cells).
+  //
   // Bound via addEventListener with `passive: false` so we can call
   // preventDefault() on the wheel event; React's synthetic onWheel is
   // passive by default and would warn on preventDefault.
@@ -168,11 +178,12 @@ export function ScrollableSlide({
       // pass through to the native horizontal scroll.
       if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
       e.preventDefault();
-      node.scrollLeft += e.deltaY;
+      const cellWidth = node.clientWidth / visiblePerPage;
+      node.scrollLeft += Math.sign(e.deltaY) * cellWidth;
     };
     node.addEventListener('wheel', handler, { passive: false });
     return () => node.removeEventListener('wheel', handler);
-  }, []);
+  }, [visiblePerPage]);
 
   return (
     <div

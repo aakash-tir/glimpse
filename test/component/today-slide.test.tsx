@@ -194,16 +194,23 @@ describe('TodaySlide — time format', () => {
 });
 
 describe('TodaySlide — wheel-to-horizontal scroll', () => {
-  it('translates a downward wheel into a positive horizontal scroll on the track', () => {
-    render(<TodaySlide forecast={buildForecast()} timeFormat="24h" />);
-    const track = screen.getByTestId('scroll-track');
+  function stubClientWidth(track: HTMLElement, value: number): void {
+    Object.defineProperty(track, 'clientWidth', {
+      value,
+      configurable: true,
+    });
     Object.defineProperty(track, 'scrollLeft', {
       value: 0,
       writable: true,
       configurable: true,
     });
-    // jsdom accepts dispatchEvent of WheelEvent; React's onWheel is
-    // passive, so the listener is attached imperatively in a useEffect.
+  }
+
+  it('a downward wheel notch advances exactly one cell width (1/6 of viewport)', () => {
+    render(<TodaySlide forecast={buildForecast()} timeFormat="24h" />);
+    const track = screen.getByTestId('scroll-track');
+    // 240 px viewport → 40 px per cell on the hourly slide.
+    stubClientWidth(track, 240);
     const e = new WheelEvent('wheel', {
       deltaY: 200,
       deltaX: 0,
@@ -213,17 +220,47 @@ describe('TodaySlide — wheel-to-horizontal scroll', () => {
     act(() => {
       track.dispatchEvent(e);
     });
-    expect(track.scrollLeft).toBe(200);
+    // 200 px raw deltaY is ignored — only the sign matters.
+    expect(track.scrollLeft).toBe(40);
+  });
+
+  it('a small wheel delta still advances a full cell (sign-based, not magnitude)', () => {
+    render(<TodaySlide forecast={buildForecast()} timeFormat="24h" />);
+    const track = screen.getByTestId('scroll-track');
+    stubClientWidth(track, 240);
+    const e = new WheelEvent('wheel', {
+      deltaY: 5,
+      deltaX: 0,
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => {
+      track.dispatchEvent(e);
+    });
+    expect(track.scrollLeft).toBe(40);
+  });
+
+  it('an upward wheel notch retreats exactly one cell width', () => {
+    render(<TodaySlide forecast={buildForecast()} timeFormat="24h" />);
+    const track = screen.getByTestId('scroll-track');
+    stubClientWidth(track, 240);
+    track.scrollLeft = 120; // start mid-track at cell 3
+    const e = new WheelEvent('wheel', {
+      deltaY: -100,
+      deltaX: 0,
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => {
+      track.dispatchEvent(e);
+    });
+    expect(track.scrollLeft).toBe(80);
   });
 
   it('leaves a predominantly-horizontal wheel event alone (trackpad gesture)', () => {
     render(<TodaySlide forecast={buildForecast()} timeFormat="24h" />);
     const track = screen.getByTestId('scroll-track');
-    Object.defineProperty(track, 'scrollLeft', {
-      value: 0,
-      writable: true,
-      configurable: true,
-    });
+    stubClientWidth(track, 240);
     const e = new WheelEvent('wheel', {
       deltaY: 30,
       deltaX: 200,
