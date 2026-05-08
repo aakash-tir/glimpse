@@ -175,6 +175,52 @@ describe('TodaySlide — time format', () => {
   });
 });
 
+describe('TodaySlide — wheel-to-horizontal scroll', () => {
+  it('translates a downward wheel into a positive horizontal scroll on the track', () => {
+    render(<TodaySlide forecast={buildForecast()} timeFormat="24h" />);
+    const track = screen.getByTestId('scroll-track');
+    Object.defineProperty(track, 'scrollLeft', {
+      value: 0,
+      writable: true,
+      configurable: true,
+    });
+    // jsdom accepts dispatchEvent of WheelEvent; React's onWheel is
+    // passive, so the listener is attached imperatively in a useEffect.
+    const e = new WheelEvent('wheel', {
+      deltaY: 200,
+      deltaX: 0,
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => {
+      track.dispatchEvent(e);
+    });
+    expect(track.scrollLeft).toBe(200);
+  });
+
+  it('leaves a predominantly-horizontal wheel event alone (trackpad gesture)', () => {
+    render(<TodaySlide forecast={buildForecast()} timeFormat="24h" />);
+    const track = screen.getByTestId('scroll-track');
+    Object.defineProperty(track, 'scrollLeft', {
+      value: 0,
+      writable: true,
+      configurable: true,
+    });
+    const e = new WheelEvent('wheel', {
+      deltaY: 30,
+      deltaX: 200,
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => {
+      track.dispatchEvent(e);
+    });
+    // We did not redirect, so scrollLeft remains untouched. Browsers
+    // would scroll horizontally on their own from the deltaX.
+    expect(track.scrollLeft).toBe(0);
+  });
+});
+
 describe('TodaySlide — edge-fade affordance', () => {
   // jsdom doesn't compute layout — the scroll-track's clientWidth /
   // scrollWidth default to 0. Stub them so the visibility logic in

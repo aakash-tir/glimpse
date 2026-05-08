@@ -170,6 +170,30 @@ export function ScrollableSlide({
     return () => ro.disconnect();
   }, [recompute, pageCount]);
 
+  // Translate vertical mouse-wheel input into horizontal scroll on the
+  // track. Without this the slider is functionally invisible on desktop
+  // — a regular wheel scroll does nothing because the track is
+  // overflow-x only. Trackpad horizontal swipes still work natively
+  // (they produce deltaX directly, which we leave alone).
+  //
+  // Bound via addEventListener with `passive: false` so we can call
+  // preventDefault() on the wheel event; React's synthetic onWheel is
+  // passive by default and would warn on preventDefault.
+  useEffect(() => {
+    const node = trackRef.current;
+    if (!node) return;
+    const handler = (e: WheelEvent): void => {
+      // Only redirect predominantly-vertical wheel input. Trackpad
+      // horizontal gestures already produce deltaX > deltaY and should
+      // pass through to the native horizontal scroll.
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      e.preventDefault();
+      node.scrollLeft += e.deltaY;
+    };
+    node.addEventListener('wheel', handler, { passive: false });
+    return () => node.removeEventListener('wheel', handler);
+  }, []);
+
   return (
     <div
       data-testid={testId}
