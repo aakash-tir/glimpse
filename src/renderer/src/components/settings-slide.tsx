@@ -140,7 +140,13 @@ export function SettingsSlide({
           bottom: 0,
           overflowY: 'auto',
           overflowX: 'hidden',
-          scrollbarWidth: 'thin',
+          // Hide the native scrollbar — the slide's content height is
+          // small enough that scrolling is rarely needed, and when it
+          // is, the user can wheel/drag without a visible track. Same
+          // pattern the today + 7-day slides use for their horizontal
+          // scrollers.
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
         }}
       >
         <div
