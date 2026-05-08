@@ -10,7 +10,11 @@ import { motion, useAnimationControls } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { MoonPhase } from '../../../shared/astro';
 import type { Forecast } from '../../../shared/forecast';
-import type { TimeFormat, Units } from '../../../shared/settings-store';
+import type {
+  Settings,
+  TimeFormat,
+  Units,
+} from '../../../shared/settings-store';
 import {
   computeVisibleSlides,
   reconcileCurrentSlideIndex,
@@ -20,6 +24,7 @@ import {
 } from '../../../shared/slides';
 import { CurrentSlide } from './current-slide';
 import { MoonSlide } from './moon-slide';
+import { SettingsSlide } from './settings-slide';
 import { SevenDaySlide } from './seven-day-slide';
 import {
   SlideIndicator,
@@ -131,6 +136,10 @@ export type SlideDeckProps = {
   // while waiting for the initial useEffect to fire — MoonSlide shows
   // a loading skeleton in that brief window.
   moonPhase?: MoonPhase | null;
+  // Full settings snapshot, forwarded to the Settings slide so each
+  // control can show its current value. Null until useSettings()
+  // resolves on first mount.
+  settings?: Settings | null;
 };
 
 type Transition = {
@@ -146,6 +155,7 @@ export function SlideDeck({
   timeFormat = '24h',
   units = 'metric',
   moonPhase = null,
+  settings = null,
 }: SlideDeckProps): JSX.Element {
   const visibleSlides = useMemo(
     () => computeVisibleSlides({ moonEnabled, eventsActive }),
@@ -341,6 +351,7 @@ export function SlideDeck({
           timeFormat={timeFormat}
           units={units}
           moonPhase={moonPhase}
+          settings={settings}
         />
         {transition && sideFaceSide ? (
           <SlideFace
@@ -352,6 +363,7 @@ export function SlideDeck({
             timeFormat={timeFormat}
             units={units}
             moonPhase={moonPhase}
+            settings={settings}
           />
         ) : null}
       </motion.div>
@@ -419,6 +431,7 @@ type SlideFaceProps = {
   timeFormat: TimeFormat;
   units: Units;
   moonPhase: MoonPhase | null;
+  settings: Settings | null;
 };
 
 function SlideFace({
@@ -430,6 +443,7 @@ function SlideFace({
   timeFormat,
   units,
   moonPhase,
+  settings,
 }: SlideFaceProps): JSX.Element {
   const meta = SLIDE_META[slideId];
   const bg = meta.background(themeMode);
@@ -441,15 +455,16 @@ function SlideFace({
         ? `rotateY(90deg) translateZ(${halfW}px)`
         : `rotateY(-90deg) translateZ(${halfW}px)`;
 
-  // M6 wires the today + seven-day slides; M7 adds current + moon. The
-  // remaining slides (events, settings) keep their M4 placeholder label
-  // until their milestone.
+  // M6 wires the today + seven-day slides; M7 adds current + moon +
+  // settings. The events slide keeps its M4 placeholder label until M8.
   const body = renderSlideBody({
     slideId,
     forecast,
     timeFormat,
     units,
     moonPhase,
+    settings,
+    luminance: bg.luminance,
     label: meta.label,
   });
 
@@ -499,6 +514,8 @@ function renderSlideBody({
   timeFormat,
   units,
   moonPhase,
+  settings,
+  luminance,
   label,
 }: {
   slideId: SlideId;
@@ -506,6 +523,8 @@ function renderSlideBody({
   timeFormat: TimeFormat;
   units: Units;
   moonPhase: MoonPhase | null;
+  settings: Settings | null;
+  luminance: SlideBackgroundLuminance;
   label: string;
 }): JSX.Element | string {
   switch (slideId) {
@@ -523,6 +542,8 @@ function renderSlideBody({
       );
     case 'moon':
       return <MoonSlide phase={moonPhase} />;
+    case 'settings':
+      return <SettingsSlide settings={settings} luminance={luminance} />;
     default:
       return label;
   }

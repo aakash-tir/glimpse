@@ -1,0 +1,416 @@
+import type { CSSProperties, ReactNode } from 'react';
+import type {
+  Settings,
+  ThemeOverride,
+  TimeFormat,
+  Units,
+} from '../../../shared/settings-store';
+
+// Plan/slides.md slide 6 — Settings. Vertical scroll within the slide;
+// background is theme-adaptive (handled by SlideDeck). Each control
+// reads its current value from `settings` and writes back via the
+// preload bridge; the resulting settings:changed broadcast updates
+// every other slide that depends on it.
+//
+// Replay tutorial is a placeholder until M9 wires the onboarding
+// restart flow — the button is rendered for layout testing but is
+// inert this milestone.
+
+export type SettingsSlideProps = {
+  settings: Settings | null;
+  /** When non-null, the row is rendered in light-mode palette. */
+  luminance: 'dark' | 'light';
+};
+
+export function SettingsSlide({
+  settings,
+  luminance,
+}: SettingsSlideProps): JSX.Element {
+  if (!settings) {
+    return (
+      <div
+        data-testid="slide-settings-shell"
+        style={{ position: 'absolute', inset: 0 }}
+      >
+        <div
+          data-testid="slide-settings-loading"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color:
+              luminance === 'light'
+                ? 'rgba(15, 23, 42, 0.5)'
+                : 'rgba(255, 255, 255, 0.5)',
+            fontFamily: 'system-ui, sans-serif',
+            fontSize: 12,
+          }}
+        >
+          Loading settings…
+        </div>
+      </div>
+    );
+  }
+
+  const palette = paletteFor(luminance);
+
+  const handleSet = (patch: Partial<Settings>): void => {
+    void window.glimpse?.setSettings(patch);
+  };
+
+  const handleResetIcon = (): void => {
+    void window.glimpse?.resetIconPosition();
+  };
+
+  const handleManualRefresh = (): void => {
+    void window.glimpse?.refreshData();
+  };
+
+  return (
+    <div
+      data-testid="slide-settings-shell"
+      data-luminance={luminance}
+      style={{
+        position: 'absolute',
+        inset: 0,
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        scrollbarWidth: 'thin',
+        color: palette.text,
+        fontFamily: 'system-ui, sans-serif',
+      }}
+    >
+      <div
+        data-testid="slide-settings-content"
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+          padding: '32px 14px 32px 14px',
+        }}
+      >
+        <Row label="Units" palette={palette}>
+          <Segmented
+            testId="settings-units"
+            value={settings.units}
+            options={[
+              { value: 'metric', label: 'Metric' },
+              { value: 'imperial', label: 'Imperial' },
+            ]}
+            onChange={(v: Units) => handleSet({ units: v })}
+            palette={palette}
+          />
+        </Row>
+
+        <Row label="Time format" palette={palette}>
+          <Segmented
+            testId="settings-time-format"
+            value={settings.timeFormat}
+            options={[
+              { value: '24h', label: '24 h' },
+              { value: '12h', label: '12 h' },
+            ]}
+            onChange={(v: TimeFormat) => handleSet({ timeFormat: v })}
+            palette={palette}
+          />
+        </Row>
+
+        <Row label="Moon-phase slide" palette={palette}>
+          <Segmented
+            testId="settings-moon-toggle"
+            value={settings.moonPhaseSlideEnabled ? 'on' : 'off'}
+            options={[
+              { value: 'on', label: 'On' },
+              { value: 'off', label: 'Off' },
+            ]}
+            onChange={(v: 'on' | 'off') =>
+              handleSet({ moonPhaseSlideEnabled: v === 'on' })
+            }
+            palette={palette}
+          />
+        </Row>
+
+        <Row label="Theme" palette={palette}>
+          <Segmented
+            testId="settings-theme"
+            value={settings.themeOverride}
+            options={[
+              { value: 'auto', label: 'Auto' },
+              { value: 'light', label: 'Light' },
+              { value: 'dark', label: 'Dark' },
+            ]}
+            onChange={(v: ThemeOverride) => handleSet({ themeOverride: v })}
+            palette={palette}
+          />
+        </Row>
+
+        <Row label="Track window position" palette={palette}>
+          <Segmented
+            testId="settings-track-window"
+            value={settings.trackWindowPosition ? 'on' : 'off'}
+            options={[
+              { value: 'on', label: 'On' },
+              { value: 'off', label: 'Off' },
+            ]}
+            onChange={(v: 'on' | 'off') =>
+              handleSet({ trackWindowPosition: v === 'on' })
+            }
+            palette={palette}
+          />
+        </Row>
+
+        <Row label="Reset icon position" palette={palette}>
+          <ActionButton
+            testId="settings-reset-icon"
+            onClick={handleResetIcon}
+            palette={palette}
+          >
+            Reset
+          </ActionButton>
+        </Row>
+
+        <Row label="Manual refresh" palette={palette}>
+          <ActionButton
+            testId="settings-manual-refresh"
+            onClick={handleManualRefresh}
+            palette={palette}
+          >
+            Refresh
+          </ActionButton>
+        </Row>
+
+        <Row label="Replay tutorial" palette={palette}>
+          {/* M9 wires the actual replay flow. Rendering the row + a
+              disabled button now keeps the layout stable through the
+              milestone gap. */}
+          <ActionButton
+            testId="settings-replay-tutorial"
+            onClick={() => {
+              /* M9 */
+            }}
+            palette={palette}
+            disabled
+          >
+            Replay
+          </ActionButton>
+        </Row>
+
+        <div
+          data-testid="settings-about"
+          style={{
+            marginTop: 14,
+            paddingTop: 12,
+            borderTop: `1px solid ${palette.divider}`,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 4,
+          }}
+        >
+          <span style={{ fontSize: 13, fontWeight: 600 }}>Glimpse</span>
+          <span style={{ fontSize: 10, opacity: 0.7, lineHeight: 1.4 }}>
+            Weather data: Open-Meteo · Aurora data: NOAA SWPC · Astronomy:
+            SunCalc
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type Palette = {
+  text: string;
+  textMuted: string;
+  rowBg: string;
+  segActiveBg: string;
+  segInactiveBg: string;
+  segBorder: string;
+  segActiveText: string;
+  segInactiveText: string;
+  buttonBg: string;
+  buttonText: string;
+  buttonBorder: string;
+  divider: string;
+};
+
+function paletteFor(luminance: 'dark' | 'light'): Palette {
+  if (luminance === 'light') {
+    return {
+      text: 'rgba(15, 23, 42, 0.95)',
+      textMuted: 'rgba(15, 23, 42, 0.65)',
+      rowBg: 'rgba(15, 23, 42, 0.04)',
+      segActiveBg: 'rgba(255, 140, 66, 0.85)',
+      segInactiveBg: 'rgba(15, 23, 42, 0.05)',
+      segBorder: 'rgba(15, 23, 42, 0.12)',
+      segActiveText: 'rgba(255, 255, 255, 0.95)',
+      segInactiveText: 'rgba(15, 23, 42, 0.7)',
+      buttonBg: 'rgba(15, 23, 42, 0.05)',
+      buttonText: 'rgba(15, 23, 42, 0.85)',
+      buttonBorder: 'rgba(15, 23, 42, 0.12)',
+      divider: 'rgba(15, 23, 42, 0.12)',
+    };
+  }
+  return {
+    text: 'rgba(255, 255, 255, 0.92)',
+    textMuted: 'rgba(255, 255, 255, 0.65)',
+    rowBg: 'rgba(255, 255, 255, 0.04)',
+    segActiveBg: 'rgba(255, 140, 66, 0.85)',
+    segInactiveBg: 'rgba(255, 255, 255, 0.06)',
+    segBorder: 'rgba(255, 255, 255, 0.12)',
+    segActiveText: 'rgba(15, 23, 42, 0.95)',
+    segInactiveText: 'rgba(255, 255, 255, 0.75)',
+    buttonBg: 'rgba(255, 255, 255, 0.06)',
+    buttonText: 'rgba(255, 255, 255, 0.92)',
+    buttonBorder: 'rgba(255, 255, 255, 0.12)',
+    divider: 'rgba(255, 255, 255, 0.12)',
+  };
+}
+
+function Row({
+  label,
+  palette,
+  children,
+}: {
+  label: string;
+  palette: Palette;
+  children: ReactNode;
+}): JSX.Element {
+  return (
+    <div
+      data-testid="settings-row"
+      data-row-label={label}
+      style={{
+        display: 'flex',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 10,
+        padding: '6px 8px',
+        background: palette.rowBg,
+        borderRadius: 6,
+      }}
+    >
+      <span
+        style={{
+          fontSize: 11,
+          fontWeight: 500,
+          color: palette.textMuted,
+          flex: '1 1 auto',
+          minWidth: 0,
+        }}
+      >
+        {label}
+      </span>
+      <span style={{ flex: '0 0 auto', display: 'inline-flex' }}>
+        {children}
+      </span>
+    </div>
+  );
+}
+
+type SegmentedOption<T extends string> = {
+  value: T;
+  label: string;
+};
+
+function Segmented<T extends string>({
+  testId,
+  value,
+  options,
+  onChange,
+  palette,
+}: {
+  testId: string;
+  value: T;
+  options: SegmentedOption<T>[];
+  onChange: (next: T) => void;
+  palette: Palette;
+}): JSX.Element {
+  return (
+    <span
+      data-testid={testId}
+      data-current-value={value}
+      style={{
+        display: 'inline-flex',
+        border: `1px solid ${palette.segBorder}`,
+        borderRadius: 6,
+        overflow: 'hidden',
+      }}
+    >
+      {options.map((opt) => {
+        const active = opt.value === value;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            data-testid={`${testId}-${opt.value}`}
+            data-active={active ? 'on' : 'off'}
+            onClick={(e) => {
+              // Prevent a panel-level double-click from absorbing the
+              // setting toggle (the click classifier in window-view
+              // would otherwise queue this as part of a double-click).
+              e.stopPropagation();
+              if (!active) onChange(opt.value);
+            }}
+            style={{
+              ...segmentBaseStyle,
+              background: active ? palette.segActiveBg : palette.segInactiveBg,
+              color: active ? palette.segActiveText : palette.segInactiveText,
+              fontWeight: active ? 600 : 500,
+            }}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </span>
+  );
+}
+
+function ActionButton({
+  testId,
+  onClick,
+  palette,
+  disabled,
+  children,
+}: {
+  testId: string;
+  onClick: () => void;
+  palette: Palette;
+  disabled?: boolean;
+  children: ReactNode;
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      data-testid={testId}
+      data-disabled={disabled ? 'on' : 'off'}
+      disabled={disabled}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!disabled) onClick();
+      }}
+      style={{
+        ...segmentBaseStyle,
+        background: palette.buttonBg,
+        color: palette.buttonText,
+        border: `1px solid ${palette.buttonBorder}`,
+        borderRadius: 6,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+const segmentBaseStyle: CSSProperties = {
+  border: 'none',
+  padding: '4px 10px',
+  fontSize: 11,
+  fontFamily: 'system-ui, sans-serif',
+  cursor: 'pointer',
+  letterSpacing: 0.2,
+};

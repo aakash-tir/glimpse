@@ -25,6 +25,9 @@ type GlimpseStub = {
   resizeEnd: ReturnType<typeof vi.fn>;
   getSettings: ReturnType<typeof vi.fn>;
   setSettings: ReturnType<typeof vi.fn>;
+  resetIconPosition: ReturnType<typeof vi.fn>;
+  refreshData: ReturnType<typeof vi.fn>;
+  onSettingsChanged: ReturnType<typeof vi.fn>;
   getData: ReturnType<typeof vi.fn>;
   onDataChanged: ReturnType<typeof vi.fn>;
 };
@@ -66,6 +69,9 @@ function installGlimpseStub(): GlimpseStub {
     resizeEnd: vi.fn(),
     getSettings: vi.fn().mockResolvedValue(STUB_SETTINGS),
     setSettings: vi.fn().mockResolvedValue(STUB_SETTINGS),
+    resetIconPosition: vi.fn().mockResolvedValue(undefined),
+    refreshData: vi.fn().mockResolvedValue(undefined),
+    onSettingsChanged: vi.fn().mockReturnValue(() => {}),
     getData: vi.fn().mockResolvedValue(STUB_SNAPSHOT),
     onDataChanged: vi.fn().mockReturnValue(() => {}),
   };

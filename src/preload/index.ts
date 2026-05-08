@@ -9,6 +9,19 @@ const api = {
   getSettings: (): Promise<Settings> => ipcRenderer.invoke('settings:get'),
   setSettings: (patch: Partial<Settings>): Promise<Settings> =>
     ipcRenderer.invoke('settings:set', patch),
+  resetIconPosition: (): Promise<void> =>
+    ipcRenderer.invoke('settings:reset-icon-position'),
+  refreshData: (): Promise<void> => ipcRenderer.invoke('data:refresh'),
+  onSettingsChanged: (cb: (settings: Settings) => void): (() => void) => {
+    const handler = (
+      _e: Electron.IpcRendererEvent,
+      settings: Settings,
+    ): void => cb(settings);
+    ipcRenderer.on('settings:changed', handler);
+    return () => {
+      ipcRenderer.off('settings:changed', handler);
+    };
+  },
   dragStart: (cursor: ScreenPoint): void =>
     ipcRenderer.send('drag:start', cursor),
   dragMove: (cursor: ScreenPoint): void =>

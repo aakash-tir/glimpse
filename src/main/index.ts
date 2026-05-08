@@ -428,7 +428,33 @@ function collapseToIcon(opts: CollapseOpts = {}): ModeChange {
 
 function registerIpc(): void {
   ipcMain.handle('settings:get', () => loadSettings());
-  ipcMain.handle('settings:set', (_evt, patch) => saveSettings(patch));
+  ipcMain.handle('settings:set', (_evt, patch) => {
+    const next = saveSettings(patch);
+    // Broadcast so every renderer-side reader (window-view's units /
+    // time-format / moon toggles, etc.) updates live without each one
+    // re-fetching. Settings changes from the Settings slide are the
+    // primary trigger for this push.
+    iconWindow?.webContents.send('settings:changed', next);
+    return next;
+  });
+
+  // M7: Reset icon position — clears persisted iconPosition AND moves
+  // the window back to the default top-right corner. The settings
+  // write is broadcast so Settings slide updates its own state.
+  ipcMain.handle('settings:reset-icon-position', () => {
+    const next = saveSettings({ iconPosition: null });
+    iconWindow?.webContents.send('settings:changed', next);
+    if (iconWindow && mode === 'icon') {
+      const def = defaultIconPosition(primaryBounds());
+      applyIconPosition(def);
+    }
+  });
+
+  // M7: Manual refresh — kicks the data scheduler so the user can
+  // force a fresh fetch from the Settings slide.
+  ipcMain.handle('data:refresh', async () => {
+    await dataStore.refresh();
+  });
 
   ipcMain.handle('data:get', () => dataStore.getSnapshot());
 

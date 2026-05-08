@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import type { TimeFormat, Units } from '../../../shared/settings-store';
 import { ICON_SIZE } from '../../../shared/icon-position';
 import { TitleBar } from '../components/title-bar';
 import { useClickClassifier } from '../components/use-click-classifier';
@@ -9,6 +8,7 @@ import { ResizeHandles } from '../components/resize-handles';
 import { SlideDeck } from '../components/slide-deck';
 import { useDataSnapshot } from '../components/use-data-snapshot';
 import { useMoonPhase } from '../components/use-moon-phase';
+import { useSettings } from '../components/use-settings';
 
 // Plan/styling.md: "Window open / close: scale animation, 200 ms
 // ease-out, anchored at the icon's position."
@@ -40,18 +40,14 @@ export function WindowView({
   enterBounds,
 }: WindowViewProps): JSX.Element {
   const [collapse, setCollapse] = useState<CollapseRequest | null>(null);
-  // Moon-phase slide visibility flag, sourced from settings on mount.
-  // M4 only wires this read path; the toggle in the Settings slide
-  // lands in M7. Events visibility is hard-coded false at M4 and
-  // becomes data-driven in M5 / M8.
-  const [moonEnabled, setMoonEnabled] = useState(false);
-  // 12 h / 24 h preference for the M6 hourly slide's time labels.
-  // Sourced from settings on mount; live updates land in M7 alongside
-  // the Settings-slide toggle.
-  const [timeFormat, setTimeFormat] = useState<TimeFormat>('24h');
-  // Metric / imperial units, used by the M7 current-conditions slide
-  // for wind speed + feels-like temperature display.
-  const [units, setUnits] = useState<Units>('metric');
+  // Live settings stream — pushed to every slide that depends on
+  // user preferences. Each settings:set in main triggers a broadcast
+  // that updates this hook, so the moon-phase visibility, time format,
+  // units, etc. all stay in sync without per-consumer re-fetching.
+  const settings = useSettings();
+  const moonEnabled = settings?.moonPhaseSlideEnabled ?? false;
+  const timeFormat = settings?.timeFormat ?? '24h';
+  const units = settings?.units ?? 'metric';
   // Forecast snapshot streamed from main via the data-snapshot hook.
   // Null while the first fetch is in flight — slide content components
   // swap in a loading skeleton in that case.
@@ -106,23 +102,6 @@ export function WindowView({
     },
     onDoubleClick: handlePanelDoubleClick,
   });
-
-  // Pull moon-phase visibility + time format from persisted settings on
-  // mount. Live updates from the Settings slide arrive in M7.
-  useEffect(() => {
-    let cancelled = false;
-    const api = window.glimpse;
-    if (!api) return;
-    void api.getSettings().then((settings) => {
-      if (cancelled) return;
-      setMoonEnabled(settings.moonPhaseSlideEnabled);
-      setTimeFormat(settings.timeFormat);
-      setUnits(settings.units);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // Window blur exits drag mode (the user's focus moved elsewhere).
   useEffect(() => {
@@ -228,6 +207,7 @@ export function WindowView({
         timeFormat={timeFormat}
         units={units}
         moonPhase={moonPhase}
+        settings={settings}
       />
     </motion.div>
   );
