@@ -8,6 +8,7 @@ import { DragModeGlow } from '../components/drag-mode-glow';
 import { ResizeHandles } from '../components/resize-handles';
 import { SlideDeck } from '../components/slide-deck';
 import { useDataSnapshot } from '../components/use-data-snapshot';
+import { useMoonPhase } from '../components/use-moon-phase';
 
 // Plan/styling.md: "Window open / close: scale animation, 200 ms
 // ease-out, anchored at the icon's position."
@@ -56,6 +57,9 @@ export function WindowView({
   // swap in a loading skeleton in that case.
   const snapshot = useDataSnapshot();
   const forecast = snapshot?.forecast ?? null;
+  // Live moon-phase reading; recomputes once per minute (much finer
+  // than the ~28-day cycle). Drives the M7 moon-phase slide.
+  const moonPhase = useMoonPhase();
   // Hides the panel + title bar in the brief window between the scale
   // animation finishing and `mode:changed` arriving from main. Without
   // this, the BrowserWindow resizes to icon-mode bounds while WindowView
@@ -223,6 +227,7 @@ export function WindowView({
         forecast={forecast}
         timeFormat={timeFormat}
         units={units}
+        moonPhase={moonPhase}
       />
     </motion.div>
   );

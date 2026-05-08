@@ -8,6 +8,7 @@ import {
 } from 'react';
 import { motion, useAnimationControls } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import type { MoonPhase } from '../../../shared/astro';
 import type { Forecast } from '../../../shared/forecast';
 import type { TimeFormat, Units } from '../../../shared/settings-store';
 import {
@@ -18,6 +19,7 @@ import {
   type WrapDirection,
 } from '../../../shared/slides';
 import { CurrentSlide } from './current-slide';
+import { MoonSlide } from './moon-slide';
 import { SevenDaySlide } from './seven-day-slide';
 import {
   SlideIndicator,
@@ -125,6 +127,10 @@ export type SlideDeckProps = {
   // Metric / imperial unit preference. Forwarded to CurrentSlide for
   // wind speed + feels-like temperature unit suffix.
   units?: Units;
+  // Current moon phase (computed via SunCalc in the host view). Null
+  // while waiting for the initial useEffect to fire — MoonSlide shows
+  // a loading skeleton in that brief window.
+  moonPhase?: MoonPhase | null;
 };
 
 type Transition = {
@@ -139,6 +145,7 @@ export function SlideDeck({
   forecast = null,
   timeFormat = '24h',
   units = 'metric',
+  moonPhase = null,
 }: SlideDeckProps): JSX.Element {
   const visibleSlides = useMemo(
     () => computeVisibleSlides({ moonEnabled, eventsActive }),
@@ -333,6 +340,7 @@ export function SlideDeck({
           forecast={forecast}
           timeFormat={timeFormat}
           units={units}
+          moonPhase={moonPhase}
         />
         {transition && sideFaceSide ? (
           <SlideFace
@@ -343,6 +351,7 @@ export function SlideDeck({
             forecast={forecast}
             timeFormat={timeFormat}
             units={units}
+            moonPhase={moonPhase}
           />
         ) : null}
       </motion.div>
@@ -409,6 +418,7 @@ type SlideFaceProps = {
   forecast: Forecast | null;
   timeFormat: TimeFormat;
   units: Units;
+  moonPhase: MoonPhase | null;
 };
 
 function SlideFace({
@@ -419,6 +429,7 @@ function SlideFace({
   forecast,
   timeFormat,
   units,
+  moonPhase,
 }: SlideFaceProps): JSX.Element {
   const meta = SLIDE_META[slideId];
   const bg = meta.background(themeMode);
@@ -430,14 +441,15 @@ function SlideFace({
         ? `rotateY(90deg) translateZ(${halfW}px)`
         : `rotateY(-90deg) translateZ(${halfW}px)`;
 
-  // M6 wires the today + seven-day slides to real forecast data. M7
-  // adds current conditions; the remaining slides (moon, events,
-  // settings) keep their M4 placeholder label until their milestone.
+  // M6 wires the today + seven-day slides; M7 adds current + moon. The
+  // remaining slides (events, settings) keep their M4 placeholder label
+  // until their milestone.
   const body = renderSlideBody({
     slideId,
     forecast,
     timeFormat,
     units,
+    moonPhase,
     label: meta.label,
   });
 
@@ -486,12 +498,14 @@ function renderSlideBody({
   forecast,
   timeFormat,
   units,
+  moonPhase,
   label,
 }: {
   slideId: SlideId;
   forecast: Forecast | null;
   timeFormat: TimeFormat;
   units: Units;
+  moonPhase: MoonPhase | null;
   label: string;
 }): JSX.Element | string {
   switch (slideId) {
@@ -507,6 +521,8 @@ function renderSlideBody({
           units={units}
         />
       );
+    case 'moon':
+      return <MoonSlide phase={moonPhase} />;
     default:
       return label;
   }
