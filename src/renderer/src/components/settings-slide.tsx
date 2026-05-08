@@ -5,6 +5,7 @@ import type {
   TimeFormat,
   Units,
 } from '../../../shared/settings-store';
+import { useWindowInnerWidth } from './use-window-width';
 
 // Plan/slides.md slide 6 — Settings. Vertical scroll within the slide;
 // background is theme-adaptive (handled by SlideDeck). Each control
@@ -16,6 +17,17 @@ import type {
 // restart flow — the button is rendered for layout testing but is
 // inert this milestone.
 
+// Below this width the labeled segmented controls (Units / Time
+// format / Theme) crowd or wrap the row labels — collapse them to
+// no-label binary switches at small widths instead. The Moon-phase
+// and Track-window rows are always switches regardless of size.
+//
+// Threshold tuned so a default-sized window on common displays
+// (1080p → 180 px, 1440p → 240 px) lands in compact mode and only
+// wide windows (4 K → 360 px, or after the user manually resizes up)
+// get the segmented buttons.
+export const SETTINGS_COMPACT_THRESHOLD_PX = 280;
+
 export type SettingsSlideProps = {
   settings: Settings | null;
   /** When non-null, the row is rendered in light-mode palette. */
@@ -26,6 +38,9 @@ export function SettingsSlide({
   settings,
   luminance,
 }: SettingsSlideProps): JSX.Element {
+  const windowWidth = useWindowInnerWidth();
+  const compact = windowWidth < SETTINGS_COMPACT_THRESHOLD_PX;
+
   if (!settings) {
     return (
       <div
@@ -72,6 +87,7 @@ export function SettingsSlide({
     <div
       data-testid="slide-settings-shell"
       data-luminance={luminance}
+      data-compact={compact ? 'on' : 'off'}
       style={{
         position: 'absolute',
         inset: 0,
@@ -92,29 +108,49 @@ export function SettingsSlide({
         }}
       >
         <Row label="Units" palette={palette}>
-          <Segmented
-            testId="settings-units"
-            value={settings.units}
-            options={[
-              { value: 'metric', label: 'Metric' },
-              { value: 'imperial', label: 'Imperial' },
-            ]}
-            onChange={(v: Units) => handleSet({ units: v })}
-            palette={palette}
-          />
+          {compact ? (
+            <Switch
+              testId="settings-units"
+              checked={settings.units === 'imperial'}
+              onChange={(v) => handleSet({ units: v ? 'imperial' : 'metric' })}
+              palette={palette}
+              ariaLabel="Units (off: metric, on: imperial)"
+            />
+          ) : (
+            <Segmented
+              testId="settings-units"
+              value={settings.units}
+              options={[
+                { value: 'metric', label: 'Metric' },
+                { value: 'imperial', label: 'Imperial' },
+              ]}
+              onChange={(v: Units) => handleSet({ units: v })}
+              palette={palette}
+            />
+          )}
         </Row>
 
         <Row label="Time format" palette={palette}>
-          <Segmented
-            testId="settings-time-format"
-            value={settings.timeFormat}
-            options={[
-              { value: '24h', label: '24 h' },
-              { value: '12h', label: '12 h' },
-            ]}
-            onChange={(v: TimeFormat) => handleSet({ timeFormat: v })}
-            palette={palette}
-          />
+          {compact ? (
+            <Switch
+              testId="settings-time-format"
+              checked={settings.timeFormat === '24h'}
+              onChange={(v) => handleSet({ timeFormat: v ? '24h' : '12h' })}
+              palette={palette}
+              ariaLabel="Time format (off: 12h, on: 24h)"
+            />
+          ) : (
+            <Segmented
+              testId="settings-time-format"
+              value={settings.timeFormat}
+              options={[
+                { value: '24h', label: '24 h' },
+                { value: '12h', label: '12 h' },
+              ]}
+              onChange={(v: TimeFormat) => handleSet({ timeFormat: v })}
+              palette={palette}
+            />
+          )}
         </Row>
 
         <Row label="Moon-phase slide" palette={palette}>
@@ -128,17 +164,37 @@ export function SettingsSlide({
         </Row>
 
         <Row label="Theme" palette={palette}>
-          <Segmented
-            testId="settings-theme"
-            value={settings.themeOverride}
-            options={[
-              { value: 'auto', label: 'Auto' },
-              { value: 'light', label: 'Light' },
-              { value: 'dark', label: 'Dark' },
-            ]}
-            onChange={(v: ThemeOverride) => handleSet({ themeOverride: v })}
-            palette={palette}
-          />
+          {compact ? (
+            <Switch
+              testId="settings-theme"
+              // At compact size the switch only exposes the binary
+              // light/dark choice. If the user previously selected
+              // 'auto', reflect the currently-resolved theme so the
+              // switch position matches what they see; clicking
+              // explicitly sets light or dark, replacing 'auto'.
+              checked={
+                settings.themeOverride === 'dark' ||
+                (settings.themeOverride === 'auto' && luminance === 'dark')
+              }
+              onChange={(v) =>
+                handleSet({ themeOverride: v ? 'dark' : 'light' })
+              }
+              palette={palette}
+              ariaLabel="Theme (off: light, on: dark)"
+            />
+          ) : (
+            <Segmented
+              testId="settings-theme"
+              value={settings.themeOverride}
+              options={[
+                { value: 'auto', label: 'Auto' },
+                { value: 'light', label: 'Light' },
+                { value: 'dark', label: 'Dark' },
+              ]}
+              onChange={(v: ThemeOverride) => handleSet({ themeOverride: v })}
+              palette={palette}
+            />
+          )}
         </Row>
 
         <Row label="Track window position" palette={palette}>

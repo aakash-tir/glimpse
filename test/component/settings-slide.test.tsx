@@ -1,10 +1,25 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { SettingsSlide } from '../../src/renderer/src/components/settings-slide';
+import {
+  SettingsSlide,
+  SETTINGS_COMPACT_THRESHOLD_PX,
+} from '../../src/renderer/src/components/settings-slide';
 import {
   DEFAULT_SETTINGS,
   type Settings,
 } from '../../src/shared/settings-store';
+
+// Pin window.innerWidth so tests deterministically pick segmented vs
+// compact-switch rendering. jsdom defaults to 1024 → segmented mode,
+// which matches the existing test expectations. Each describe block
+// that exercises compact mode resets innerWidth in its own beforeEach.
+function setWindowWidth(px: number): void {
+  Object.defineProperty(window, 'innerWidth', {
+    value: px,
+    configurable: true,
+    writable: true,
+  });
+}
 
 type GlimpseStub = {
   setSettings: ReturnType<typeof vi.fn>;
@@ -283,5 +298,175 @@ describe('SettingsSlide — luminance palette', () => {
     expect(
       screen.getByTestId('slide-settings-shell').getAttribute('data-luminance'),
     ).toBe('light');
+  });
+});
+
+// Below SETTINGS_COMPACT_THRESHOLD_PX the labeled segmented controls
+// (Units / Time / Theme) collapse into the same blue switches the
+// always-binary rows use. Above the threshold they stay as labeled
+// segmented buttons.
+describe('SettingsSlide — compact mode (narrow window)', () => {
+  beforeEach(() => {
+    // Pick a width comfortably below the threshold so the math
+    // doesn't depend on the exact threshold value.
+    setWindowWidth(SETTINGS_COMPACT_THRESHOLD_PX - 40);
+    installStub();
+  });
+
+  afterEach(() => {
+    setWindowWidth(1024);
+  });
+
+  it('marks the shell with data-compact="on" below the threshold', () => {
+    render(<SettingsSlide settings={buildSettings()} luminance="dark" />);
+    expect(
+      screen.getByTestId('slide-settings-shell').getAttribute('data-compact'),
+    ).toBe('on');
+  });
+
+  it('renders Units, Time format, and Theme as switches (no segmented buttons)', () => {
+    render(<SettingsSlide settings={buildSettings()} luminance="dark" />);
+    // Wrappers exist but contain a switch (role="switch"), not labeled
+    // segments — querying for the segment-specific testIds returns null.
+    expect(screen.queryByTestId('settings-units-metric')).toBeNull();
+    expect(screen.queryByTestId('settings-units-imperial')).toBeNull();
+    expect(screen.queryByTestId('settings-time-format-12h')).toBeNull();
+    expect(screen.queryByTestId('settings-time-format-24h')).toBeNull();
+    expect(screen.queryByTestId('settings-theme-auto')).toBeNull();
+    expect(screen.queryByTestId('settings-theme-light')).toBeNull();
+    expect(screen.queryByTestId('settings-theme-dark')).toBeNull();
+    // The base testIds are now switches.
+    expect(screen.getByTestId('settings-units').getAttribute('role')).toBe(
+      'switch',
+    );
+    expect(
+      screen.getByTestId('settings-time-format').getAttribute('role'),
+    ).toBe('switch');
+    expect(screen.getByTestId('settings-theme').getAttribute('role')).toBe(
+      'switch',
+    );
+  });
+
+  it('Units switch off = metric (the spec default), on = imperial', () => {
+    const stub = installStub();
+    render(
+      <SettingsSlide
+        settings={buildSettings({ units: 'metric' })}
+        luminance="dark"
+      />,
+    );
+    expect(
+      screen.getByTestId('settings-units').getAttribute('aria-checked'),
+    ).toBe('false');
+    fireEvent.click(screen.getByTestId('settings-units'));
+    expect(stub.setSettings).toHaveBeenCalledWith({ units: 'imperial' });
+  });
+
+  it('Units switch reads imperial as on', () => {
+    render(
+      <SettingsSlide
+        settings={buildSettings({ units: 'imperial' })}
+        luminance="dark"
+      />,
+    );
+    expect(
+      screen.getByTestId('settings-units').getAttribute('aria-checked'),
+    ).toBe('true');
+  });
+
+  it('Time-format switch off = 12h, on = 24h', () => {
+    const stub = installStub();
+    render(
+      <SettingsSlide
+        settings={buildSettings({ timeFormat: '12h' })}
+        luminance="dark"
+      />,
+    );
+    expect(
+      screen.getByTestId('settings-time-format').getAttribute('aria-checked'),
+    ).toBe('false');
+    fireEvent.click(screen.getByTestId('settings-time-format'));
+    expect(stub.setSettings).toHaveBeenCalledWith({ timeFormat: '24h' });
+  });
+
+  it('Theme switch off = light, on = dark, and clicking off → on writes "dark"', () => {
+    const stub = installStub();
+    render(
+      <SettingsSlide
+        settings={buildSettings({ themeOverride: 'light' })}
+        luminance="light"
+      />,
+    );
+    expect(
+      screen.getByTestId('settings-theme').getAttribute('aria-checked'),
+    ).toBe('false');
+    fireEvent.click(screen.getByTestId('settings-theme'));
+    expect(stub.setSettings).toHaveBeenCalledWith({ themeOverride: 'dark' });
+  });
+
+  it('Theme switch with override="auto" reflects the resolved luminance', () => {
+    // Auto + resolved-light → switch off; auto + resolved-dark → switch on.
+    render(
+      <SettingsSlide
+        settings={buildSettings({ themeOverride: 'auto' })}
+        luminance="light"
+      />,
+    );
+    expect(
+      screen.getByTestId('settings-theme').getAttribute('aria-checked'),
+    ).toBe('false');
+    cleanup();
+
+    render(
+      <SettingsSlide
+        settings={buildSettings({ themeOverride: 'auto' })}
+        luminance="dark"
+      />,
+    );
+    expect(
+      screen.getByTestId('settings-theme').getAttribute('aria-checked'),
+    ).toBe('true');
+  });
+
+  it('clicking the auto-resolved Theme switch writes an explicit override', () => {
+    const stub = installStub();
+    render(
+      <SettingsSlide
+        settings={buildSettings({ themeOverride: 'auto' })}
+        luminance="light"
+      />,
+    );
+    // Currently auto + resolved-light → switch off → click flips to dark.
+    fireEvent.click(screen.getByTestId('settings-theme'));
+    expect(stub.setSettings).toHaveBeenCalledWith({ themeOverride: 'dark' });
+  });
+});
+
+describe('SettingsSlide — segmented mode (wide window)', () => {
+  // Restate that wide windows still render the segmented controls.
+  // Default jsdom innerWidth = 1024 (well above the threshold), but
+  // make it explicit here so a future jsdom default change doesn't
+  // silently flip the assertion.
+  beforeEach(() => {
+    setWindowWidth(SETTINGS_COMPACT_THRESHOLD_PX + 100);
+    installStub();
+  });
+
+  afterEach(() => {
+    setWindowWidth(1024);
+  });
+
+  it('marks the shell with data-compact="off" above the threshold', () => {
+    render(<SettingsSlide settings={buildSettings()} luminance="dark" />);
+    expect(
+      screen.getByTestId('slide-settings-shell').getAttribute('data-compact'),
+    ).toBe('off');
+  });
+
+  it('Units / Time / Theme render their labeled segmented buttons', () => {
+    render(<SettingsSlide settings={buildSettings()} luminance="dark" />);
+    expect(screen.getByTestId('settings-units-metric')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-time-format-24h')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-theme-auto')).toBeInTheDocument();
   });
 });
