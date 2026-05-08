@@ -118,17 +118,12 @@ export function SettingsSlide({
         </Row>
 
         <Row label="Moon-phase slide" palette={palette}>
-          <Segmented
+          <Switch
             testId="settings-moon-toggle"
-            value={settings.moonPhaseSlideEnabled ? 'on' : 'off'}
-            options={[
-              { value: 'on', label: 'On' },
-              { value: 'off', label: 'Off' },
-            ]}
-            onChange={(v: 'on' | 'off') =>
-              handleSet({ moonPhaseSlideEnabled: v === 'on' })
-            }
+            checked={settings.moonPhaseSlideEnabled}
+            onChange={(v) => handleSet({ moonPhaseSlideEnabled: v })}
             palette={palette}
+            ariaLabel="Moon-phase slide"
           />
         </Row>
 
@@ -147,17 +142,12 @@ export function SettingsSlide({
         </Row>
 
         <Row label="Track window position" palette={palette}>
-          <Segmented
+          <Switch
             testId="settings-track-window"
-            value={settings.trackWindowPosition ? 'on' : 'off'}
-            options={[
-              { value: 'on', label: 'On' },
-              { value: 'off', label: 'Off' },
-            ]}
-            onChange={(v: 'on' | 'off') =>
-              handleSet({ trackWindowPosition: v === 'on' })
-            }
+            checked={settings.trackWindowPosition}
+            onChange={(v) => handleSet({ trackWindowPosition: v })}
             palette={palette}
+            ariaLabel="Track window position"
           />
         </Row>
 
@@ -232,7 +222,15 @@ type Palette = {
   buttonText: string;
   buttonBorder: string;
   divider: string;
+  switchOnTrack: string;
+  switchOffTrack: string;
+  switchThumb: string;
 };
+
+// Blue used for the on-state of binary switches. Distinct from the
+// warm-orange accent so the switch reads as a system control rather
+// than a "celebration" accent.
+const SWITCH_BLUE = '#3b82f6';
 
 function paletteFor(luminance: 'dark' | 'light'): Palette {
   if (luminance === 'light') {
@@ -249,6 +247,9 @@ function paletteFor(luminance: 'dark' | 'light'): Palette {
       buttonText: 'rgba(15, 23, 42, 0.85)',
       buttonBorder: 'rgba(15, 23, 42, 0.12)',
       divider: 'rgba(15, 23, 42, 0.12)',
+      switchOnTrack: SWITCH_BLUE,
+      switchOffTrack: 'rgba(15, 23, 42, 0.18)',
+      switchThumb: 'rgba(255, 255, 255, 1)',
     };
   }
   return {
@@ -264,6 +265,9 @@ function paletteFor(luminance: 'dark' | 'light'): Palette {
     buttonText: 'rgba(255, 255, 255, 0.92)',
     buttonBorder: 'rgba(255, 255, 255, 0.12)',
     divider: 'rgba(255, 255, 255, 0.12)',
+    switchOnTrack: SWITCH_BLUE,
+    switchOffTrack: 'rgba(255, 255, 255, 0.22)',
+    switchThumb: 'rgba(255, 255, 255, 1)',
   };
 }
 
@@ -414,3 +418,78 @@ const segmentBaseStyle: CSSProperties = {
   cursor: 'pointer',
   letterSpacing: 0.2,
 };
+
+// Compact iOS-style switch for binary on/off toggles. The track is
+// blue (#3b82f6) when on and a translucent neutral when off; the
+// thumb is a white circle that slides between left/right ends with a
+// 150 ms ease. No labels — position alone signals state, which is
+// what the user feedback asked for after the labeled "On / Off"
+// segmented control crowded narrow row labels.
+const SWITCH_WIDTH = 32;
+const SWITCH_HEIGHT = 18;
+const SWITCH_PADDING = 2;
+const SWITCH_THUMB = SWITCH_HEIGHT - SWITCH_PADDING * 2;
+
+function Switch({
+  testId,
+  checked,
+  onChange,
+  palette,
+  ariaLabel,
+}: {
+  testId: string;
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  palette: Palette;
+  ariaLabel: string;
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={ariaLabel}
+      data-testid={testId}
+      data-checked={checked ? 'on' : 'off'}
+      data-current-value={checked ? 'on' : 'off'}
+      onClick={(e) => {
+        // Same defensive stopPropagation as the segmented buttons —
+        // the panel-level double-click classifier mustn't absorb the
+        // toggle into a window-drag gesture.
+        e.stopPropagation();
+        onChange(!checked);
+      }}
+      style={{
+        position: 'relative',
+        width: SWITCH_WIDTH,
+        height: SWITCH_HEIGHT,
+        padding: 0,
+        border: 'none',
+        borderRadius: SWITCH_HEIGHT / 2,
+        backgroundColor: checked
+          ? palette.switchOnTrack
+          : palette.switchOffTrack,
+        cursor: 'pointer',
+        transition: 'background-color 150ms ease',
+        flex: '0 0 auto',
+      }}
+    >
+      <span
+        data-testid={`${testId}-thumb`}
+        style={{
+          position: 'absolute',
+          top: SWITCH_PADDING,
+          left: checked
+            ? SWITCH_WIDTH - SWITCH_PADDING - SWITCH_THUMB
+            : SWITCH_PADDING,
+          width: SWITCH_THUMB,
+          height: SWITCH_THUMB,
+          borderRadius: '50%',
+          backgroundColor: palette.switchThumb,
+          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.25)',
+          transition: 'left 150ms ease',
+        }}
+      />
+    </button>
+  );
+}

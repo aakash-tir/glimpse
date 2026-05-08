@@ -67,19 +67,17 @@ describe('SettingsSlide — control reads', () => {
         .getByTestId('settings-time-format')
         .getAttribute('data-current-value'),
     ).toBe('12h');
-    expect(
-      screen
-        .getByTestId('settings-moon-toggle')
-        .getAttribute('data-current-value'),
-    ).toBe('on');
+    // Moon-phase + track-window are switches now (binary on/off, no
+    // word labels) — assert via aria-checked / data-checked.
+    const moon = screen.getByTestId('settings-moon-toggle');
+    expect(moon.getAttribute('aria-checked')).toBe('true');
+    expect(moon.getAttribute('data-checked')).toBe('on');
     expect(
       screen.getByTestId('settings-theme').getAttribute('data-current-value'),
     ).toBe('dark');
-    expect(
-      screen
-        .getByTestId('settings-track-window')
-        .getAttribute('data-current-value'),
-    ).toBe('on');
+    const trackWindow = screen.getByTestId('settings-track-window');
+    expect(trackWindow.getAttribute('aria-checked')).toBe('true');
+    expect(trackWindow.getAttribute('data-checked')).toBe('on');
   });
 
   it('lists rows in the spec-required order', () => {
@@ -135,12 +133,27 @@ describe('SettingsSlide — control writes', () => {
     expect(stub.setSettings).toHaveBeenCalledWith({ timeFormat: '12h' });
   });
 
-  it('writes moonPhaseSlideEnabled true / false on toggle clicks', () => {
+  it('clicking the moon-phase switch (off → on) writes true', () => {
     const stub = installStub();
     render(<SettingsSlide settings={buildSettings()} luminance="dark" />);
-    fireEvent.click(screen.getByTestId('settings-moon-toggle-on'));
+    // Default is off; one click flips to on.
+    fireEvent.click(screen.getByTestId('settings-moon-toggle'));
     expect(stub.setSettings).toHaveBeenCalledWith({
       moonPhaseSlideEnabled: true,
+    });
+  });
+
+  it('clicking the moon-phase switch (on → off) writes false', () => {
+    const stub = installStub();
+    render(
+      <SettingsSlide
+        settings={buildSettings({ moonPhaseSlideEnabled: true })}
+        luminance="dark"
+      />,
+    );
+    fireEvent.click(screen.getByTestId('settings-moon-toggle'));
+    expect(stub.setSettings).toHaveBeenCalledWith({
+      moonPhaseSlideEnabled: false,
     });
   });
 
@@ -158,10 +171,10 @@ describe('SettingsSlide — control writes', () => {
     expect(stub.setSettings).toHaveBeenCalledWith({ themeOverride: 'dark' });
   });
 
-  it('writes trackWindowPosition on toggle click', () => {
+  it('clicking the track-window switch (off → on) writes true', () => {
     const stub = installStub();
     render(<SettingsSlide settings={buildSettings()} luminance="dark" />);
-    fireEvent.click(screen.getByTestId('settings-track-window-on'));
+    fireEvent.click(screen.getByTestId('settings-track-window'));
     expect(stub.setSettings).toHaveBeenCalledWith({
       trackWindowPosition: true,
     });
@@ -189,6 +202,71 @@ describe('SettingsSlide — control writes', () => {
     ) as HTMLButtonElement;
     expect(replay.disabled).toBe(true);
     expect(replay.getAttribute('data-disabled')).toBe('on');
+  });
+});
+
+describe('SettingsSlide — binary switch styling', () => {
+  it('switch track is blue when checked, neutral when unchecked', () => {
+    render(
+      <SettingsSlide
+        settings={buildSettings({ moonPhaseSlideEnabled: false })}
+        luminance="dark"
+      />,
+    );
+    const switchOff = screen.getByTestId(
+      'settings-moon-toggle',
+    ) as HTMLButtonElement;
+    // Off track is the neutral white-22% on dark backgrounds — colors
+    // are normalized by the browser engine, just assert it isn't blue.
+    expect(switchOff.style.backgroundColor).not.toBe('rgb(59, 130, 246)');
+
+    cleanup();
+
+    render(
+      <SettingsSlide
+        settings={buildSettings({ moonPhaseSlideEnabled: true })}
+        luminance="dark"
+      />,
+    );
+    const switchOn = screen.getByTestId(
+      'settings-moon-toggle',
+    ) as HTMLButtonElement;
+    // #3b82f6 normalises to rgb(59, 130, 246) in jsdom.
+    expect(switchOn.style.backgroundColor).toBe('rgb(59, 130, 246)');
+  });
+
+  it('switch thumb slides from left (off) to right (on)', () => {
+    render(
+      <SettingsSlide
+        settings={buildSettings({ moonPhaseSlideEnabled: false })}
+        luminance="dark"
+      />,
+    );
+    const offThumb = screen.getByTestId('settings-moon-toggle-thumb');
+    const offLeft = parseInt(offThumb.style.left, 10);
+    cleanup();
+
+    render(
+      <SettingsSlide
+        settings={buildSettings({ moonPhaseSlideEnabled: true })}
+        luminance="dark"
+      />,
+    );
+    const onThumb = screen.getByTestId('settings-moon-toggle-thumb');
+    const onLeft = parseInt(onThumb.style.left, 10);
+
+    expect(onLeft).toBeGreaterThan(offLeft);
+  });
+
+  it('switch exposes role="switch" and aria-checked for accessibility', () => {
+    render(
+      <SettingsSlide
+        settings={buildSettings({ moonPhaseSlideEnabled: true })}
+        luminance="dark"
+      />,
+    );
+    const sw = screen.getByRole('switch', { name: 'Moon-phase slide' });
+    expect(sw.getAttribute('aria-checked')).toBe('true');
   });
 });
 
