@@ -9,6 +9,7 @@ import {
 import { motion, useAnimationControls } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { MoonPhase } from '../../../shared/astro';
+import type { DataLocation } from '../../../shared/data-snapshot';
 import type { Forecast } from '../../../shared/forecast';
 import type {
   Settings,
@@ -146,6 +147,12 @@ export type SlideDeckProps = {
   // control can show its current value. Null until useSettings()
   // resolves on first mount.
   settings?: Settings | null;
+  // Geolocation + last-updated timestamp from the data snapshot,
+  // surfaced as a small subtitle on the Current slide so the user
+  // can verify where Open-Meteo geolocated to and how fresh the
+  // current data is.
+  location?: DataLocation | null;
+  lastUpdated?: string | null;
 };
 
 type Transition = {
@@ -162,6 +169,8 @@ export function SlideDeck({
   units = 'metric',
   moonPhase = null,
   settings = null,
+  location = null,
+  lastUpdated = null,
 }: SlideDeckProps): JSX.Element {
   const visibleSlides = useMemo(
     () => computeVisibleSlides({ moonEnabled, eventsActive }),
@@ -359,6 +368,8 @@ export function SlideDeck({
           units={units}
           moonPhase={moonPhase}
           settings={settings}
+          location={location}
+          lastUpdated={lastUpdated}
         />
         {transition && sideFaceSide ? (
           <SlideFace
@@ -371,6 +382,8 @@ export function SlideDeck({
             units={units}
             moonPhase={moonPhase}
             settings={settings}
+            location={location}
+            lastUpdated={lastUpdated}
           />
         ) : null}
       </motion.div>
@@ -439,6 +452,8 @@ type SlideFaceProps = {
   units: Units;
   moonPhase: MoonPhase | null;
   settings: Settings | null;
+  location: DataLocation | null;
+  lastUpdated: string | null;
 };
 
 function SlideFace({
@@ -451,6 +466,8 @@ function SlideFace({
   units,
   moonPhase,
   settings,
+  location,
+  lastUpdated,
 }: SlideFaceProps): JSX.Element {
   const meta = SLIDE_META[slideId];
   const bg = meta.background(themeMode);
@@ -471,6 +488,8 @@ function SlideFace({
     units,
     moonPhase,
     settings,
+    location,
+    lastUpdated,
     luminance: bg.luminance,
     label: meta.label,
   });
@@ -529,6 +548,8 @@ function renderSlideBody({
   units,
   moonPhase,
   settings,
+  location,
+  lastUpdated,
   luminance,
   label,
 }: {
@@ -538,6 +559,8 @@ function renderSlideBody({
   units: Units;
   moonPhase: MoonPhase | null;
   settings: Settings | null;
+  location: DataLocation | null;
+  lastUpdated: string | null;
   luminance: SlideBackgroundLuminance;
   label: string;
 }): JSX.Element | string {
@@ -552,6 +575,8 @@ function renderSlideBody({
           forecast={forecast}
           timeFormat={timeFormat}
           units={units}
+          location={location}
+          lastUpdated={lastUpdated}
         />
       );
     case 'moon':

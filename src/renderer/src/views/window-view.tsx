@@ -54,6 +54,8 @@ export function WindowView({
   // swap in a loading skeleton in that case.
   const snapshot = useDataSnapshot();
   const forecast = snapshot?.forecast ?? null;
+  const location = snapshot?.location ?? null;
+  const lastUpdated = snapshot?.lastUpdated ?? null;
   // Live moon-phase reading; recomputes once per minute (much finer
   // than the ~28-day cycle). Drives the M7 moon-phase slide.
   const moonPhase = useMoonPhase();
@@ -214,6 +216,8 @@ export function WindowView({
         moonPhase={moonPhase}
         settings={settings}
         themeMode={resolvedTheme}
+        location={location}
+        lastUpdated={lastUpdated}
       />
     </motion.div>
   );

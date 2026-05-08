@@ -214,6 +214,78 @@ describe('CurrentSlide — fits inside the default window', () => {
   });
 });
 
+describe('CurrentSlide — diagnostic subtitle', () => {
+  it('shows the city name when location is provided', () => {
+    render(
+      <CurrentSlide
+        forecast={buildForecast()}
+        timeFormat="24h"
+        units="metric"
+        location={{ latitude: 49.9, longitude: -119.5, city: 'Kelowna' }}
+      />,
+    );
+    const subtitle = screen.getByTestId('slide-current-subtitle');
+    expect(subtitle.textContent).toContain('Kelowna');
+  });
+
+  it('shows the last-updated time formatted to the user time format (24 h)', () => {
+    render(
+      <CurrentSlide
+        forecast={buildForecast()}
+        timeFormat="24h"
+        units="metric"
+        location={{ latitude: 49.9, longitude: -119.5, city: 'Kelowna' }}
+        lastUpdated="2026-05-08T11:23:00.000Z"
+      />,
+    );
+    // The exact rendered HH:MM depends on the test runner's local zone,
+    // but the format should match HH:MM (zero-padded) when timeFormat=24h.
+    const subtitle = screen.getByTestId('slide-current-subtitle');
+    expect(subtitle.textContent).toMatch(/Kelowna · \d{2}:\d{2}/);
+  });
+
+  it('uses 12 h AM/PM formatting when timeFormat=12h', () => {
+    render(
+      <CurrentSlide
+        forecast={buildForecast()}
+        timeFormat="12h"
+        units="metric"
+        location={{ latitude: 49.9, longitude: -119.5, city: 'Kelowna' }}
+        lastUpdated="2026-05-08T11:23:00.000Z"
+      />,
+    );
+    const subtitle = screen.getByTestId('slide-current-subtitle');
+    expect(subtitle.textContent).toMatch(/Kelowna · \d{1,2}:\d{2} (AM|PM)/);
+  });
+
+  it('omits the subtitle entirely when neither location nor lastUpdated is known', () => {
+    render(
+      <CurrentSlide
+        forecast={buildForecast()}
+        timeFormat="24h"
+        units="metric"
+      />,
+    );
+    expect(
+      screen.queryByTestId('slide-current-subtitle'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('falls back to just the time when city is unknown', () => {
+    render(
+      <CurrentSlide
+        forecast={buildForecast()}
+        timeFormat="24h"
+        units="metric"
+        location={{ latitude: 49.9, longitude: -119.5, city: null }}
+        lastUpdated="2026-05-08T11:23:00.000Z"
+      />,
+    );
+    const subtitle = screen.getByTestId('slide-current-subtitle');
+    expect(subtitle.textContent).toMatch(/^\d{2}:\d{2}$/);
+  });
+});
+
 describe('CurrentSlide — feels-like tile', () => {
   it('renders feels-like value with °C suffix in metric', () => {
     render(

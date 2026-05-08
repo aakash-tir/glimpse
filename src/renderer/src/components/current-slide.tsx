@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { WiHumidity, WiSunrise, WiSunset, WiThermometer } from 'react-icons/wi';
+import type { DataLocation } from '../../../shared/data-snapshot';
 import type { Forecast } from '../../../shared/forecast';
 import type { TimeFormat, Units } from '../../../shared/settings-store';
 import { formatHourTime, localDate } from '../../../shared/forecast-window';
@@ -41,12 +42,21 @@ export type CurrentSlideProps = {
   forecast: Forecast | null;
   timeFormat: TimeFormat;
   units: Units;
+  /** Last successful geolocation; surfaced as the slide subtitle. */
+  location?: DataLocation | null;
+  /**
+   * ISO timestamp of the most recent successful weather fetch.
+   * Surfaced as part of the subtitle so the user can spot stale data.
+   */
+  lastUpdated?: string | null;
 };
 
 export function CurrentSlide({
   forecast,
   timeFormat,
   units,
+  location = null,
+  lastUpdated = null,
 }: CurrentSlideProps): JSX.Element {
   if (!forecast) {
     return (
@@ -78,6 +88,8 @@ export function CurrentSlide({
   const windSpeed =
     units === 'imperial' ? current.windSpeed * KMH_TO_MPH : current.windSpeed;
 
+  const subtitle = formatSubtitle(location, lastUpdated, timeFormat);
+
   return (
     <SlideShell
       title="Current"
@@ -86,56 +98,115 @@ export function CurrentSlide({
       topReservedPx={TOP_TITLE_RESERVE_PX}
     >
       <div
-        data-testid="slide-current-content"
+        data-testid="slide-current-layout"
         style={{
           position: 'absolute',
           inset: 0,
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gridTemplateRows: '1fr 1fr',
-          gap: 4,
-          padding: '0 8px 4px 8px',
-          boxSizing: 'border-box',
+          display: 'flex',
+          flexDirection: 'column',
         }}
       >
-        <Tile testId="tile-wind" label="Wind">
-          <WindArrow degrees={current.windDirection} />
-          <span style={tileValueStyle}>
-            {Math.round(windSpeed)}{' '}
-            <span style={tileUnitStyle}>{speedUnit}</span>
-          </span>
-        </Tile>
-
-        <Tile testId="tile-humidity" label="Humidity">
-          <WiHumidity size={TILE_ICON_SIZE} aria-hidden="true" />
-          <span style={tileValueStyle}>{Math.round(current.humidity)}%</span>
-        </Tile>
-
-        <Tile testId="tile-sun" label="Sun">
-          {sunrise ? (
-            <span data-testid="tile-sunrise" style={sunRowStyle}>
-              <WiSunrise size={SUN_ICON_SIZE} aria-hidden="true" />
-              <span>{formatHourTime(sunrise, timeFormat)}</span>
+        {subtitle ? (
+          <div
+            data-testid="slide-current-subtitle"
+            data-subtitle-text={subtitle}
+            style={{
+              flex: '0 0 auto',
+              height: 13,
+              textAlign: 'center',
+              fontFamily: 'system-ui, sans-serif',
+              fontSize: 9,
+              letterSpacing: 0.2,
+              color: 'rgba(255, 255, 255, 0.5)',
+              pointerEvents: 'none',
+              lineHeight: '13px',
+            }}
+          >
+            {subtitle}
+          </div>
+        ) : null}
+        <div
+          data-testid="slide-current-content"
+          style={{
+            flex: '1 1 auto',
+            minHeight: 0,
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gridTemplateRows: '1fr 1fr',
+            gap: 4,
+            padding: '0 8px 4px 8px',
+            boxSizing: 'border-box',
+          }}
+        >
+          <Tile testId="tile-wind" label="Wind">
+            <WindArrow degrees={current.windDirection} />
+            <span style={tileValueStyle}>
+              {Math.round(windSpeed)}{' '}
+              <span style={tileUnitStyle}>{speedUnit}</span>
             </span>
-          ) : null}
-          {sunset ? (
-            <span data-testid="tile-sunset" style={sunRowStyle}>
-              <WiSunset size={SUN_ICON_SIZE} aria-hidden="true" />
-              <span>{formatHourTime(sunset, timeFormat)}</span>
-            </span>
-          ) : null}
-        </Tile>
+          </Tile>
 
-        <Tile testId="tile-feels-like" label="Feels like">
-          <WiThermometer size={TILE_ICON_SIZE} aria-hidden="true" />
-          <span style={tileValueStyle}>
-            {Math.round(feelsLike)}
-            <span style={tileUnitStyle}>{tempUnit}</span>
-          </span>
-        </Tile>
+          <Tile testId="tile-humidity" label="Humidity">
+            <WiHumidity size={TILE_ICON_SIZE} aria-hidden="true" />
+            <span style={tileValueStyle}>{Math.round(current.humidity)}%</span>
+          </Tile>
+
+          <Tile testId="tile-sun" label="Sun">
+            {sunrise ? (
+              <span data-testid="tile-sunrise" style={sunRowStyle}>
+                <WiSunrise size={SUN_ICON_SIZE} aria-hidden="true" />
+                <span>{formatHourTime(sunrise, timeFormat)}</span>
+              </span>
+            ) : null}
+            {sunset ? (
+              <span data-testid="tile-sunset" style={sunRowStyle}>
+                <WiSunset size={SUN_ICON_SIZE} aria-hidden="true" />
+                <span>{formatHourTime(sunset, timeFormat)}</span>
+              </span>
+            ) : null}
+          </Tile>
+
+          <Tile testId="tile-feels-like" label="Feels like">
+            <WiThermometer size={TILE_ICON_SIZE} aria-hidden="true" />
+            <span style={tileValueStyle}>
+              {Math.round(feelsLike)}
+              <span style={tileUnitStyle}>{tempUnit}</span>
+            </span>
+          </Tile>
+        </div>
       </div>
     </SlideShell>
   );
+}
+
+// Compose the diagnostic subtitle: "{city} · {HH:MM}". Either piece is
+// optional — if only the city is known, just show the city. If only
+// the timestamp is available, just show the time. If neither, return
+// null so the slide hides the subtitle row entirely.
+function formatSubtitle(
+  location: DataLocation | null,
+  lastUpdated: string | null,
+  timeFormat: TimeFormat,
+): string | null {
+  const city = location?.city ?? null;
+  const time = lastUpdated ? formatLastUpdated(lastUpdated, timeFormat) : null;
+  if (city && time) return `${city} · ${time}`;
+  if (city) return city;
+  if (time) return time;
+  return null;
+}
+
+function formatLastUpdated(iso: string, timeFormat: TimeFormat): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const hours24 = d.getHours();
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  if (timeFormat === '24h') {
+    return `${String(hours24).padStart(2, '0')}:${minutes}`;
+  }
+  const period = hours24 >= 12 ? 'PM' : 'AM';
+  const h12 = hours24 % 12 === 0 ? 12 : hours24 % 12;
+  return `${h12}:${minutes} ${period}`;
 }
 
 function Tile({
