@@ -35,10 +35,12 @@ export const SLIDE_TRANSITION_DURATION_S = 0.5;
 const SLIDE_TOP_PADDING_PX = 32;
 const SLIDE_BOTTOM_PADDING_PX = 32;
 
-// Plan/slides.md: "Left and right arrow buttons on the panel edges
-// (only these two — no other navigation, no keyboard)."
-const ARROW_INSET_PX = 6;
-const ARROW_SIZE_PX = 28;
+// Plan/slides.md: prev / next arrow buttons sit in the bottom
+// navigation bar, flanking the slide-indicator dots — not on the panel
+// side edges. Single horizontal control row pinned to the bottom.
+const NAV_BAR_BOTTOM_INSET_PX = 6;
+const NAV_BAR_GAP_PX = 14;
+const ARROW_SIZE_PX = 24;
 
 // Plan/styling.md: backgrounds per slide. Settings is the only
 // theme-adaptive surface; all others stay dark. Theme-resolution wires
@@ -338,43 +340,55 @@ export function SlideDeck({
         ) : null}
       </motion.div>
 
-      <button
-        type="button"
-        data-testid="slide-deck-arrow-prev"
-        aria-label="Previous slide"
-        onClick={handlePrev}
+      <div
+        data-testid="slide-deck-nav-bar"
         style={{
-          ...arrowButtonBaseStyle,
-          left: ARROW_INSET_PX,
+          position: 'absolute',
+          bottom: NAV_BAR_BOTTOM_INSET_PX,
+          left: 0,
+          right: 0,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: NAV_BAR_GAP_PX,
+          zIndex: 5,
+          // Default pointer-events so the arrows are clickable; the
+          // SlideIndicator's container sets pointer-events: none on
+          // itself so dots don't intercept stray clicks between them.
         }}
       >
-        <ChevronLeft
-          size={ARROW_SIZE_PX - 8}
-          color={arrowGlyphColor(currentBackground.luminance)}
-        />
-      </button>
+        <button
+          type="button"
+          data-testid="slide-deck-arrow-prev"
+          aria-label="Previous slide"
+          onClick={handlePrev}
+          style={arrowButtonStyle}
+        >
+          <ChevronLeft
+            size={ARROW_SIZE_PX - 8}
+            color={arrowGlyphColor(currentBackground.luminance)}
+          />
+        </button>
 
-      <button
-        type="button"
-        data-testid="slide-deck-arrow-next"
-        aria-label="Next slide"
-        onClick={handleNext}
-        style={{
-          ...arrowButtonBaseStyle,
-          right: ARROW_INSET_PX,
-        }}
-      >
-        <ChevronRight
-          size={ARROW_SIZE_PX - 8}
-          color={arrowGlyphColor(currentBackground.luminance)}
+        <SlideIndicator
+          currentIndex={safeIndex}
+          slideCount={visibleSlides.length}
+          backgroundLuminance={currentBackground.luminance}
         />
-      </button>
 
-      <SlideIndicator
-        currentIndex={safeIndex}
-        slideCount={visibleSlides.length}
-        backgroundLuminance={currentBackground.luminance}
-      />
+        <button
+          type="button"
+          data-testid="slide-deck-arrow-next"
+          aria-label="Next slide"
+          onClick={handleNext}
+          style={arrowButtonStyle}
+        >
+          <ChevronRight
+            size={ARROW_SIZE_PX - 8}
+            color={arrowGlyphColor(currentBackground.luminance)}
+          />
+        </button>
+      </div>
     </div>
   );
 }
@@ -478,10 +492,7 @@ function renderSlideBody({
   }
 }
 
-const arrowButtonBaseStyle: CSSProperties = {
-  position: 'absolute',
-  top: '50%',
-  transform: 'translateY(-50%)',
+const arrowButtonStyle: CSSProperties = {
   width: ARROW_SIZE_PX,
   height: ARROW_SIZE_PX,
   borderRadius: '50%',
@@ -492,8 +503,9 @@ const arrowButtonBaseStyle: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   padding: 0,
-  // Above the slide content but below the title-bar overlay.
-  zIndex: 5,
+  // Buttons live inside the bottom nav bar's flex row — positioning is
+  // handled by the parent so no absolute coords here.
+  flex: '0 0 auto',
 };
 
 function arrowGlyphColor(luminance: SlideBackgroundLuminance): string {

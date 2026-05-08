@@ -2,13 +2,17 @@
 
 The window content is organized as a deck of slides. Slides are navigated by arrow buttons; transitions are 500 ms ease-in-out cube rotations. Slides loop in the click direction (no reverse-spin on wrap).
 
-## Slide indicator
+## Slide indicator + navigation bar
 
-Centered along the bottom edge of the window: a row of small dots, one per currently-active slide. The active slide's dot is larger. **Dot color is adaptive** — light dots on dark slide backgrounds, dark dots on the (light-mode) Settings slide.
+A single horizontal control row pinned to the bottom edge of the window:
 
-## Navigation
+```
+[ ◂ ]   • • • • •   [ ▸ ]
+```
 
-- Left and right arrow buttons on the panel edges (only these two — no other navigation, no keyboard).
+- **Left and right arrow buttons** flank the indicator dots — no arrows on the panel side edges, no keyboard, no swipe.
+- **Indicator dots** sit between the arrows: one dot per currently-active slide; the active slide's dot is larger. **Dot color is adaptive** — light dots on dark slide backgrounds, dark dots on the (light-mode) Settings slide.
+- Arrow glyph color follows the same dark/light rule as the dots.
 - Cube animation rotates **in the direction of the arrow click**. **500 ms ease-in-out.**
 - Slides loop in the click direction (no reverse-spin on wrap).
 

@@ -5,14 +5,18 @@ import type { CSSProperties } from 'react';
 // consumer) and re-exported to slide-deck to avoid a circular import.
 export type SlideBackgroundLuminance = 'dark' | 'light';
 
-// Plan/slides.md: "Centered along the bottom edge of the window: a row
-// of small dots, one per currently-active slide. The active slide's dot
-// is larger. Dot color is adaptive — light dots on dark slide
-// backgrounds, dark dots on the (light-mode) Settings slide."
+// Plan/slides.md: indicator dots sit between the prev / next arrows in
+// the bottom navigation bar. One dot per currently-active slide; the
+// active slide's dot is larger. Dot color is adaptive — light on dark
+// slide backgrounds, dark on the (light-mode) Settings slide.
+//
+// Container is a non-positioned inline flex so SlideDeck's bottom bar
+// can lay it out alongside the arrows. The bottom-pinning that used
+// to live here was lifted into SlideDeck when arrow placement moved
+// from the panel edges into the navigation bar.
 const DOT_SIZE_INACTIVE_PX = 6;
 const DOT_SIZE_ACTIVE_PX = 10;
 const DOT_GAP_PX = 6;
-const BOTTOM_INSET_PX = 8;
 
 const DOT_COLOR_ON_DARK = 'rgba(255, 255, 255, 0.9)';
 const DOT_COLOR_ON_LIGHT = 'rgba(15, 23, 42, 0.85)';
@@ -66,14 +70,10 @@ export function SlideIndicator({
 }
 
 const containerStyle: CSSProperties = {
-  position: 'absolute',
-  bottom: BOTTOM_INSET_PX,
-  left: 0,
-  right: 0,
-  display: 'flex',
-  justifyContent: 'center',
+  display: 'inline-flex',
   alignItems: 'center',
   gap: DOT_GAP_PX,
-  zIndex: 4,
+  // Dots are decorative — clicks pass through to the bottom-bar so a
+  // misclick between dots doesn't swallow an arrow press.
   pointerEvents: 'none',
 };
