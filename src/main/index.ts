@@ -1,4 +1,11 @@
-import { app, BrowserWindow, ipcMain, powerMonitor, screen } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  ipcMain,
+  nativeTheme,
+  powerMonitor,
+  screen,
+} from 'electron';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { fetchGeolocation } from './data/geolocation';
@@ -36,6 +43,7 @@ import {
 } from '../shared/window-position';
 import type { IconPosition, WindowBounds } from '../shared/settings-store';
 import type { Mode, ModeChange } from '../shared/mode';
+import { resolveTheme, type ResolvedTheme } from '../shared/theme';
 import { loadSettings, saveSettings } from './settings';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -426,17 +434,31 @@ function collapseToIcon(opts: CollapseOpts = {}): ModeChange {
   return payload;
 }
 
+function currentResolvedTheme(): ResolvedTheme {
+  const settings = loadSettings();
+  return resolveTheme(settings.themeOverride, nativeTheme.shouldUseDarkColors);
+}
+
 function registerIpc(): void {
   ipcMain.handle('settings:get', () => loadSettings());
   ipcMain.handle('settings:set', (_evt, patch) => {
+    const prevOverride = loadSettings().themeOverride;
     const next = saveSettings(patch);
     // Broadcast so every renderer-side reader (window-view's units /
     // time-format / moon toggles, etc.) updates live without each one
     // re-fetching. Settings changes from the Settings slide are the
     // primary trigger for this push.
     iconWindow?.webContents.send('settings:changed', next);
+    // If the user changed their themeOverride, push the newly-resolved
+    // theme too so the SlideDeck cross-fade fires immediately rather
+    // than waiting for the next nativeTheme.updated event.
+    if (next.themeOverride !== prevOverride) {
+      iconWindow?.webContents.send('theme:changed', currentResolvedTheme());
+    }
     return next;
   });
+
+  ipcMain.handle('theme:get', () => currentResolvedTheme());
 
   // M7: Reset icon position — clears persisted iconPosition AND moves
   // the window back to the default top-right corner. The settings
@@ -739,6 +761,16 @@ if (!gotLock) {
     // Fire an extra refresh on resume if the system slept past at
     // least one tick window — see TickScheduler.notifyResume.
     powerMonitor.on('resume', () => dataScheduler.notifyResume());
+
+    // Live theme switching: push the resolved theme any time the host
+    // OS toggles dark mode (or any other native-theme attribute the
+    // user might bind a system-wide hotkey to). When the user has
+    // themeOverride='auto' this is what keeps the Settings slide in
+    // sync with Windows; when override is locked light/dark the push
+    // still fires but the resolved value won't change.
+    nativeTheme.on('updated', () => {
+      iconWindow?.webContents.send('theme:changed', currentResolvedTheme());
+    });
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createIconWindow();

@@ -28,6 +28,8 @@ type GlimpseStub = {
   resetIconPosition: ReturnType<typeof vi.fn>;
   refreshData: ReturnType<typeof vi.fn>;
   onSettingsChanged: ReturnType<typeof vi.fn>;
+  getTheme: ReturnType<typeof vi.fn>;
+  onThemeChanged: ReturnType<typeof vi.fn>;
   getData: ReturnType<typeof vi.fn>;
   onDataChanged: ReturnType<typeof vi.fn>;
 };
@@ -72,6 +74,8 @@ function installGlimpseStub(): GlimpseStub {
     resetIconPosition: vi.fn().mockResolvedValue(undefined),
     refreshData: vi.fn().mockResolvedValue(undefined),
     onSettingsChanged: vi.fn().mockReturnValue(() => {}),
+    getTheme: vi.fn().mockResolvedValue('dark'),
+    onThemeChanged: vi.fn().mockReturnValue(() => {}),
     getData: vi.fn().mockResolvedValue(STUB_SNAPSHOT),
     onDataChanged: vi.fn().mockReturnValue(() => {}),
   };

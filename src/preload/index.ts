@@ -4,6 +4,7 @@ import type { ScreenPoint } from '../shared/drag';
 import type { Mode, ModeChange } from '../shared/mode';
 import type { ResizeCorner } from '../shared/window-position';
 import type { DataSnapshot } from '../shared/data-snapshot';
+import type { ResolvedTheme } from '../shared/theme';
 
 const api = {
   getSettings: (): Promise<Settings> => ipcRenderer.invoke('settings:get'),
@@ -48,6 +49,17 @@ const api = {
     ipcRenderer.on('mode:changed', handler);
     return () => {
       ipcRenderer.off('mode:changed', handler);
+    };
+  },
+  getTheme: (): Promise<ResolvedTheme> => ipcRenderer.invoke('theme:get'),
+  onThemeChanged: (cb: (theme: ResolvedTheme) => void): (() => void) => {
+    const handler = (
+      _e: Electron.IpcRendererEvent,
+      theme: ResolvedTheme,
+    ): void => cb(theme);
+    ipcRenderer.on('theme:changed', handler);
+    return () => {
+      ipcRenderer.off('theme:changed', handler);
     };
   },
   getData: (): Promise<DataSnapshot> => ipcRenderer.invoke('data:get'),

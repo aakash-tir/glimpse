@@ -8,6 +8,7 @@ import { ResizeHandles } from '../components/resize-handles';
 import { SlideDeck } from '../components/slide-deck';
 import { useDataSnapshot } from '../components/use-data-snapshot';
 import { useMoonPhase } from '../components/use-moon-phase';
+import { useResolvedTheme } from '../components/use-resolved-theme';
 import { useSettings } from '../components/use-settings';
 
 // Plan/styling.md: "Window open / close: scale animation, 200 ms
@@ -56,6 +57,10 @@ export function WindowView({
   // Live moon-phase reading; recomputes once per minute (much finer
   // than the ~28-day cycle). Drives the M7 moon-phase slide.
   const moonPhase = useMoonPhase();
+  // Resolved theme (light / dark) — pushed from main on settings or
+  // nativeTheme changes. Drives the Settings slide background palette
+  // and the slide-indicator dot color.
+  const resolvedTheme = useResolvedTheme();
   // Hides the panel + title bar in the brief window between the scale
   // animation finishing and `mode:changed` arriving from main. Without
   // this, the BrowserWindow resizes to icon-mode bounds while WindowView
@@ -208,6 +213,7 @@ export function WindowView({
         units={units}
         moonPhase={moonPhase}
         settings={settings}
+        themeMode={resolvedTheme}
       />
     </motion.div>
   );

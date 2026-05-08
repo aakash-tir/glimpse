@@ -37,6 +37,12 @@ import { TodaySlide } from './today-slide';
 // continue in click direction)."
 export const SLIDE_TRANSITION_DURATION_S = 0.5;
 
+// Plan/styling.md: "Theme switches use a 200 ms cross-fade between
+// palettes." Applied to the slide-face background + foreground when
+// the SlideDeck's themeMode prop changes (or, transitively, when
+// useResolvedTheme pushes a new value).
+export const THEME_TRANSITION_DURATION_S = 0.2;
+
 // Title bar trigger zone sits at the top, dot indicator hugs the
 // bottom; slide content reserves space for both so placeholder text
 // sits in the optical center of the *visible* slide area.
@@ -314,6 +320,7 @@ export function SlideDeck({
       data-current-slide-index={String(safeIndex)}
       data-visible-slide-count={String(visibleSlides.length)}
       data-direction={direction}
+      data-theme-mode={themeMode}
       data-transition-duration-s={String(SLIDE_TRANSITION_DURATION_S)}
       style={{
         position: 'absolute',
@@ -468,20 +475,27 @@ function SlideFace({
     label: meta.label,
   });
 
+  const textColor =
+    bg.luminance === 'light'
+      ? 'rgba(15, 23, 42, 0.85)'
+      : 'rgba(255, 255, 255, 0.85)';
+
   return (
-    <div
+    <motion.div
       data-testid={`slide-${slideId}`}
       data-slide-id={slideId}
       data-slide-luminance={bg.luminance}
       data-slide-face={face}
+      data-theme-transition-duration-s={String(THEME_TRANSITION_DURATION_S)}
+      // Plan/styling.md: theme switches cross-fade between palettes
+      // over 200 ms. Animating both background + text color in sync
+      // keeps adaptive luminance text from snapping while the panel
+      // fades.
+      animate={{ backgroundColor: bg.color, color: textColor }}
+      transition={{ duration: THEME_TRANSITION_DURATION_S, ease: 'easeOut' }}
       style={{
         position: 'absolute',
         inset: 0,
-        background: bg.color,
-        color:
-          bg.luminance === 'light'
-            ? 'rgba(15, 23, 42, 0.85)'
-            : 'rgba(255, 255, 255, 0.85)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -504,7 +518,7 @@ function SlideFace({
       }}
     >
       {body}
-    </div>
+    </motion.div>
   );
 }
 
