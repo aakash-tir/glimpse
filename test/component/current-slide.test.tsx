@@ -184,6 +184,36 @@ describe('CurrentSlide — sunrise / sunset tile', () => {
   });
 });
 
+describe('CurrentSlide — fits inside the default window', () => {
+  it('uses a tighter top title reserve than the scrolling slides so the 2 × 2 grid fits', () => {
+    render(
+      <CurrentSlide
+        forecast={buildForecast()}
+        timeFormat="24h"
+        units="metric"
+      />,
+    );
+    const body = screen.getByTestId('slide-body');
+    expect(Number(body.getAttribute('data-top-reserved-px'))).toBeLessThan(30);
+  });
+
+  it('uses a tighter bottom-nav reserve than the scrolling slides', () => {
+    render(
+      <CurrentSlide
+        forecast={buildForecast()}
+        timeFormat="24h"
+        units="metric"
+      />,
+    );
+    const body = screen.getByTestId('slide-body');
+    // Scrolling slides reserve 36 px; the fixed grid only needs to
+    // clear the dot indicator + arrows.
+    expect(Number(body.getAttribute('data-bottom-reserved-px'))).toBeLessThan(
+      36,
+    );
+  });
+});
+
 describe('CurrentSlide — feels-like tile', () => {
   it('renders feels-like value with °C suffix in metric', () => {
     render(

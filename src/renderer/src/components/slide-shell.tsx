@@ -35,6 +35,13 @@ export type SlideShellProps = {
    * of the panel rather than centering against the bottom nav bar.
    */
   bottomReservedPx?: number;
+  /**
+   * Pixels reserved at the top of the body for the slide title.
+   * Defaults to SLIDE_TITLE_AREA_PX (30 px). Slides that need to fit
+   * fixed content into a small panel (e.g. the current-conditions
+   * 2 × 2 grid) can pass a smaller value to recover a few pixels.
+   */
+  topReservedPx?: number;
   children: ReactNode;
 };
 
@@ -42,6 +49,7 @@ export function SlideShell({
   title,
   testId,
   bottomReservedPx = 0,
+  topReservedPx = SLIDE_TITLE_AREA_PX,
   children,
 }: SlideShellProps): JSX.Element {
   return (
@@ -79,9 +87,10 @@ export function SlideShell({
       <div
         data-testid="slide-body"
         data-bottom-reserved-px={String(bottomReservedPx)}
+        data-top-reserved-px={String(topReservedPx)}
         style={{
           position: 'absolute',
-          top: SLIDE_TITLE_AREA_PX,
+          top: topReservedPx,
           left: 0,
           right: 0,
           bottom: bottomReservedPx,

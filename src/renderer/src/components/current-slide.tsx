@@ -11,11 +11,25 @@ import { SlideShell } from './slide-shell';
 //   - Humidity: percentage with a small drop icon.
 //   - Sunrise / sunset: two times stacked vertically with mini icons.
 //   - Feels-like temperature: numeric.
-// Background is the default dark glass; nav-bar reserve mirrors the
-// other "always dark" slides so vertically-centered content lands in
-// the visible (non-nav-bar) middle of the panel.
+// Background is the default dark glass. Layout is a fixed 2 × 2 grid
+// (no scroll) and must fit all four tiles inside the default ~240 px
+// window between the title and the bottom nav bar — every dimension
+// here is tuned for that constraint.
 
-const BOTTOM_NAV_RESERVE_PX = 36;
+// Bottom-nav reserve is tighter than the scrolling slides because the
+// 2 × 2 grid does not need extra breathing room above the nav bar; it
+// just needs to clear the dot indicator + arrows.
+const BOTTOM_NAV_RESERVE_PX = 26;
+// Tighter title reserve than the default SLIDE_TITLE_AREA_PX so the
+// fixed grid has more vertical room. The title still renders at its
+// usual position (TITLE_TOP_PX inside SlideShell) — this just reduces
+// the gap between title baseline and the tile grid.
+const TOP_TITLE_RESERVE_PX = 24;
+// Tile glyphs sized so the SUN tile (which stacks two icon-text rows)
+// fits comfortably alongside the single-row tiles at the same row
+// height.
+const TILE_ICON_SIZE = 22;
+const SUN_ICON_SIZE = 18;
 
 // Open-Meteo's defaults: temperatures in °C, wind speed in km/h. The
 // Settings units toggle picks the display label; converting numbers is
@@ -69,6 +83,7 @@ export function CurrentSlide({
       title="Current"
       testId="slide-current-shell"
       bottomReservedPx={BOTTOM_NAV_RESERVE_PX}
+      topReservedPx={TOP_TITLE_RESERVE_PX}
     >
       <div
         data-testid="slide-current-content"
@@ -78,8 +93,8 @@ export function CurrentSlide({
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
           gridTemplateRows: '1fr 1fr',
-          gap: 6,
-          padding: '8px 10px',
+          gap: 4,
+          padding: '0 8px 4px 8px',
           boxSizing: 'border-box',
         }}
       >
@@ -92,27 +107,27 @@ export function CurrentSlide({
         </Tile>
 
         <Tile testId="tile-humidity" label="Humidity">
-          <WiHumidity size={28} aria-hidden="true" />
+          <WiHumidity size={TILE_ICON_SIZE} aria-hidden="true" />
           <span style={tileValueStyle}>{Math.round(current.humidity)}%</span>
         </Tile>
 
         <Tile testId="tile-sun" label="Sun">
           {sunrise ? (
             <span data-testid="tile-sunrise" style={sunRowStyle}>
-              <WiSunrise size={22} aria-hidden="true" />
+              <WiSunrise size={SUN_ICON_SIZE} aria-hidden="true" />
               <span>{formatHourTime(sunrise, timeFormat)}</span>
             </span>
           ) : null}
           {sunset ? (
             <span data-testid="tile-sunset" style={sunRowStyle}>
-              <WiSunset size={22} aria-hidden="true" />
+              <WiSunset size={SUN_ICON_SIZE} aria-hidden="true" />
               <span>{formatHourTime(sunset, timeFormat)}</span>
             </span>
           ) : null}
         </Tile>
 
         <Tile testId="tile-feels-like" label="Feels like">
-          <WiThermometer size={28} aria-hidden="true" />
+          <WiThermometer size={TILE_ICON_SIZE} aria-hidden="true" />
           <span style={tileValueStyle}>
             {Math.round(feelsLike)}
             <span style={tileUnitStyle}>{tempUnit}</span>
@@ -141,15 +156,17 @@ function Tile({
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 2,
+        gap: 1,
         color: 'rgba(255, 255, 255, 0.92)',
         fontFamily: 'system-ui, sans-serif',
         textAlign: 'center',
         minWidth: 0,
+        minHeight: 0,
+        overflow: 'hidden',
         background: 'rgba(255, 255, 255, 0.04)',
         border: '1px solid rgba(255, 255, 255, 0.08)',
-        borderRadius: 8,
-        padding: 4,
+        borderRadius: 6,
+        padding: '2px 4px',
         boxSizing: 'border-box',
       }}
     >
@@ -169,9 +186,9 @@ function Tile({
 }
 
 const tileValueStyle: CSSProperties = {
-  fontSize: 14,
+  fontSize: 13,
   fontWeight: 600,
-  lineHeight: 1.1,
+  lineHeight: 1.05,
 };
 
 const tileUnitStyle: CSSProperties = {
@@ -183,9 +200,10 @@ const tileUnitStyle: CSSProperties = {
 const sunRowStyle: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
-  gap: 2,
-  fontSize: 12,
+  gap: 1,
+  fontSize: 11,
   fontWeight: 500,
+  lineHeight: 1.05,
 };
 
 // Plan/slides.md: "Wind: SVG arrow rotated by direction degrees +
@@ -199,8 +217,8 @@ function WindArrow({ degrees }: { degrees: number }): JSX.Element {
     <svg
       data-testid="wind-arrow"
       data-direction-degrees={String(Math.round(degrees))}
-      width={28}
-      height={28}
+      width={TILE_ICON_SIZE}
+      height={TILE_ICON_SIZE}
       viewBox="0 0 24 24"
       style={{
         // Source SVG points up (north). Add 180° so 0° wind FROM north
