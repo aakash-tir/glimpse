@@ -76,6 +76,21 @@ describe('TodaySlide — loading skeleton', () => {
     // Real content is absent.
     expect(screen.queryByTestId('slide-today-content')).not.toBeInTheDocument();
   });
+
+  it('keeps the "Today" title visible during the loading skeleton', () => {
+    render(<TodaySlide forecast={null} timeFormat="24h" />);
+    const title = screen.getByTestId('slide-title');
+    expect(title.getAttribute('data-slide-title')).toBe('Today');
+    expect(title).toHaveTextContent('Today');
+  });
+});
+
+describe('TodaySlide — title', () => {
+  it('renders a "Today" title at the top of the slide once data is loaded', () => {
+    render(<TodaySlide forecast={buildForecast()} timeFormat="24h" />);
+    const title = screen.getByTestId('slide-title');
+    expect(title).toHaveTextContent('Today');
+  });
 });
 
 describe('TodaySlide — hourly content', () => {

@@ -28,6 +28,7 @@ When the window is opened before the first successful fetch, slides display **mu
 
 ## Slide 1 — Today (hourly)
 
+- **Title:** "Today", centered along the top edge of the slide. Stays visible during the loading skeleton.
 - **Each hour shows:** time (in user's 12 h / 24 h format) · condition icon (day/night variant) · temperature · precipitation %.
 - **Range:** rolling next 24 hours, **starting at the next full hour** from now.
 - **Layout:** horizontal scroll inside the slide; **5 hours visible at a time**. **Snap-to-cell** — each scroll step advances by **one hour**, so the seen items shift one column rather than the whole page sliding off.
@@ -37,6 +38,7 @@ When the window is opened before the first successful fetch, slides display **mu
 
 ## Slide 2 — Next 7 days
 
+- **Title:** "Next 7 days", centered along the top edge of the slide. Stays visible during the loading skeleton.
 - **Each daily row:** day label · condition icon · high / low · precipitation %.
 - **Day labels:** "Today" in row 1, then weekday abbreviations (Mon, Tue, …) for the rest.
 - **Range:** today + next 6 days.

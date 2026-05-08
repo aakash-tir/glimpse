@@ -10,6 +10,7 @@ import {
 import { EdgeFade } from './edge-fade';
 import { IconGlyph } from './icon-glyph';
 import { LoadingSkeleton } from './loading-skeleton';
+import { SlideShell } from './slide-shell';
 
 // Plan/slides.md (slide 1 — Today / hourly):
 //   - 24 rolling hours starting at the next full hour from now
@@ -49,7 +50,11 @@ export function TodaySlide({
   now,
 }: TodaySlideProps): JSX.Element {
   if (!forecast) {
-    return <LoadingSkeleton variant="hourly" />;
+    return (
+      <SlideShell title="Today" testId="slide-today-shell">
+        <LoadingSkeleton variant="hourly" />
+      </SlideShell>
+    );
   }
 
   const nowLocal = now ?? forecast.current.time;
@@ -65,53 +70,55 @@ export function TodaySlide({
   const cellFlexBasis = `calc(100% / ${HOURS_VISIBLE_PER_PAGE})`;
 
   return (
-    <ScrollableSlide
-      testId="slide-today-content"
-      itemCount={hours.length}
-      visiblePerPage={HOURS_VISIBLE_PER_PAGE}
-      sidePaddingPx={HOURLY_SIDE_PADDING_PX}
-    >
-      {hours.map((hour) => {
-        const isDay = isHourDaytime(hour.time, forecast.daily);
-        const glyph = conditionToGlyph(hour.condition, isDay);
-        return (
-          <div
-            key={hour.time}
-            data-testid="hourly-cell"
-            data-hour-time={hour.time}
-            data-is-day={isDay ? 'on' : 'off'}
-            data-glyph={glyph}
-            style={{
-              flex: `0 0 ${cellFlexBasis}`,
-              scrollSnapAlign: 'start',
-              scrollSnapStop: 'always',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 4,
-              padding: '4px 2px',
-              color: 'rgba(255, 255, 255, 0.92)',
-              fontFamily: 'system-ui, sans-serif',
-              textAlign: 'center',
-              minWidth: 0,
-              boxSizing: 'border-box',
-            }}
-          >
-            <span style={{ fontSize: 10, opacity: 0.75 }}>
-              {formatHourTime(hour.time, timeFormat)}
-            </span>
-            <IconGlyph name={glyph} size={26} />
-            <span style={{ fontSize: 13, fontWeight: 600 }}>
-              {Math.round(hour.temperature)}°
-            </span>
-            <span style={{ fontSize: 9, opacity: 0.7 }}>
-              {Math.round(hour.precipitationProbability)}%
-            </span>
-          </div>
-        );
-      })}
-    </ScrollableSlide>
+    <SlideShell title="Today" testId="slide-today-shell">
+      <ScrollableSlide
+        testId="slide-today-content"
+        itemCount={hours.length}
+        visiblePerPage={HOURS_VISIBLE_PER_PAGE}
+        sidePaddingPx={HOURLY_SIDE_PADDING_PX}
+      >
+        {hours.map((hour) => {
+          const isDay = isHourDaytime(hour.time, forecast.daily);
+          const glyph = conditionToGlyph(hour.condition, isDay);
+          return (
+            <div
+              key={hour.time}
+              data-testid="hourly-cell"
+              data-hour-time={hour.time}
+              data-is-day={isDay ? 'on' : 'off'}
+              data-glyph={glyph}
+              style={{
+                flex: `0 0 ${cellFlexBasis}`,
+                scrollSnapAlign: 'start',
+                scrollSnapStop: 'always',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 4,
+                padding: '4px 2px',
+                color: 'rgba(255, 255, 255, 0.92)',
+                fontFamily: 'system-ui, sans-serif',
+                textAlign: 'center',
+                minWidth: 0,
+                boxSizing: 'border-box',
+              }}
+            >
+              <span style={{ fontSize: 10, opacity: 0.75 }}>
+                {formatHourTime(hour.time, timeFormat)}
+              </span>
+              <IconGlyph name={glyph} size={26} />
+              <span style={{ fontSize: 13, fontWeight: 600 }}>
+                {Math.round(hour.temperature)}°
+              </span>
+              <span style={{ fontSize: 9, opacity: 0.7 }}>
+                {Math.round(hour.precipitationProbability)}%
+              </span>
+            </div>
+          );
+        })}
+      </ScrollableSlide>
+    </SlideShell>
   );
 }
 

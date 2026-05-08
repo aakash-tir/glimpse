@@ -63,6 +63,21 @@ describe('SevenDaySlide — loading skeleton', () => {
       screen.queryByTestId('slide-seven-day-content'),
     ).not.toBeInTheDocument();
   });
+
+  it('keeps the "Next 7 days" title visible during the loading skeleton', () => {
+    render(<SevenDaySlide forecast={null} />);
+    const title = screen.getByTestId('slide-title');
+    expect(title.getAttribute('data-slide-title')).toBe('Next 7 days');
+    expect(title).toHaveTextContent('Next 7 days');
+  });
+});
+
+describe('SevenDaySlide — title', () => {
+  it('renders a "Next 7 days" title at the top of the slide once data is loaded', () => {
+    render(<SevenDaySlide forecast={buildForecast()} />);
+    const title = screen.getByTestId('slide-title');
+    expect(title).toHaveTextContent('Next 7 days');
+  });
 });
 
 describe('SevenDaySlide — content', () => {
