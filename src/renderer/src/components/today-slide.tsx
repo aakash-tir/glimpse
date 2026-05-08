@@ -94,9 +94,13 @@ export function TodaySlide({
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                justifyContent: 'center',
+                // Top-align cell content under the slide title so the
+                // data sits just below the heading instead of centering
+                // in the full body height (which left a large gap and
+                // pushed the data toward the bottom nav bar).
+                justifyContent: 'flex-start',
                 gap: 4,
-                padding: '4px 2px',
+                padding: '8px 2px 4px 2px',
                 color: 'rgba(255, 255, 255, 0.92)',
                 fontFamily: 'system-ui, sans-serif',
                 textAlign: 'center',

@@ -64,9 +64,10 @@ export function SevenDaySlide({ forecast }: SevenDaySlideProps): JSX.Element {
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                justifyContent: 'center',
+                // Top-align — see today-slide for rationale.
+                justifyContent: 'flex-start',
                 gap: 4,
-                padding: '6px 4px',
+                padding: '10px 4px 6px 4px',
                 color: 'rgba(255, 255, 255, 0.92)',
                 fontFamily: 'system-ui, sans-serif',
                 textAlign: 'center',
