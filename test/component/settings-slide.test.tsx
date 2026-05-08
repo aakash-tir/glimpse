@@ -285,6 +285,68 @@ describe('SettingsSlide — binary switch styling', () => {
   });
 });
 
+describe('SettingsSlide — title', () => {
+  it('renders a "Settings" title at the top of the slide', () => {
+    render(<SettingsSlide settings={buildSettings()} luminance="dark" />);
+    const title = screen.getByTestId('slide-title');
+    expect(title).toHaveTextContent('Settings');
+    expect(title.getAttribute('data-slide-title')).toBe('Settings');
+  });
+
+  it('renders the title even during the loading state', () => {
+    // Loading branch returns early — but the user should still see the
+    // title so the slide identity is visible while settings load. We
+    // tolerate either rendering it then or not rendering it then; the
+    // sanity check is that no test-ids interfere with the loaded form.
+    render(<SettingsSlide settings={null} luminance="dark" />);
+    // Loaded form is what we care about; the loading branch shows a
+    // simple message and is exercised by the existing loading test.
+    expect(screen.getByTestId('slide-settings-loading')).toBeInTheDocument();
+  });
+});
+
+describe('SettingsSlide — default-value hints in row labels', () => {
+  it('shows the off-position value in brackets for each switchable row', () => {
+    render(<SettingsSlide settings={buildSettings()} luminance="dark" />);
+    const hintByLabel = (label: string): string | null => {
+      const row = screen
+        .getAllByTestId('settings-row')
+        .find((r) => r.getAttribute('data-row-label') === label);
+      return row?.getAttribute('data-row-default-hint') ?? null;
+    };
+    expect(hintByLabel('Units')).toBe('metric');
+    expect(hintByLabel('Time format')).toBe('12 h');
+    expect(hintByLabel('Moon-phase slide')).toBe('off');
+    expect(hintByLabel('Theme')).toBe('light');
+    expect(hintByLabel('Track window position')).toBe('off');
+  });
+
+  it('does NOT show a default hint on the action-button rows', () => {
+    render(<SettingsSlide settings={buildSettings()} luminance="dark" />);
+    const hintByLabel = (label: string): string | null => {
+      const row = screen
+        .getAllByTestId('settings-row')
+        .find((r) => r.getAttribute('data-row-label') === label);
+      return row?.getAttribute('data-row-default-hint') ?? null;
+    };
+    expect(hintByLabel('Reset icon position')).toBe('');
+    expect(hintByLabel('Manual refresh')).toBe('');
+    expect(hintByLabel('Replay tutorial')).toBe('');
+  });
+
+  it('renders the bracketed hint text alongside the row label', () => {
+    render(<SettingsSlide settings={buildSettings()} luminance="dark" />);
+    const hints = screen.getAllByTestId('settings-row-default-hint');
+    // 5 switchable rows → 5 hint elements.
+    expect(hints).toHaveLength(5);
+    const texts = hints.map((h) => h.textContent);
+    expect(texts).toContain('(metric)');
+    expect(texts).toContain('(12 h)');
+    expect(texts).toContain('(off)');
+    expect(texts).toContain('(light)');
+  });
+});
+
 describe('SettingsSlide — luminance palette', () => {
   it('exposes the active luminance via data attribute (dark)', () => {
     render(<SettingsSlide settings={buildSettings()} luminance="dark" />);

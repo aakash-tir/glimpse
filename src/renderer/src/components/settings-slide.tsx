@@ -28,6 +28,17 @@ import { useWindowInnerWidth } from './use-window-width';
 // get the segmented buttons.
 export const SETTINGS_COMPACT_THRESHOLD_PX = 280;
 
+// Title metrics mirror SlideShell's TITLE_TOP_PX / TITLE_LINE_PX so
+// the "Settings" title sits at exactly the same vertical position as
+// every other slide's title. Settings does not use SlideShell because
+// (a) the slide is theme-adaptive — the title color must follow the
+// resolved palette — and (b) the body is a scroll container, which
+// SlideShell's body is not.
+const SETTINGS_TITLE_TOP_PX = 6;
+const SETTINGS_TITLE_LINE_PX = 18;
+const SETTINGS_TITLE_AREA_PX =
+  SETTINGS_TITLE_TOP_PX + SETTINGS_TITLE_LINE_PX + 6;
+
 export type SettingsSlideProps = {
   settings: Settings | null;
   /** When non-null, the row is rendered in light-mode palette. */
@@ -91,174 +102,215 @@ export function SettingsSlide({
       style={{
         position: 'absolute',
         inset: 0,
-        overflowY: 'auto',
-        overflowX: 'hidden',
-        scrollbarWidth: 'thin',
         color: palette.text,
         fontFamily: 'system-ui, sans-serif',
       }}
     >
+      {/* Title pinned to the top of the slide, outside the scroll
+          container so it stays put while the rows scroll. Mirrors the
+          SlideShell title styling but with a theme-adaptive color
+          since Settings is the only theme-adaptive slide. */}
       <div
-        data-testid="slide-settings-content"
+        data-testid="slide-title"
+        data-slide-title="Settings"
         style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 8,
-          padding: '32px 14px 32px 14px',
+          position: 'absolute',
+          top: SETTINGS_TITLE_TOP_PX,
+          left: 0,
+          right: 0,
+          height: SETTINGS_TITLE_LINE_PX,
+          textAlign: 'center',
+          fontFamily: 'system-ui, sans-serif',
+          fontSize: 12,
+          fontWeight: 600,
+          letterSpacing: 0.4,
+          color: palette.text,
+          pointerEvents: 'none',
         }}
       >
-        <Row label="Units" palette={palette}>
-          {compact ? (
-            <Switch
-              testId="settings-units"
-              checked={settings.units === 'imperial'}
-              onChange={(v) => handleSet({ units: v ? 'imperial' : 'metric' })}
-              palette={palette}
-              ariaLabel="Units (off: metric, on: imperial)"
-            />
-          ) : (
-            <Segmented
-              testId="settings-units"
-              value={settings.units}
-              options={[
-                { value: 'metric', label: 'Metric' },
-                { value: 'imperial', label: 'Imperial' },
-              ]}
-              onChange={(v: Units) => handleSet({ units: v })}
-              palette={palette}
-            />
-          )}
-        </Row>
-
-        <Row label="Time format" palette={palette}>
-          {compact ? (
-            <Switch
-              testId="settings-time-format"
-              checked={settings.timeFormat === '24h'}
-              onChange={(v) => handleSet({ timeFormat: v ? '24h' : '12h' })}
-              palette={palette}
-              ariaLabel="Time format (off: 12h, on: 24h)"
-            />
-          ) : (
-            <Segmented
-              testId="settings-time-format"
-              value={settings.timeFormat}
-              options={[
-                { value: '24h', label: '24 h' },
-                { value: '12h', label: '12 h' },
-              ]}
-              onChange={(v: TimeFormat) => handleSet({ timeFormat: v })}
-              palette={palette}
-            />
-          )}
-        </Row>
-
-        <Row label="Moon-phase slide" palette={palette}>
-          <Switch
-            testId="settings-moon-toggle"
-            checked={settings.moonPhaseSlideEnabled}
-            onChange={(v) => handleSet({ moonPhaseSlideEnabled: v })}
-            palette={palette}
-            ariaLabel="Moon-phase slide"
-          />
-        </Row>
-
-        <Row label="Theme" palette={palette}>
-          {compact ? (
-            <Switch
-              testId="settings-theme"
-              // At compact size the switch only exposes the binary
-              // light/dark choice. If the user previously selected
-              // 'auto', reflect the currently-resolved theme so the
-              // switch position matches what they see; clicking
-              // explicitly sets light or dark, replacing 'auto'.
-              checked={
-                settings.themeOverride === 'dark' ||
-                (settings.themeOverride === 'auto' && luminance === 'dark')
-              }
-              onChange={(v) =>
-                handleSet({ themeOverride: v ? 'dark' : 'light' })
-              }
-              palette={palette}
-              ariaLabel="Theme (off: light, on: dark)"
-            />
-          ) : (
-            <Segmented
-              testId="settings-theme"
-              value={settings.themeOverride}
-              options={[
-                { value: 'auto', label: 'Auto' },
-                { value: 'light', label: 'Light' },
-                { value: 'dark', label: 'Dark' },
-              ]}
-              onChange={(v: ThemeOverride) => handleSet({ themeOverride: v })}
-              palette={palette}
-            />
-          )}
-        </Row>
-
-        <Row label="Track window position" palette={palette}>
-          <Switch
-            testId="settings-track-window"
-            checked={settings.trackWindowPosition}
-            onChange={(v) => handleSet({ trackWindowPosition: v })}
-            palette={palette}
-            ariaLabel="Track window position"
-          />
-        </Row>
-
-        <Row label="Reset icon position" palette={palette}>
-          <ActionButton
-            testId="settings-reset-icon"
-            onClick={handleResetIcon}
-            palette={palette}
-          >
-            Reset
-          </ActionButton>
-        </Row>
-
-        <Row label="Manual refresh" palette={palette}>
-          <ActionButton
-            testId="settings-manual-refresh"
-            onClick={handleManualRefresh}
-            palette={palette}
-          >
-            Refresh
-          </ActionButton>
-        </Row>
-
-        <Row label="Replay tutorial" palette={palette}>
-          {/* M9 wires the actual replay flow. Rendering the row + a
-              disabled button now keeps the layout stable through the
-              milestone gap. */}
-          <ActionButton
-            testId="settings-replay-tutorial"
-            onClick={() => {
-              /* M9 */
-            }}
-            palette={palette}
-            disabled
-          >
-            Replay
-          </ActionButton>
-        </Row>
-
+        Settings
+      </div>
+      <div
+        data-testid="slide-settings-scroll"
+        style={{
+          position: 'absolute',
+          top: SETTINGS_TITLE_AREA_PX,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          scrollbarWidth: 'thin',
+        }}
+      >
         <div
-          data-testid="settings-about"
+          data-testid="slide-settings-content"
           style={{
-            marginTop: 14,
-            paddingTop: 12,
-            borderTop: `1px solid ${palette.divider}`,
             display: 'flex',
             flexDirection: 'column',
-            gap: 4,
+            gap: 8,
+            padding: '4px 14px 32px 14px',
           }}
         >
-          <span style={{ fontSize: 13, fontWeight: 600 }}>Glimpse</span>
-          <span style={{ fontSize: 10, opacity: 0.7, lineHeight: 1.4 }}>
-            Weather data: Open-Meteo · Aurora data: NOAA SWPC · Astronomy:
-            SunCalc
-          </span>
+          <Row label="Units" defaultHint="metric" palette={palette}>
+            {compact ? (
+              <Switch
+                testId="settings-units"
+                checked={settings.units === 'imperial'}
+                onChange={(v) =>
+                  handleSet({ units: v ? 'imperial' : 'metric' })
+                }
+                palette={palette}
+                ariaLabel="Units (off: metric, on: imperial)"
+              />
+            ) : (
+              <Segmented
+                testId="settings-units"
+                value={settings.units}
+                options={[
+                  { value: 'metric', label: 'Metric' },
+                  { value: 'imperial', label: 'Imperial' },
+                ]}
+                onChange={(v: Units) => handleSet({ units: v })}
+                palette={palette}
+              />
+            )}
+          </Row>
+
+          <Row label="Time format" defaultHint="12 h" palette={palette}>
+            {compact ? (
+              <Switch
+                testId="settings-time-format"
+                checked={settings.timeFormat === '24h'}
+                onChange={(v) => handleSet({ timeFormat: v ? '24h' : '12h' })}
+                palette={palette}
+                ariaLabel="Time format (off: 12h, on: 24h)"
+              />
+            ) : (
+              <Segmented
+                testId="settings-time-format"
+                value={settings.timeFormat}
+                options={[
+                  { value: '24h', label: '24 h' },
+                  { value: '12h', label: '12 h' },
+                ]}
+                onChange={(v: TimeFormat) => handleSet({ timeFormat: v })}
+                palette={palette}
+              />
+            )}
+          </Row>
+
+          <Row label="Moon-phase slide" defaultHint="off" palette={palette}>
+            <Switch
+              testId="settings-moon-toggle"
+              checked={settings.moonPhaseSlideEnabled}
+              onChange={(v) => handleSet({ moonPhaseSlideEnabled: v })}
+              palette={palette}
+              ariaLabel="Moon-phase slide"
+            />
+          </Row>
+
+          <Row label="Theme" defaultHint="light" palette={palette}>
+            {compact ? (
+              <Switch
+                testId="settings-theme"
+                // At compact size the switch only exposes the binary
+                // light/dark choice. If the user previously selected
+                // 'auto', reflect the currently-resolved theme so the
+                // switch position matches what they see; clicking
+                // explicitly sets light or dark, replacing 'auto'.
+                checked={
+                  settings.themeOverride === 'dark' ||
+                  (settings.themeOverride === 'auto' && luminance === 'dark')
+                }
+                onChange={(v) =>
+                  handleSet({ themeOverride: v ? 'dark' : 'light' })
+                }
+                palette={palette}
+                ariaLabel="Theme (off: light, on: dark)"
+              />
+            ) : (
+              <Segmented
+                testId="settings-theme"
+                value={settings.themeOverride}
+                options={[
+                  { value: 'auto', label: 'Auto' },
+                  { value: 'light', label: 'Light' },
+                  { value: 'dark', label: 'Dark' },
+                ]}
+                onChange={(v: ThemeOverride) => handleSet({ themeOverride: v })}
+                palette={palette}
+              />
+            )}
+          </Row>
+
+          <Row
+            label="Track window position"
+            defaultHint="off"
+            palette={palette}
+          >
+            <Switch
+              testId="settings-track-window"
+              checked={settings.trackWindowPosition}
+              onChange={(v) => handleSet({ trackWindowPosition: v })}
+              palette={palette}
+              ariaLabel="Track window position"
+            />
+          </Row>
+
+          <Row label="Reset icon position" palette={palette}>
+            <ActionButton
+              testId="settings-reset-icon"
+              onClick={handleResetIcon}
+              palette={palette}
+            >
+              Reset
+            </ActionButton>
+          </Row>
+
+          <Row label="Manual refresh" palette={palette}>
+            <ActionButton
+              testId="settings-manual-refresh"
+              onClick={handleManualRefresh}
+              palette={palette}
+            >
+              Refresh
+            </ActionButton>
+          </Row>
+
+          <Row label="Replay tutorial" palette={palette}>
+            {/* M9 wires the actual replay flow. Rendering the row + a
+              disabled button now keeps the layout stable through the
+              milestone gap. */}
+            <ActionButton
+              testId="settings-replay-tutorial"
+              onClick={() => {
+                /* M9 */
+              }}
+              palette={palette}
+              disabled
+            >
+              Replay
+            </ActionButton>
+          </Row>
+
+          <div
+            data-testid="settings-about"
+            style={{
+              marginTop: 14,
+              paddingTop: 12,
+              borderTop: `1px solid ${palette.divider}`,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 4,
+            }}
+          >
+            <span style={{ fontSize: 13, fontWeight: 600 }}>Glimpse</span>
+            <span style={{ fontSize: 10, opacity: 0.7, lineHeight: 1.4 }}>
+              Weather data: Open-Meteo · Aurora data: NOAA SWPC · Astronomy:
+              SunCalc
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -329,10 +381,18 @@ function paletteFor(luminance: 'dark' | 'light'): Palette {
 
 function Row({
   label,
+  defaultHint,
   palette,
   children,
 }: {
   label: string;
+  /**
+   * Optional hint shown in brackets after the label, indicating the
+   * value the off-position represents (e.g. "metric" for the Units
+   * switch). Lets the user read what each switch's default state
+   * means without labeled segments.
+   */
+  defaultHint?: string;
   palette: Palette;
   children: ReactNode;
 }): JSX.Element {
@@ -340,6 +400,7 @@ function Row({
     <div
       data-testid="settings-row"
       data-row-label={label}
+      data-row-default-hint={defaultHint ?? ''}
       style={{
         display: 'flex',
         flexDirection: 'row',
@@ -361,6 +422,14 @@ function Row({
         }}
       >
         {label}
+        {defaultHint ? (
+          <span
+            data-testid="settings-row-default-hint"
+            style={{ marginLeft: 4, opacity: 0.55, fontSize: 10 }}
+          >
+            ({defaultHint})
+          </span>
+        ) : null}
       </span>
       <span style={{ flex: '0 0 auto', display: 'inline-flex' }}>
         {children}
