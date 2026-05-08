@@ -11,6 +11,7 @@ import { EdgeFade } from './edge-fade';
 import { IconGlyph } from './icon-glyph';
 import { LoadingSkeleton } from './loading-skeleton';
 import { SlideShell } from './slide-shell';
+import { useWindowInnerWidth } from './use-window-width';
 
 // Plan/slides.md (slide 1 — Today / hourly):
 //   - 24 rolling hours starting at the next full hour from now
@@ -24,13 +25,24 @@ import { SlideShell } from './slide-shell';
 // "Now" defaults to forecast.current.time so the component is
 // deterministic against a fixture; tests / future-callers can override.
 
-const HOURS_VISIBLE_PER_PAGE = 5;
 const ROLLING_WINDOW_HOURS = 24;
 // Horizontal breathing room around the hourly cells so they don't
 // hug the panel edges. Plan/slides.md slide 1 calls for ~12 px each
 // side. The 7-day slide currently uses 0 (its 1/3-viewport cells
 // already have plenty of internal room).
 const HOURLY_SIDE_PADDING_PX = 12;
+// Plan/slides.md: visible cell count is responsive — chosen so each
+// cell stays roughly TARGET_CELL_WIDTH_PX, clamped to MIN..MAX.
+// Default 240 px window resolves to 5 visible cells; wider windows
+// show more, narrower fewer.
+const HOURLY_TARGET_CELL_WIDTH_PX = 48;
+const HOURLY_MIN_VISIBLE = 3;
+const HOURLY_MAX_VISIBLE = 8;
+// Pixels reserved at the bottom of the body for the slide-deck nav
+// bar (prev arrow · dots · next arrow). Cells are vertically centered
+// in the body, so the reserve keeps the visual midpoint of the data
+// inside the visible (non-nav-bar) region of the panel.
+const BOTTOM_NAV_RESERVE_PX = 36;
 // Tolerance for fractional pixel scrollLeft values reported by some
 // browsers — without it, the right edge-fade flickers off at the very
 // end of a scroll because (scrollLeft + clientWidth) is reported a
@@ -49,9 +61,20 @@ export function TodaySlide({
   timeFormat,
   now,
 }: TodaySlideProps): JSX.Element {
+  const visiblePerPage = useResponsiveVisibleCount({
+    sidePaddingPx: HOURLY_SIDE_PADDING_PX,
+    targetCellWidthPx: HOURLY_TARGET_CELL_WIDTH_PX,
+    min: HOURLY_MIN_VISIBLE,
+    max: HOURLY_MAX_VISIBLE,
+  });
+
   if (!forecast) {
     return (
-      <SlideShell title="Today" testId="slide-today-shell">
+      <SlideShell
+        title="Today"
+        testId="slide-today-shell"
+        bottomReservedPx={BOTTOM_NAV_RESERVE_PX}
+      >
         <LoadingSkeleton variant="hourly" />
       </SlideShell>
     );
@@ -67,14 +90,18 @@ export function TodaySlide({
   // Each hour cell is its own snap target with width = 1/N of the
   // visible viewport, so a wheel scroll advances one column at a time
   // (plan/slides.md: snap-to-cell, not snap-to-page).
-  const cellFlexBasis = `calc(100% / ${HOURS_VISIBLE_PER_PAGE})`;
+  const cellFlexBasis = `calc(100% / ${visiblePerPage})`;
 
   return (
-    <SlideShell title="Today" testId="slide-today-shell">
+    <SlideShell
+      title="Today"
+      testId="slide-today-shell"
+      bottomReservedPx={BOTTOM_NAV_RESERVE_PX}
+    >
       <ScrollableSlide
         testId="slide-today-content"
         itemCount={hours.length}
-        visiblePerPage={HOURS_VISIBLE_PER_PAGE}
+        visiblePerPage={visiblePerPage}
         sidePaddingPx={HOURLY_SIDE_PADDING_PX}
       >
         {hours.map((hour) => {
@@ -94,13 +121,13 @@ export function TodaySlide({
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                // Top-align cell content under the slide title so the
-                // data sits just below the heading instead of centering
-                // in the full body height (which left a large gap and
-                // pushed the data toward the bottom nav bar).
-                justifyContent: 'flex-start',
+                // Vertically center the cell content. The body region
+                // already excludes the bottom-nav-bar reserve, so the
+                // visual midpoint of the data lands in the middle of
+                // the visible (non-nav-bar) panel area.
+                justifyContent: 'center',
                 gap: 4,
-                padding: '8px 2px 4px 2px',
+                padding: '4px 2px',
                 color: 'rgba(255, 255, 255, 0.92)',
                 fontFamily: 'system-ui, sans-serif',
                 textAlign: 'center',
@@ -124,6 +151,25 @@ export function TodaySlide({
       </ScrollableSlide>
     </SlideShell>
   );
+}
+
+// Pick a responsive visible-cell count based on the current window
+// width. Cells aim to render at roughly `targetCellWidthPx`; the count
+// is clamped to [min, max] so very narrow windows still fit a few
+// cells and very wide windows don't render an unreadable smear.
+//
+// Exported so SevenDaySlide can share the same hook with its own
+// targets (different cell width, different bounds).
+export function useResponsiveVisibleCount(opts: {
+  sidePaddingPx: number;
+  targetCellWidthPx: number;
+  min: number;
+  max: number;
+}): number {
+  const windowWidth = useWindowInnerWidth();
+  const innerWidth = Math.max(0, windowWidth - opts.sidePaddingPx * 2);
+  const raw = Math.round(innerWidth / opts.targetCellWidthPx);
+  return Math.min(opts.max, Math.max(opts.min, raw));
 }
 
 // Shared horizontal-scroll container used by the hourly + 7-day slides.

@@ -29,12 +29,19 @@ export type SlideShellProps = {
   title: string;
   /** Test id on the outer wrapper for scoped queries. */
   testId?: string;
+  /**
+   * Pixels reserved at the bottom of the body — kept clear of slide
+   * content so vertically-centered cells land in the visible middle
+   * of the panel rather than centering against the bottom nav bar.
+   */
+  bottomReservedPx?: number;
   children: ReactNode;
 };
 
 export function SlideShell({
   title,
   testId,
+  bottomReservedPx = 0,
   children,
 }: SlideShellProps): JSX.Element {
   return (
@@ -71,12 +78,13 @@ export function SlideShell({
       </div>
       <div
         data-testid="slide-body"
+        data-bottom-reserved-px={String(bottomReservedPx)}
         style={{
           position: 'absolute',
           top: SLIDE_TITLE_AREA_PX,
           left: 0,
           right: 0,
-          bottom: 0,
+          bottom: bottomReservedPx,
         }}
       >
         {children}

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   act,
   cleanup,
@@ -9,6 +9,18 @@ import {
 import type { Condition } from '../../src/shared/condition';
 import type { Forecast } from '../../src/shared/forecast';
 import { TodaySlide } from '../../src/renderer/src/components/today-slide';
+
+// Pin window.innerWidth to the default Electron window size so the
+// responsive visible-cell count is deterministic across tests.
+// jsdom defaults to 1024 which would produce 8 visible cells (the
+// hourly max) and break the assertions tuned to default-size layout.
+beforeEach(() => {
+  Object.defineProperty(window, 'innerWidth', {
+    value: 240,
+    configurable: true,
+    writable: true,
+  });
+});
 
 afterEach(cleanup);
 
@@ -115,12 +127,78 @@ describe('TodaySlide — hourly content', () => {
     expect(content.getAttribute('data-side-padding-px')).toBe('12');
   });
 
-  it('each cell has scroll-snap-align: start and a 1/5 flex basis', () => {
+  it('reserves space at the bottom of the body for the slide-deck nav bar', () => {
+    render(<TodaySlide forecast={buildForecast()} timeFormat="24h" />);
+    // SlideShell exposes the reserve so vertically-centered cells land
+    // in the middle of the visible (non-nav-bar) area.
+    expect(
+      screen.getByTestId('slide-body').getAttribute('data-bottom-reserved-px'),
+    ).toBe('36');
+  });
+
+  it('vertically centers the cell content (justify-content: center)', () => {
+    render(<TodaySlide forecast={buildForecast()} timeFormat="24h" />);
+    const cell = screen.getAllByTestId('hourly-cell')[0]!;
+    expect(cell.style.justifyContent).toBe('center');
+  });
+});
+
+describe('TodaySlide — responsive visible cell count', () => {
+  it('renders 5 cells at the default 240 px window', () => {
+    Object.defineProperty(window, 'innerWidth', {
+      value: 240,
+      configurable: true,
+      writable: true,
+    });
+    render(<TodaySlide forecast={buildForecast()} timeFormat="24h" />);
+    const content = screen.getByTestId('slide-today-content');
+    // round((240 - 24) / 48) = round(4.5) = 5.
+    expect(content.getAttribute('data-visible-per-page')).toBe('5');
+  });
+
+  it('renders more cells on a wider window', () => {
+    Object.defineProperty(window, 'innerWidth', {
+      value: 360,
+      configurable: true,
+      writable: true,
+    });
+    render(<TodaySlide forecast={buildForecast()} timeFormat="24h" />);
+    const content = screen.getByTestId('slide-today-content');
+    // round((360 - 24) / 48) = 7.
+    expect(content.getAttribute('data-visible-per-page')).toBe('7');
+  });
+
+  it('clamps to the maximum visible-cell count on huge windows', () => {
+    Object.defineProperty(window, 'innerWidth', {
+      value: 800,
+      configurable: true,
+      writable: true,
+    });
+    render(<TodaySlide forecast={buildForecast()} timeFormat="24h" />);
+    const content = screen.getByTestId('slide-today-content');
+    // round((800 - 24) / 48) = 16, clamped to max 8.
+    expect(content.getAttribute('data-visible-per-page')).toBe('8');
+  });
+
+  it('clamps to the minimum visible-cell count on tiny windows', () => {
+    Object.defineProperty(window, 'innerWidth', {
+      value: 120,
+      configurable: true,
+      writable: true,
+    });
+    render(<TodaySlide forecast={buildForecast()} timeFormat="24h" />);
+    const content = screen.getByTestId('slide-today-content');
+    // round((120 - 24) / 48) = 2, clamped to min 3.
+    expect(content.getAttribute('data-visible-per-page')).toBe('3');
+  });
+
+  it('each cell has scroll-snap-align: start and a flex basis matching the responsive count', () => {
     render(<TodaySlide forecast={buildForecast()} timeFormat="24h" />);
     const cells = screen.getAllByTestId('hourly-cell');
     for (const cell of cells) {
       expect(cell.style.scrollSnapAlign).toBe('start');
-      // jsdom canonicalizes `calc(100% / 5)` to `calc(20%)`.
+      // At the pinned default 240 px window: 5 visible per page →
+      // calc(100% / 5), which jsdom canonicalizes to calc(20%).
       expect(cell.style.flexBasis).toMatch(/^calc\((?:100%\s*\/\s*5|20%)\)$/);
     }
   });

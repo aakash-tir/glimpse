@@ -4,7 +4,7 @@ import { formatDayLabel, localDate } from '../../../shared/forecast-window';
 import { IconGlyph } from './icon-glyph';
 import { LoadingSkeleton } from './loading-skeleton';
 import { SlideShell } from './slide-shell';
-import { ScrollableSlide } from './today-slide';
+import { ScrollableSlide, useResponsiveVisibleCount } from './today-slide';
 
 // Plan/slides.md (slide 2 — Next 7 days):
 //   - Today + next 6 days (7 rows total)
@@ -13,17 +13,37 @@ import { ScrollableSlide } from './today-slide';
 //   - 3 days visible at a time, snap-to-page horizontal scroll
 //   - Same 24 px edge-fade pattern as the hourly slide
 
-const DAYS_VISIBLE_PER_PAGE = 3;
 const FORECAST_DAYS = 7;
+// Plan/slides.md: visible-cell count is responsive — chosen so each
+// daily cell stays roughly TARGET_CELL_WIDTH_PX wide, clamped to
+// MIN..MAX. Default 240 px window resolves to 3; ≥ 560 px shows all 7.
+const DAYS_TARGET_CELL_WIDTH_PX = 80;
+const DAYS_MIN_VISIBLE = 2;
+const DAYS_MAX_VISIBLE = FORECAST_DAYS;
+// Pixels reserved at the bottom of the body for the slide-deck nav
+// bar so cells centered in the body land in the middle of the visible
+// (non-nav-bar) panel area.
+const BOTTOM_NAV_RESERVE_PX = 36;
 
 export type SevenDaySlideProps = {
   forecast: Forecast | null;
 };
 
 export function SevenDaySlide({ forecast }: SevenDaySlideProps): JSX.Element {
+  const visiblePerPage = useResponsiveVisibleCount({
+    sidePaddingPx: 0,
+    targetCellWidthPx: DAYS_TARGET_CELL_WIDTH_PX,
+    min: DAYS_MIN_VISIBLE,
+    max: DAYS_MAX_VISIBLE,
+  });
+
   if (!forecast) {
     return (
-      <SlideShell title="Next 7 days" testId="slide-seven-day-shell">
+      <SlideShell
+        title="Next 7 days"
+        testId="slide-seven-day-shell"
+        bottomReservedPx={BOTTOM_NAV_RESERVE_PX}
+      >
         <LoadingSkeleton variant="seven-day" />
       </SlideShell>
     );
@@ -32,17 +52,21 @@ export function SevenDaySlide({ forecast }: SevenDaySlideProps): JSX.Element {
   const days = forecast.daily.slice(0, FORECAST_DAYS);
   const todayDate = localDate(forecast.current.time);
 
-  // Each day-cell is its own snap target with width = 1/3 of the
+  // Each day-cell is its own snap target with width = 1/N of the
   // visible viewport, so a wheel scroll advances one day at a time
   // (plan/slides.md: snap-to-cell, not snap-to-page).
-  const cellFlexBasis = `calc(100% / ${DAYS_VISIBLE_PER_PAGE})`;
+  const cellFlexBasis = `calc(100% / ${visiblePerPage})`;
 
   return (
-    <SlideShell title="Next 7 days" testId="slide-seven-day-shell">
+    <SlideShell
+      title="Next 7 days"
+      testId="slide-seven-day-shell"
+      bottomReservedPx={BOTTOM_NAV_RESERVE_PX}
+    >
       <ScrollableSlide
         testId="slide-seven-day-content"
         itemCount={days.length}
-        visiblePerPage={DAYS_VISIBLE_PER_PAGE}
+        visiblePerPage={visiblePerPage}
       >
         {days.map((day) => {
           // Daily summary uses the daytime icon variant — the row
@@ -64,10 +88,13 @@ export function SevenDaySlide({ forecast }: SevenDaySlideProps): JSX.Element {
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                // Top-align — see today-slide for rationale.
-                justifyContent: 'flex-start',
+                // Vertically center — see today-slide for rationale.
+                // Body excludes the bottom-nav-bar reserve so the
+                // visual midpoint of the data lands in the visible
+                // middle of the panel.
+                justifyContent: 'center',
                 gap: 4,
-                padding: '10px 4px 6px 4px',
+                padding: '6px 4px',
                 color: 'rgba(255, 255, 255, 0.92)',
                 fontFamily: 'system-ui, sans-serif',
                 textAlign: 'center',

@@ -1,8 +1,19 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import type { Condition } from '../../src/shared/condition';
 import type { Forecast, ForecastDay } from '../../src/shared/forecast';
 import { SevenDaySlide } from '../../src/renderer/src/components/seven-day-slide';
+
+// Pin window.innerWidth so the responsive visible-day count is
+// deterministic across tests (default jsdom 1024 would resolve to
+// the daily max — all 7 — and break the 3/page assertion).
+beforeEach(() => {
+  Object.defineProperty(window, 'innerWidth', {
+    value: 240,
+    configurable: true,
+    writable: true,
+  });
+});
 
 afterEach(cleanup);
 
@@ -91,11 +102,62 @@ describe('SevenDaySlide — content', () => {
     expect(screen.queryAllByTestId('seven-day-page')).toHaveLength(0);
   });
 
-  it('reports 7 items / 3 visible per page on the slide wrapper', () => {
+  it('reports 7 items / 3 visible per page on the slide wrapper at the default window width', () => {
     render(<SevenDaySlide forecast={buildForecast()} />);
     const content = screen.getByTestId('slide-seven-day-content');
     expect(content.getAttribute('data-item-count')).toBe('7');
+    // round(240 / 80) = 3.
     expect(content.getAttribute('data-visible-per-page')).toBe('3');
+  });
+
+  it('reserves space at the bottom of the body for the slide-deck nav bar', () => {
+    render(<SevenDaySlide forecast={buildForecast()} />);
+    expect(
+      screen.getByTestId('slide-body').getAttribute('data-bottom-reserved-px'),
+    ).toBe('36');
+  });
+
+  it('vertically centers the cell content (justify-content: center)', () => {
+    render(<SevenDaySlide forecast={buildForecast()} />);
+    const cell = screen.getAllByTestId('seven-day-cell')[0]!;
+    expect(cell.style.justifyContent).toBe('center');
+  });
+});
+
+describe('SevenDaySlide — responsive visible cell count', () => {
+  it('shows more days on a wider window', () => {
+    Object.defineProperty(window, 'innerWidth', {
+      value: 400,
+      configurable: true,
+      writable: true,
+    });
+    render(<SevenDaySlide forecast={buildForecast()} />);
+    const content = screen.getByTestId('slide-seven-day-content');
+    // round(400 / 80) = 5.
+    expect(content.getAttribute('data-visible-per-page')).toBe('5');
+  });
+
+  it('caps at 7 (all daily entries) on huge windows', () => {
+    Object.defineProperty(window, 'innerWidth', {
+      value: 1000,
+      configurable: true,
+      writable: true,
+    });
+    render(<SevenDaySlide forecast={buildForecast()} />);
+    const content = screen.getByTestId('slide-seven-day-content');
+    expect(content.getAttribute('data-visible-per-page')).toBe('7');
+  });
+
+  it('clamps to the minimum on tiny windows', () => {
+    Object.defineProperty(window, 'innerWidth', {
+      value: 120,
+      configurable: true,
+      writable: true,
+    });
+    render(<SevenDaySlide forecast={buildForecast()} />);
+    const content = screen.getByTestId('slide-seven-day-content');
+    // round(120 / 80) = 2 = min, no clamp triggered.
+    expect(content.getAttribute('data-visible-per-page')).toBe('2');
   });
 
   it('each cell has scroll-snap-align: start and a 1/3 flex basis', () => {
