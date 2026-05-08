@@ -42,7 +42,12 @@ export function IconView(): JSX.Element {
     // Single-click only expands when not in drag mode (drag mode swallows
     // single clicks per plan/icon.md). Also gated on `expanding` so a
     // stray click during the deferred IPC doesn't fire a second expand.
-    if (dragMode || expanding) return;
+    // Also ignored in the error state: window mode would just show
+    // skeleton placeholders behind a sad-cloud icon, which is more
+    // confusing than helpful — see plan/icon.md § Error state. The
+    // onboarding tutorial previews this state so the user isn't
+    // surprised when they hit it.
+    if (dragMode || expanding || iconState.kind === 'error') return;
     // flushSync forces React to commit the `expanding=true` update to
     // the DOM synchronously before this function returns. Without it,
     // the commit lands in a microtask after the click handler — the
@@ -83,7 +88,7 @@ export function IconView(): JSX.Element {
         });
       });
     });
-  }, [dragMode, expanding]);
+  }, [dragMode, expanding, iconState.kind]);
 
   const handleDoubleClick = useCallback(() => {
     setDragMode((on) => !on);

@@ -203,11 +203,11 @@
 
 **Status:** Not started
 
-**Scope.** Custom 7-step coachmark tutorial that runs on first launch and is replayable from settings.
+**Scope.** Custom 8-step coachmark tutorial that runs on first launch and is replayable from settings.
 
 - `onboardingCompleted` boolean in `settings.json` gates the tutorial.
 - Custom coachmark / spotlight overlay component: 60 % black dim, spotlight cuts the active element with 8 px padding + rounded corners, callout bubble auto-positioned, click-through enabled only on the spotlit element.
-- 7 steps in order: 1) welcome + click icon to expand, 2) slide navigation arrows, 3) icon ↔ window switching, 4) drag mode (two-line text), 5) relocate button, 6) resize (two-line text), 7) ends on Settings slide with "You're all set" toast (~3 s).
+- 8 steps in order: 1) welcome + click icon to expand, 2) slide navigation arrows, 3) icon ↔ window switching, 4) drag mode (two-line text), 5) relocate button, 6) resize (two-line text), 7) offline state preview (two-line text — heads-up about the sad-cloud + click-disabled state), 8) ends on Settings slide with "You're all set" toast (~3 s).
 - Animated cursor performs gestures with click ripples for steps 2, 3, 4, 6.
 - Step counter dots along the bottom (matches slide indicator).
 - Skip link top-right, ghost styling.
@@ -220,7 +220,7 @@
 
 **Refs:** [`plan/onboarding.md`](./plan/onboarding.md), [`plan/styling.md`](./plan/styling.md). **Tests:** [`rules/testing.md` § M9](./rules/testing.md#m9--first-launch-onboarding).
 
-**Definition of done.** First launch (no `settings.json`) triggers the tutorial. All 7 steps work via gesture + via Next button. Skip / interrupt / replay behaviors verified. Toast appears on completion. Tutorial coexists with first-fetch loading + with error state.
+**Definition of done.** First launch (no `settings.json`) triggers the tutorial. All 8 steps work via gesture + via Next button. Skip / interrupt / replay behaviors verified. Toast appears on completion. Tutorial coexists with first-fetch loading + with error state.
 
 ---
 

@@ -51,7 +51,8 @@ For each milestone below, every bullet is a test (or small group of related test
 - **Component:** icon renders the right `weather-icons` glyph for each (condition, day/night) input.
 - **Component:** hover state scales to 1.15× (verify Framer Motion `animate` prop / data-test attribute).
 - **Component:** loading-state animation renders.
-- **Component:** error-state renders sad cloud + tooltip on hover (tooltip text matches spec).
+- **Component:** error-state renders sad cloud (no tooltip — sad face is the only signal; see [`plan/icon.md` § Error state](../plan/icon.md#error-state-weather-fetch-failed)).
+- **Component:** single-click on the icon while in error state is ignored (does not trigger expand IPC).
 - **Integration:** icon position persists across simulated app restart (write → relaunch → read).
 
 ## M2 — Drag & snap
@@ -144,6 +145,7 @@ For each milestone below, every bullet is a test (or small group of related test
 - **Unit:** skip vs interrupt — skip sets `onboardingCompleted = true`; simulated app-close mid-tutorial does not.
 - **Component:** replay tutorial button (Settings) closes window, returns to icon, restarts from step 1.
 - **Component:** title bar force-visible during steps 3 and 5.
+- **Component:** offline-preview step (step 7) renders a static sample sad-cloud (not the live icon) inside the overlay; two-line copy matches the spec.
 - **E2E:** full onboarding flow on a clean profile (no `settings.json`) — completes via Next button only; completes via gestures only; skip exits cleanly; interrupted run resumes from step 1 next launch.
 - **E2E:** onboarding running while first data fetch is in-flight → skeletons visible behind overlay.
 - **E2E:** onboarding running with mocked first-fetch failure → sad cloud visible behind overlay; tutorial proceeds.

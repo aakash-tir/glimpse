@@ -6,12 +6,12 @@ export const ICON_PADDING = 16;
 
 // The Electron window wrapping the icon is just barely larger than the
 // 64×64 glyph — enough margin for the 1.15× hover scale and the drag-
-// mode glow's drop-shadow filter to render without clipping. We do
-// NOT reserve room for a wide tooltip here: tooltip rendering is a
-// separate concern (will be its own popup window or HTML-positioned
-// element when M5 lands). Keeping the icon-mode window compact is
-// what allows the "icon at the LEFT edge midpoint" case (B3b) to
-// work without Windows OS-clamping the window position.
+// mode glow's drop-shadow filter to render without clipping. There is
+// no room reserved for a tooltip: per plan/icon.md § Error state the
+// sad-cloud signals offline on its own (no hover tooltip), and the
+// other states don't have tooltip text. Keeping the icon-mode window
+// compact is what allows the "icon at the LEFT edge midpoint" case
+// (B3b) to work without Windows OS-clamping the window position.
 export const WINDOW_WIDTH = 64 + ICON_PADDING * 2; // 96
 export const WINDOW_HEIGHT = 64 + ICON_PADDING * 2; // 96
 

@@ -62,7 +62,7 @@ Visibility text on the slide is user-aware:
 
 ### Failure handling
 
-- **General weather fetch fails** → icon switches to error state (sad cloud + dark-glass hover tooltip "weather could not be determined"). Retry on **exponential backoff doubling 5 → 10 → 20 → 40 → 60 min, capped at 1 h**, while the app is active. Backoff resets to 5 min only on a successful fetch.
+- **General weather fetch fails** → icon switches to error state (sad cloud, no tooltip — see [icon.md § Error state](./icon.md#error-state-weather-fetch-failed); single-click is ignored while in error state). Retry on **exponential backoff doubling 5 → 10 → 20 → 40 → 60 min, capped at 1 h**, while the app is active. Backoff resets to 5 min only on a successful fetch.
 - **Special-events fetch fails** → silently hide the special-events slide for this session.
 
 ## App-active definition
