@@ -1,9 +1,8 @@
 import type { CSSProperties } from 'react';
 
 // Plan/slides.md (hourly + 7-day): "~14 px white edge-fade glow on the
-// scrollable side. Alpha follows a quadratic curve so the highlight is
-// concentrated near the panel edge rather than spread evenly across
-// the gradient."
+// scrollable side. Radial gradient anchored at the panel edge so
+// iso-alpha lines arc inward from the edge — visually curved."
 //
 // Rendered by hourly + 7-day slides in M6. Defined here in M4 so the
 // slide framework ships the affordance utility alongside the deck.
@@ -13,31 +12,20 @@ export type EdgeFadeProps = {
   side: 'left' | 'right';
   // Visibility — driven by scroll position in M6. Hidden = no gradient.
   visible: boolean;
-  // The base color the gradient fades to at the panel edge. The
-  // gradient's curve goes 0 → targetAlpha; pass an rgba color whose
-  // alpha is the desired peak (e.g. `rgba(255,255,255,0.4)`).
+  // The base color the gradient peaks at (at the panel edge). The
+  // gradient runs 0 → targetAlpha; pass an rgba color whose alpha is
+  // the desired peak (e.g. `rgba(255,255,255,0.4)`).
   fadeToColor?: string;
 };
 
 const DEFAULT_FADE_COLOR = 'rgba(15, 23, 42, 0.92)';
-
-// Quadratic ease-in stops: alpha(t) = targetAlpha * t^2. Concentrates
-// most of the visual weight near the edge so the inner side blends
-// almost invisibly into the cells while the outer side reads as a
-// clear highlight. Stops at 0/25/50/75/100 % give a smooth-enough
-// curve for a 14 px gradient without going stop-crazy.
-const CURVE_STOPS_PCT = [0, 25, 50, 75, 100];
-const CURVE_ALPHA_FACTORS = CURVE_STOPS_PCT.map((p) => (p / 100) ** 2);
 
 export function EdgeFade({
   side,
   visible,
   fadeToColor = DEFAULT_FADE_COLOR,
 }: EdgeFadeProps): JSX.Element {
-  // Transparent → fadeToColor in the direction the user is scrolling
-  // toward, so off-edge content visually melts into the panel rim.
-  const gradientDirection = side === 'right' ? 'to right' : 'to left';
-  const background = buildCurvedGradient(gradientDirection, fadeToColor);
+  const background = buildRadialGradient(side, fadeToColor);
 
   const style: CSSProperties = {
     position: 'absolute',
@@ -58,28 +46,44 @@ export function EdgeFade({
       data-side={side}
       data-visible={visible ? 'on' : 'off'}
       data-width-px={String(EDGE_FADE_WIDTH_PX)}
-      data-curve="quadratic"
+      data-curve="radial"
       style={style}
     />
   );
 }
 
-// Build a multi-stop linear gradient whose alpha follows a quadratic
-// curve from 0 → the target alpha embedded in `fadeToColor`. Falls
-// back to a plain two-stop transparent → fadeToColor gradient if the
-// color isn't parseable rgba, so the component keeps working with
-// odd inputs even though the curve disappears.
-function buildCurvedGradient(direction: string, fadeToColor: string): string {
+// Build a radial gradient anchored at the slide-edge midpoint. The
+// horizontal radius matches the fade strip's width (so the gradient
+// fully transparents-out at the inner end); the vertical radius is
+// stretched well past the strip's height so iso-alpha lines stay
+// gently curved across the slide rather than collapsing to a small
+// circle. Three stops give a noticeable mid-curve falloff.
+//
+// Falls back to a plain two-stop linear gradient if `fadeToColor`
+// isn't parseable rgba — the component keeps working even though the
+// curve disappears.
+function buildRadialGradient(
+  side: 'left' | 'right',
+  fadeToColor: string,
+): string {
   const parsed = parseRgba(fadeToColor);
   if (!parsed) {
-    return `linear-gradient(${direction}, transparent, ${fadeToColor})`;
+    const dir = side === 'right' ? 'to right' : 'to left';
+    return `linear-gradient(${dir}, transparent, ${fadeToColor})`;
   }
   const { r, g, b, a } = parsed;
-  const stops = CURVE_STOPS_PCT.map((pct, i) => {
-    const alpha = a * CURVE_ALPHA_FACTORS[i]!;
-    return `rgba(${r}, ${g}, ${b}, ${roundAlpha(alpha)}) ${pct}%`;
-  });
-  return `linear-gradient(${direction}, ${stops.join(', ')})`;
+  // Origin sits exactly at the slide edge, vertically centered.
+  const origin = side === 'right' ? '100% 50%' : '0% 50%';
+  // Ellipse 100% × 220% — width matches the strip so transparency
+  // hits exactly at the inner edge; height oversize stretches the
+  // ellipse vertically so the top / bottom corners of the strip
+  // still get a strong glow rather than fading too early.
+  const stops = [
+    `rgba(${r}, ${g}, ${b}, ${roundAlpha(a)}) 0%`,
+    `rgba(${r}, ${g}, ${b}, ${roundAlpha(a * 0.35)}) 55%`,
+    `rgba(${r}, ${g}, ${b}, 0) 100%`,
+  ].join(', ');
+  return `radial-gradient(ellipse 100% 220% at ${origin}, ${stops})`;
 }
 
 function parseRgba(
