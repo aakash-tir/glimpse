@@ -62,6 +62,69 @@ describe('mergeWithDefaults', () => {
     const merged = mergeWithDefaults({ iconPosition: null });
     expect(merged.iconPosition).toBeNull();
   });
+
+  it('accepts the new location-related fields', () => {
+    const merged = mergeWithDefaults({
+      advancedLocationEnabled: true,
+      locationOverrides: [
+        {
+          detectedCity: 'Kelowna',
+          city: 'Kelowna Airport',
+          latitude: 49.96,
+          longitude: -119.38,
+        },
+      ],
+      browserGeolocation: {
+        latitude: 50.0,
+        longitude: -119.3,
+        capturedAt: '2026-05-08T11:00:00Z',
+      },
+      locationPermissionAsked: true,
+    });
+    expect(merged.advancedLocationEnabled).toBe(true);
+    expect(merged.locationOverrides).toHaveLength(1);
+    expect(merged.locationOverrides[0]?.city).toBe('Kelowna Airport');
+    expect(merged.browserGeolocation?.capturedAt).toBe('2026-05-08T11:00:00Z');
+    expect(merged.locationPermissionAsked).toBe(true);
+  });
+
+  it('drops malformed locationOverride entries silently', () => {
+    const merged = mergeWithDefaults({
+      locationOverrides: [
+        // valid
+        {
+          detectedCity: 'Kelowna',
+          city: 'Kelowna',
+          latitude: 49.96,
+          longitude: -119.38,
+        },
+        // missing detectedCity
+        { city: 'Bad', latitude: 1, longitude: 2 },
+        // bad lat type
+        { detectedCity: 'X', city: 'X', latitude: 'oops', longitude: 2 },
+        // empty detectedCity
+        { detectedCity: '', city: 'X', latitude: 1, longitude: 2 },
+      ],
+    });
+    expect(merged.locationOverrides).toHaveLength(1);
+    expect(merged.locationOverrides[0]?.detectedCity).toBe('Kelowna');
+  });
+
+  it('rejects malformed browserGeolocation and falls back to null', () => {
+    const merged = mergeWithDefaults({
+      browserGeolocation: {
+        latitude: 'oops',
+        longitude: -119.3,
+        capturedAt: '2026-05-08T11:00:00Z',
+      },
+    });
+    expect(merged.browserGeolocation).toBeNull();
+  });
+
+  it('accepts an explicit null browserGeolocation', () => {
+    const merged = mergeWithDefaults({ browserGeolocation: null });
+    expect(merged.browserGeolocation).toBeNull();
+  });
 });
 
 describe('readSettingsFromFile', () => {

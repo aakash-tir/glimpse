@@ -41,7 +41,15 @@ import {
   WINDOW_MIN_SIZE_PX,
   type ResizeCorner,
 } from '../shared/window-position';
-import type { IconPosition, WindowBounds } from '../shared/settings-store';
+import {
+  removeLocationOverride,
+  upsertLocationOverride,
+  type BrowserGeolocation,
+  type IconPosition,
+  type LocationOverride,
+  type WindowBounds,
+} from '../shared/settings-store';
+import { resolveCoords } from '../shared/location-resolver';
 import type { Mode, ModeChange } from '../shared/mode';
 import { resolveTheme, type ResolvedTheme } from '../shared/theme';
 import { loadSettings, saveSettings } from './settings';
@@ -60,6 +68,10 @@ const dataStore = new DataStore({
   fetchGeolocation,
   fetchForecast,
   fetchKp,
+  // The resolver picks final coords from (override → browser → IP).
+  // Reads current settings each call so changes from the Settings
+  // slide take effect on the very next refresh — no store restart.
+  resolveCoords: (detected) => resolveCoords(detected, loadSettings()),
 });
 const dataScheduler = new TickScheduler(async () => {
   const result = await dataStore.refresh();
@@ -476,6 +488,61 @@ function registerIpc(): void {
   // force a fresh fetch from the Settings slide.
   ipcMain.handle('data:refresh', async () => {
     await dataStore.refresh();
+  });
+
+  // ---- Location override + browser-geolocation IPC ----
+  // All four handlers persist the new settings AND broadcast the
+  // change so the renderer's useSettings() picks it up immediately,
+  // then trigger an immediate weather refresh so the new coords take
+  // effect on the very next tick.
+
+  function broadcastSettings(): void {
+    const settings = loadSettings();
+    iconWindow?.webContents.send('settings:changed', settings);
+  }
+
+  ipcMain.handle(
+    'location:set-override',
+    async (_evt, override: LocationOverride) => {
+      const current = loadSettings();
+      saveSettings({
+        locationOverrides: upsertLocationOverride(
+          current.locationOverrides,
+          override,
+        ),
+      });
+      broadcastSettings();
+      await dataStore.refresh();
+    },
+  );
+
+  ipcMain.handle(
+    'location:clear-override',
+    async (_evt, detectedCity: string) => {
+      const current = loadSettings();
+      saveSettings({
+        locationOverrides: removeLocationOverride(
+          current.locationOverrides,
+          detectedCity,
+        ),
+      });
+      broadcastSettings();
+      await dataStore.refresh();
+    },
+  );
+
+  ipcMain.handle(
+    'location:set-browser-coords',
+    async (_evt, coords: BrowserGeolocation | null) => {
+      saveSettings({ browserGeolocation: coords });
+      broadcastSettings();
+      await dataStore.refresh();
+    },
+  );
+
+  ipcMain.handle('location:mark-permission-asked', () => {
+    saveSettings({ locationPermissionAsked: true });
+    broadcastSettings();
   });
 
   ipcMain.handle('data:get', () => dataStore.getSnapshot());

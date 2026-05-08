@@ -24,6 +24,21 @@ import type { GeolocationResult } from './geolocation';
 import type { KpReading } from './noaa-swpc';
 import type { Forecast } from '../../shared/forecast';
 
+/** Outcome from the coord resolver — see StoreDeps.resolveCoords. */
+export type ResolvedCoords = {
+  /** Coordinates to actually fetch the forecast with. */
+  latitude: number;
+  longitude: number;
+  /**
+   * What to display as the "city" in the snapshot. When an override is
+   * active this is the user-entered city name; otherwise it's the
+   * IP-detected city.
+   */
+  displayCity: string | null;
+  /** Which source ultimately won. Useful for diagnostics + tests. */
+  source: 'override' | 'browser' | 'ip';
+};
+
 export type StoreDeps = {
   fetchGeolocation: () => Promise<GeolocationResult>;
   fetchForecast: (input: {
@@ -31,6 +46,14 @@ export type StoreDeps = {
     longitude: number;
   }) => Promise<Forecast>;
   fetchKp: () => Promise<KpReading>;
+  /**
+   * Resolves the IP-detected location to the coordinates we should
+   * actually fetch with. The host implementation reads current
+   * settings (advancedLocationEnabled, locationOverrides,
+   * browserGeolocation) so the priority logic stays out of the store.
+   * If omitted, the IP-detected coords are used as-is.
+   */
+  resolveCoords?: (detected: GeolocationResult) => ResolvedCoords;
   /** Pluggable for tests. Defaults to the host wall clock. */
   now?: () => Date;
 };
@@ -86,12 +109,28 @@ export class DataStore {
     // exists from an earlier success — the spec says general failure
     // sets errorState; it doesn't require dropping previously-good
     // location data. But on first launch, no location = can't fetch.
+    //
+    // After IP-detection succeeds, resolveCoords (if provided) gets to
+    // pick the actual coords for the forecast fetch — that's where the
+    // user's manual overrides + browser geolocation enter the picture.
+    let detectedCity: string | null = null;
+    let fetchLat = 0;
+    let fetchLon = 0;
     try {
       const fresh = await this.deps.fetchGeolocation();
-      location = {
+      detectedCity = fresh.city;
+      const resolved = this.deps.resolveCoords?.(fresh) ?? {
         latitude: fresh.latitude,
         longitude: fresh.longitude,
-        city: fresh.city,
+        displayCity: fresh.city,
+        source: 'ip' as const,
+      };
+      fetchLat = resolved.latitude;
+      fetchLon = resolved.longitude;
+      location = {
+        latitude: resolved.latitude,
+        longitude: resolved.longitude,
+        city: resolved.displayCity,
       };
     } catch {
       weatherOk = false;
@@ -101,8 +140,8 @@ export class DataStore {
     if (weatherOk && location) {
       try {
         forecast = await this.deps.fetchForecast({
-          latitude: location.latitude,
-          longitude: location.longitude,
+          latitude: fetchLat,
+          longitude: fetchLon,
         });
       } catch {
         weatherOk = false;
@@ -143,6 +182,7 @@ export class DataStore {
 
     const next: DataSnapshot = {
       location,
+      detectedCity: detectedCity ?? this.snapshot.detectedCity,
       forecast,
       kp,
       lastUpdated: weatherOk

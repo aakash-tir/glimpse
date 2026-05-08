@@ -13,6 +13,30 @@ export type WindowBounds = {
   height: number;
 };
 
+/**
+ * A user-supplied location override keyed by the IP-detected city it
+ * applies to. When the IP geolocator reports `detectedCity`, the
+ * data-store substitutes `latitude` / `longitude` for the forecast
+ * fetch (instead of using the IP-detected coords). Travel away → the
+ * override goes dormant because IP-detected city no longer matches.
+ * Travel back → it reactivates automatically.
+ */
+export type LocationOverride = {
+  /** IP-detected city this override applies to (the lookup key). */
+  detectedCity: string;
+  /** User-entered city name. Used for display in the Current slide. */
+  city: string;
+  latitude: number;
+  longitude: number;
+};
+
+export type BrowserGeolocation = {
+  latitude: number;
+  longitude: number;
+  /** ISO timestamp of when the browser geolocation API resolved. */
+  capturedAt: string;
+};
+
 export type Settings = {
   units: Units;
   timeFormat: TimeFormat;
@@ -22,6 +46,33 @@ export type Settings = {
   trackWindowPosition: boolean;
   windowBounds: WindowBounds | null;
   onboardingCompleted: boolean;
+  /**
+   * Toggle for the "Advanced location" Settings section. When false,
+   * any saved overrides are dormant and IP-detected coords (or
+   * cached browser geolocation) drive the forecast. When true and
+   * a matching override exists, the override wins.
+   */
+  advancedLocationEnabled: boolean;
+  /**
+   * Saved overrides per IP-detected city. Kept dormant when
+   * advancedLocationEnabled is false; activated when it's true and
+   * a matching `detectedCity` is present.
+   */
+  locationOverrides: LocationOverride[];
+  /**
+   * Cached coordinates from the browser's `navigator.geolocation`
+   * API. Higher accuracy than IP geolocation but requires user
+   * permission. Used as the second-priority source after explicit
+   * overrides; falls back to IP if null.
+   */
+  browserGeolocation: BrowserGeolocation | null;
+  /**
+   * True once we've shown the first-launch permission prompt at
+   * least once (regardless of allow/deny). Stops the prompt from
+   * re-appearing every launch. The user can re-trigger it from
+   * Settings → "Re-ask location permission".
+   */
+  locationPermissionAsked: boolean;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -33,6 +84,10 @@ export const DEFAULT_SETTINGS: Settings = {
   trackWindowPosition: false,
   windowBounds: null,
   onboardingCompleted: false,
+  advancedLocationEnabled: false,
+  locationOverrides: [],
+  browserGeolocation: null,
+  locationPermissionAsked: false,
 };
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -60,6 +115,28 @@ function isWindowBounds(v: unknown): v is WindowBounds {
     typeof v.height === 'number'
   );
 }
+function isLocationOverride(v: unknown): v is LocationOverride {
+  return (
+    isPlainObject(v) &&
+    typeof v.detectedCity === 'string' &&
+    v.detectedCity.length > 0 &&
+    typeof v.city === 'string' &&
+    typeof v.latitude === 'number' &&
+    Number.isFinite(v.latitude) &&
+    typeof v.longitude === 'number' &&
+    Number.isFinite(v.longitude)
+  );
+}
+function isBrowserGeolocation(v: unknown): v is BrowserGeolocation {
+  return (
+    isPlainObject(v) &&
+    typeof v.latitude === 'number' &&
+    Number.isFinite(v.latitude) &&
+    typeof v.longitude === 'number' &&
+    Number.isFinite(v.longitude) &&
+    typeof v.capturedAt === 'string'
+  );
+}
 
 export function mergeWithDefaults(raw: unknown): Settings {
   const out: Settings = { ...DEFAULT_SETTINGS };
@@ -78,8 +155,77 @@ export function mergeWithDefaults(raw: unknown): Settings {
     out.windowBounds = raw.windowBounds;
   if (typeof raw.onboardingCompleted === 'boolean')
     out.onboardingCompleted = raw.onboardingCompleted;
+  if (typeof raw.advancedLocationEnabled === 'boolean')
+    out.advancedLocationEnabled = raw.advancedLocationEnabled;
+  if (Array.isArray(raw.locationOverrides)) {
+    // Drop malformed entries silently rather than rejecting the whole
+    // settings file — partial recovery is better than wiping the user's
+    // saved cities. Same shape as how iconPosition / windowBounds
+    // tolerate corruption above.
+    out.locationOverrides = raw.locationOverrides.filter(isLocationOverride);
+  }
+  if (
+    raw.browserGeolocation === null ||
+    isBrowserGeolocation(raw.browserGeolocation)
+  )
+    out.browserGeolocation = raw.browserGeolocation;
+  if (typeof raw.locationPermissionAsked === 'boolean')
+    out.locationPermissionAsked = raw.locationPermissionAsked;
 
   return out;
+}
+
+/**
+ * Look up the override that applies to a given IP-detected city. Case-
+ * insensitive match (so "kelowna" / "Kelowna" / "KELOWNA" are the same
+ * key — IP geolocation providers don't always agree on casing).
+ *
+ * Returns null when no override matches OR when overrides are globally
+ * dormant (advancedLocationEnabled === false). The dormant rule lives
+ * here so every caller (data store, Settings UI) gets the same answer
+ * for "is the override active right now?" without each duplicating
+ * the gate.
+ */
+export function findActiveOverride(
+  settings: Settings,
+  detectedCity: string | null,
+): LocationOverride | null {
+  if (!settings.advancedLocationEnabled) return null;
+  if (!detectedCity) return null;
+  const target = detectedCity.toLowerCase();
+  return (
+    settings.locationOverrides.find(
+      (o) => o.detectedCity.toLowerCase() === target,
+    ) ?? null
+  );
+}
+
+/**
+ * Insert or replace the entry for a given detected city. Pure — returns
+ * a new array rather than mutating the input. Case-insensitive on the
+ * detectedCity comparison so we don't end up with "Kelowna" + "kelowna"
+ * as two separate entries.
+ */
+export function upsertLocationOverride(
+  existing: readonly LocationOverride[],
+  next: LocationOverride,
+): LocationOverride[] {
+  const target = next.detectedCity.toLowerCase();
+  const filtered = existing.filter(
+    (o) => o.detectedCity.toLowerCase() !== target,
+  );
+  return [...filtered, next];
+}
+
+/**
+ * Remove the entry for a given detected city. Pure. Case-insensitive.
+ */
+export function removeLocationOverride(
+  existing: readonly LocationOverride[],
+  detectedCity: string,
+): LocationOverride[] {
+  const target = detectedCity.toLowerCase();
+  return existing.filter((o) => o.detectedCity.toLowerCase() !== target);
 }
 
 export function readSettingsFromFile(filePath: string): Settings {

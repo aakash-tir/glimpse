@@ -1,5 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { Settings } from '../shared/settings-store';
+import type {
+  BrowserGeolocation,
+  LocationOverride,
+  Settings,
+} from '../shared/settings-store';
 import type { ScreenPoint } from '../shared/drag';
 import type { Mode, ModeChange } from '../shared/mode';
 import type { ResizeCorner } from '../shared/window-position';
@@ -13,6 +17,14 @@ const api = {
   resetIconPosition: (): Promise<void> =>
     ipcRenderer.invoke('settings:reset-icon-position'),
   refreshData: (): Promise<void> => ipcRenderer.invoke('data:refresh'),
+  setLocationOverride: (override: LocationOverride): Promise<void> =>
+    ipcRenderer.invoke('location:set-override', override),
+  clearLocationOverride: (detectedCity: string): Promise<void> =>
+    ipcRenderer.invoke('location:clear-override', detectedCity),
+  setBrowserCoords: (coords: BrowserGeolocation | null): Promise<void> =>
+    ipcRenderer.invoke('location:set-browser-coords', coords),
+  markLocationPermissionAsked: (): Promise<void> =>
+    ipcRenderer.invoke('location:mark-permission-asked'),
   onSettingsChanged: (cb: (settings: Settings) => void): (() => void) => {
     const handler = (_e: Electron.IpcRendererEvent, settings: Settings): void =>
       cb(settings);

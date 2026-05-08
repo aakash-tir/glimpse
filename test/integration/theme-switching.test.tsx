@@ -30,10 +30,15 @@ const SETTINGS: Settings = {
   trackWindowPosition: false,
   windowBounds: null,
   onboardingCompleted: false,
+  advancedLocationEnabled: false,
+  locationOverrides: [],
+  browserGeolocation: null,
+  locationPermissionAsked: false,
 };
 
 const SNAPSHOT: DataSnapshot = {
   location: null,
+  detectedCity: null,
   forecast: null,
   kp: null,
   lastUpdated: null,
@@ -65,6 +70,10 @@ function installStub(initialTheme: ResolvedTheme = 'dark'): {
     setSettings: vi.fn().mockResolvedValue(SETTINGS),
     resetIconPosition: vi.fn().mockResolvedValue(undefined),
     refreshData: vi.fn().mockResolvedValue(undefined),
+    setLocationOverride: vi.fn().mockResolvedValue(undefined),
+    clearLocationOverride: vi.fn().mockResolvedValue(undefined),
+    setBrowserCoords: vi.fn().mockResolvedValue(undefined),
+    markLocationPermissionAsked: vi.fn().mockResolvedValue(undefined),
     onSettingsChanged: vi.fn().mockReturnValue(() => {}),
     getTheme: vi.fn().mockResolvedValue(initialTheme),
     onThemeChanged: vi.fn((cb: ThemeListener) => {
