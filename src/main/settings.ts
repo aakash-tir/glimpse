@@ -1,11 +1,7 @@
 import { join } from 'node:path';
 import { app } from 'electron';
-import {
-  DEFAULT_SETTINGS,
-  readSettingsFromFile,
-  writeSettingsToFile,
-  type Settings,
-} from '../shared/settings-store';
+import { DEFAULT_SETTINGS, type Settings } from '../shared/settings-store';
+import { readSettingsFromFile, writeSettingsToFile } from './settings-fs';
 
 export type {
   Settings,

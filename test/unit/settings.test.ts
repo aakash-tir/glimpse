@@ -5,10 +5,12 @@ import { join } from 'node:path';
 import {
   DEFAULT_SETTINGS,
   mergeWithDefaults,
-  readSettingsFromFile,
-  writeSettingsToFile,
   type Settings,
 } from '../../src/shared/settings-store';
+import {
+  readSettingsFromFile,
+  writeSettingsToFile,
+} from '../../src/main/settings-fs';
 
 let tmp: string;
 let file: string;

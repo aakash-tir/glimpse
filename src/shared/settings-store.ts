@@ -1,5 +1,7 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+// Pure types + helpers for the persisted settings shape. NO Node
+// built-ins (node:fs / node:path) are imported here so the file is
+// safe for the renderer bundle. File I/O lives in
+// src/main/settings-fs.ts and is consumed only by main.
 
 export type Units = 'metric' | 'imperial';
 export type TimeFormat = '12h' | '24h';
@@ -226,23 +228,4 @@ export function removeLocationOverride(
 ): LocationOverride[] {
   const target = detectedCity.toLowerCase();
   return existing.filter((o) => o.detectedCity.toLowerCase() !== target);
-}
-
-export function readSettingsFromFile(filePath: string): Settings {
-  let raw: unknown;
-  try {
-    const contents = readFileSync(filePath, 'utf-8');
-    raw = JSON.parse(contents);
-  } catch {
-    return { ...DEFAULT_SETTINGS };
-  }
-  return mergeWithDefaults(raw);
-}
-
-export function writeSettingsToFile(
-  filePath: string,
-  settings: Settings,
-): void {
-  mkdirSync(dirname(filePath), { recursive: true });
-  writeFileSync(filePath, JSON.stringify(settings, null, 2), 'utf-8');
 }
