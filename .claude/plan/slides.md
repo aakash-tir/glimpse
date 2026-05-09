@@ -89,13 +89,15 @@ Only shown when ≥ 1 event is active today or calendar-tomorrow (system local t
 
 ### Eclipse
 
-- Type (lunar / solar / partial / total) · start / peak / end times in local time · visibility from user's location (yes / no / partial) · magnitude % if available.
+- Type (lunar / solar / partial / total) · peak time in user's local time (start / end times shown when present in the bundled JSON) · visibility text · magnitude % if available.
+- **Visibility text** is a static string per entry in the bundled JSON (e.g. "Visible from: Americas, Pacific, East Asia"). We don't compute per-user yes/no/partial geometry — the static regions string is a good-enough cue for "does this apply to me?" without dragging in solar-eclipse path-of-totality math or per-user moon-altitude computation. Same handling for blood moon.
 - **Background:** radial gradient `#1a0a0a` (center) → `#2a1010` (edges) — suggests an eclipse silhouette.
 - **Motion:** slow brightness pulse, 4 s period, ±5 % amplitude.
 
 ### Blood moon
 
-- Peak time · visibility info.
+- Title "Blood moon" · peak time in user's local time · visibility text (same static-string approach as eclipse).
+- A blood moon slide appears alongside the eclipse slide whenever a **total lunar eclipse** is active — the totality phase reddens the moon. Each event still gets its own slide.
 - **Background:** linear gradient `#2a0a05` (top) → `#5a1a0a` (bottom) — warmer / oranger than eclipse so the two read differently.
 - **Motion:** slow pulse with subtle color shift toward orange, 5 s period.
 
