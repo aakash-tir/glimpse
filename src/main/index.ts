@@ -486,9 +486,17 @@ function registerIpc(): void {
   });
 
   // M7: Manual refresh — kicks the data scheduler so the user can
-  // force a fresh fetch from the Settings slide.
+  // force a fresh fetch from the Settings slide. Logs both edges so
+  // the manual test can verify the request actually fires (the rest
+  // of the data layer is silent by design).
   ipcMain.handle('data:refresh', async () => {
-    await dataStore.refresh();
+    const startedAt = new Date().toISOString();
+    console.log(`[refresh] started ${startedAt}`);
+    const result = await dataStore.refresh();
+    console.log(
+      `[refresh] finished ${new Date().toISOString()} ` +
+        `weatherOk=${result.weatherOk} noaaOk=${result.noaaOk}`,
+    );
   });
 
   // ---- Location override + browser-geolocation IPC ----
