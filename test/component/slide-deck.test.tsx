@@ -202,4 +202,48 @@ describe('SlideDeck — currently-viewed slide does not shift on visibility chan
     rerender(<SlideDeck events={[]} />);
     expect(getDeck().getAttribute('data-current-slide-id')).toBe('current');
   });
+
+  // Plan/data-sources.md: NOAA failure → eventsHidden flips and is
+  // sticky for the session. The wiring layer (useActiveEvents) maps
+  // that flag to an empty events list, which the deck collapses
+  // without disturbing the user's current slide if it's a non-event
+  // slide.
+  it('events-fetch failure (events list emptied) drops the dot count and hides every event slide', () => {
+    const { rerender } = render(
+      <SlideDeck events={[AURORA_TODAY, PERSEIDS_TODAY]} />,
+    );
+    // 4 static + 2 events = 6 visible slides.
+    expect(getDeck().getAttribute('data-visible-slide-count')).toBe('6');
+
+    // Navigate to the aurora slide so it's actually mounted in the
+    // DOM — front-face only renders the current slide, so we verify
+    // event slides exist by visiting them.
+    fireEvent.click(screen.getByTestId('slide-deck-arrow-next'));
+    fireEvent.click(screen.getByTestId('slide-deck-arrow-next'));
+    fireEvent.click(screen.getByTestId('slide-deck-arrow-next'));
+    expect(getDeck().getAttribute('data-current-slide-id')).toBe(
+      'event:aurora',
+    );
+
+    // Simulated failure: events list collapses to empty mid-session.
+    // The user was on the aurora event slide → reconcile drops them
+    // back to `current` (nearest preceding slide that still exists).
+    rerender(<SlideDeck events={[]} />);
+    expect(getDeck().getAttribute('data-visible-slide-count')).toBe('4');
+    expect(getDeck().getAttribute('data-current-slide-id')).toBe('current');
+    expect(screen.queryByTestId('slide-event:aurora')).toBeNull();
+    expect(screen.queryByTestId('slide-event:meteor:Perseids')).toBeNull();
+  });
+
+  it('events-fetch failure leaves a non-event-current slide untouched', () => {
+    // User is on `today` (index 0) when events are active.
+    const { rerender } = render(
+      <SlideDeck events={[AURORA_TODAY, PERSEIDS_TODAY]} />,
+    );
+    expect(getDeck().getAttribute('data-current-slide-id')).toBe('today');
+    rerender(<SlideDeck events={[]} />);
+    expect(getDeck().getAttribute('data-current-slide-id')).toBe('today');
+    expect(getDeck().getAttribute('data-current-slide-index')).toBe('0');
+    expect(getDeck().getAttribute('data-visible-slide-count')).toBe('4');
+  });
 });
