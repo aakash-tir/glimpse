@@ -4,6 +4,7 @@ import { ICON_SIZE } from '../../../shared/icon-position';
 import { TitleBar } from '../components/title-bar';
 import { useClickClassifier } from '../components/use-click-classifier';
 import { DragModeGlow } from '../components/drag-mode-glow';
+import { LocationPrompt } from '../components/location-prompt';
 import { ResizeHandles } from '../components/resize-handles';
 import { SlideDeck } from '../components/slide-deck';
 import { useDataSnapshot } from '../components/use-data-snapshot';
@@ -245,6 +246,11 @@ export function WindowView({
           separate absolutely-positioned overlay sibling. */}
       {panelInner}
       {dragMode ? <DragModeGlow fill /> : null}
+      {/* First-launch prompt — sits above slide content, below title
+          bar (which auto-reveals on top-edge hover). LocationPrompt
+          renders null when settings.locationPermissionAsked is true,
+          so this layer disappears after the user picks an option. */}
+      <LocationPrompt settings={settings} />
       <TitleBar
         background="dark"
         disabled={dragMode}
