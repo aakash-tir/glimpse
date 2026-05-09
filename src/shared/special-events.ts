@@ -111,9 +111,7 @@ export function localTomorrowYmd(date: Date): string {
   return localYmd(next);
 }
 
-export function computeActiveEvents(
-  input: ComputeEventsInput,
-): SpecialEvent[] {
+export function computeActiveEvents(input: ComputeEventsInput): SpecialEvent[] {
   const events: SpecialEvent[] = [];
 
   // Aurora — today-only. Requires both latitude and Kp.

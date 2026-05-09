@@ -101,9 +101,7 @@ describe('parseEclipses', () => {
   });
 
   it('omits absent optional fields from the parsed entry (no `undefined` keys)', () => {
-    const out = parseEclipses([
-      { date: '2026-02-17', type: 'annular-solar' },
-    ]);
+    const out = parseEclipses([{ date: '2026-02-17', type: 'annular-solar' }]);
     expect(out).toHaveLength(1);
     const keys = Object.keys(out[0]!);
     expect(keys.sort()).toEqual(['date', 'type']);
@@ -114,9 +112,7 @@ describe('eclipseTypeLabel', () => {
   it('renders human-readable titles for every type', () => {
     expect(eclipseTypeLabel('total-lunar')).toBe('Total lunar eclipse');
     expect(eclipseTypeLabel('partial-lunar')).toBe('Partial lunar eclipse');
-    expect(eclipseTypeLabel('penumbral-lunar')).toBe(
-      'Penumbral lunar eclipse',
-    );
+    expect(eclipseTypeLabel('penumbral-lunar')).toBe('Penumbral lunar eclipse');
     expect(eclipseTypeLabel('total-solar')).toBe('Total solar eclipse');
     expect(eclipseTypeLabel('annular-solar')).toBe('Annular solar eclipse');
     expect(eclipseTypeLabel('partial-solar')).toBe('Partial solar eclipse');

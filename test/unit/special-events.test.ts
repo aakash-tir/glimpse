@@ -49,7 +49,9 @@ const TOTAL_SOLAR: Eclipse = {
   magnitude: 1.039,
 };
 
-function baseInput(overrides: Partial<ComputeEventsInput> = {}): ComputeEventsInput {
+function baseInput(
+  overrides: Partial<ComputeEventsInput> = {},
+): ComputeEventsInput {
   return {
     todayLocal: '2026-05-09',
     tomorrowLocal: '2026-05-10',
@@ -129,19 +131,16 @@ describe('computeActiveEvents — detection', () => {
         eclipses: [TOTAL_LUNAR],
       }),
     );
-    expect(out.map((e) => e.type).sort()).toEqual([
-      'blood-moon',
-      'eclipse',
-    ]);
+    expect(out.map((e) => e.type).sort()).toEqual(['blood-moon', 'eclipse']);
   });
 
   it('does not detect aurora when latitude or kp is missing', () => {
-    expect(
-      computeActiveEvents(baseInput({ latitude: null, kp: 9 })),
-    ).toEqual([]);
-    expect(
-      computeActiveEvents(baseInput({ latitude: 60, kp: null })),
-    ).toEqual([]);
+    expect(computeActiveEvents(baseInput({ latitude: null, kp: 9 }))).toEqual(
+      [],
+    );
+    expect(computeActiveEvents(baseInput({ latitude: 60, kp: null }))).toEqual(
+      [],
+    );
   });
 
   it('detects aurora when (lat, kp) crosses the threshold', () => {
@@ -231,9 +230,7 @@ describe('computeActiveEvents — ordering', () => {
       }),
     );
     // Aurora today, then alphabetical (blood-moon, eclipse) tomorrow.
-    expect(
-      out.map((e) => ({ type: e.type, day: e.dayOffset })),
-    ).toEqual([
+    expect(out.map((e) => ({ type: e.type, day: e.dayOffset }))).toEqual([
       { type: 'aurora', day: 0 },
       { type: 'blood-moon', day: 1 },
       { type: 'eclipse', day: 1 },

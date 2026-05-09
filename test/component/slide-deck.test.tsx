@@ -4,14 +4,37 @@ import {
   SlideDeck,
   SLIDE_TRANSITION_DURATION_S,
 } from '../../src/renderer/src/components/slide-deck';
+import type { SpecialEvent } from '../../src/shared/special-events';
 
 afterEach(cleanup);
+
+const AURORA_TODAY: SpecialEvent = {
+  type: 'aurora',
+  id: 'event:aurora',
+  dayOffset: 0,
+  kp: 6,
+  latitude: 60,
+  visibilityText: 'Visible from your location',
+};
+
+const PERSEIDS_TODAY: SpecialEvent = {
+  type: 'meteor',
+  id: 'event:meteor:Perseids',
+  dayOffset: 0,
+  shower: {
+    name: 'Perseids',
+    peakDate: '2026-08-12',
+    zhr: 100,
+    bestViewingTime: 'Late night to pre-dawn',
+    radiantConstellation: 'Perseus',
+  },
+};
 
 function getDeck(): HTMLElement {
   return screen.getByTestId('slide-deck');
 }
 
-describe('SlideDeck — placeholder slide rendering', () => {
+describe('SlideDeck — slide rendering', () => {
   it('renders the today slide first by default (moon + events off)', () => {
     render(<SlideDeck />);
     const deck = getDeck();
@@ -28,44 +51,67 @@ describe('SlideDeck — placeholder slide rendering', () => {
   });
 
   it('renders 4 visible slides with both flags off (no moon, no events)', () => {
-    render(<SlideDeck moonEnabled={false} eventsActive={false} />);
+    render(<SlideDeck moonEnabled={false} events={[]} />);
     expect(getDeck().getAttribute('data-visible-slide-count')).toBe('4');
   });
 
   it('renders 5 visible slides with moon on, events off', () => {
-    render(<SlideDeck moonEnabled eventsActive={false} />);
+    render(<SlideDeck moonEnabled events={[]} />);
     expect(getDeck().getAttribute('data-visible-slide-count')).toBe('5');
   });
 
-  it('renders 5 visible slides with events on, moon off', () => {
-    render(<SlideDeck moonEnabled={false} eventsActive />);
+  it('renders 5 visible slides with one event active, moon off', () => {
+    render(<SlideDeck moonEnabled={false} events={[AURORA_TODAY]} />);
     expect(getDeck().getAttribute('data-visible-slide-count')).toBe('5');
   });
 
-  it('renders all 6 visible slides with both flags on', () => {
-    render(<SlideDeck moonEnabled eventsActive />);
+  it('renders one slide per event when multiple are active', () => {
+    render(<SlideDeck events={[AURORA_TODAY, PERSEIDS_TODAY]} />);
+    // 4 static (no moon) + 2 event = 6.
     expect(getDeck().getAttribute('data-visible-slide-count')).toBe('6');
   });
 
-  it('every distinct slide is uniquely identifiable by testid as it becomes current', () => {
-    const { rerender } = render(<SlideDeck moonEnabled eventsActive />);
+  it('renders all 6 slides with moon on + one event', () => {
+    render(<SlideDeck moonEnabled events={[AURORA_TODAY]} />);
+    expect(getDeck().getAttribute('data-visible-slide-count')).toBe('6');
+  });
+
+  it('every distinct slide is uniquely identifiable as it becomes current', () => {
+    const { rerender } = render(
+      <SlideDeck moonEnabled events={[AURORA_TODAY, PERSEIDS_TODAY]} />,
+    );
     const expectedIds = [
       'today',
       'seven-day',
       'current',
       'moon',
-      'events',
+      'event:aurora',
+      'event:meteor:Perseids',
       'settings',
     ];
     for (let i = 0; i < expectedIds.length; i++) {
       const id = expectedIds[i];
-      // First slide is `today` by default; advance with the next arrow
-      // for every subsequent slide.
       if (i > 0) fireEvent.click(screen.getByTestId('slide-deck-arrow-next'));
-      rerender(<SlideDeck moonEnabled eventsActive />);
-      expect(screen.getByTestId(`slide-${id}`)).toBeInTheDocument();
+      rerender(
+        <SlideDeck moonEnabled events={[AURORA_TODAY, PERSEIDS_TODAY]} />,
+      );
       expect(getDeck().getAttribute('data-current-slide-id')).toBe(id);
+      expect(screen.getByTestId(`slide-${id}`)).toBeInTheDocument();
     }
+  });
+
+  it('event slides render between the moon (or current) slide and settings', () => {
+    render(<SlideDeck moonEnabled events={[AURORA_TODAY]} />);
+    // Advance to the event slide: today → seven-day → current → moon → aurora.
+    for (let i = 0; i < 4; i++) {
+      fireEvent.click(screen.getByTestId('slide-deck-arrow-next'));
+    }
+    expect(getDeck().getAttribute('data-current-slide-id')).toBe(
+      'event:aurora',
+    );
+    // Next arrow → settings (event sits immediately before settings).
+    fireEvent.click(screen.getByTestId('slide-deck-arrow-next'));
+    expect(getDeck().getAttribute('data-current-slide-id')).toBe('settings');
   });
 });
 
@@ -81,7 +127,6 @@ describe('SlideDeck — arrow navigation triggers cube transition', () => {
 
   it('left arrow click retreats the index and sets direction to "prev"', () => {
     render(<SlideDeck />);
-    // Move forward then back so we have a non-trivial prev step.
     fireEvent.click(screen.getByTestId('slide-deck-arrow-next'));
     fireEvent.click(screen.getByTestId('slide-deck-arrow-next'));
     expect(getDeck().getAttribute('data-current-slide-index')).toBe('2');
@@ -92,15 +137,12 @@ describe('SlideDeck — arrow navigation triggers cube transition', () => {
 
   it('right arrow at the last slide wraps to the first (same direction, no reverse-spin)', () => {
     render(<SlideDeck />);
-    // 4 visible slides → click 3 times to reach the last.
     fireEvent.click(screen.getByTestId('slide-deck-arrow-next'));
     fireEvent.click(screen.getByTestId('slide-deck-arrow-next'));
     fireEvent.click(screen.getByTestId('slide-deck-arrow-next'));
     expect(getDeck().getAttribute('data-current-slide-id')).toBe('settings');
     fireEvent.click(screen.getByTestId('slide-deck-arrow-next'));
     expect(getDeck().getAttribute('data-current-slide-id')).toBe('today');
-    // Direction stays 'next' on wrap so the rotateY visual continues
-    // in the click direction (no reverse-spin).
     expect(getDeck().getAttribute('data-direction')).toBe('next');
   });
 
@@ -128,7 +170,6 @@ describe('SlideDeck — arrow navigation triggers cube transition', () => {
 describe('SlideDeck — currently-viewed slide does not shift on visibility change', () => {
   it('user on settings stays on settings when moon turns on (index shifts but slide id is preserved)', () => {
     const { rerender } = render(<SlideDeck moonEnabled={false} />);
-    // Advance to settings (index 3 with 4 visible slides).
     fireEvent.click(screen.getByTestId('slide-deck-arrow-next'));
     fireEvent.click(screen.getByTestId('slide-deck-arrow-next'));
     fireEvent.click(screen.getByTestId('slide-deck-arrow-next'));
@@ -136,28 +177,29 @@ describe('SlideDeck — currently-viewed slide does not shift on visibility chan
     expect(getDeck().getAttribute('data-current-slide-index')).toBe('3');
 
     rerender(<SlideDeck moonEnabled />);
-    // Settings is still visible but its index moved from 3 → 4.
     expect(getDeck().getAttribute('data-current-slide-id')).toBe('settings');
     expect(getDeck().getAttribute('data-current-slide-index')).toBe('4');
   });
 
-  it('user on today stays on today when events turn on (index unchanged, slide id preserved)', () => {
-    const { rerender } = render(<SlideDeck eventsActive={false} />);
+  it('user on today stays on today when an event becomes active', () => {
+    const { rerender } = render(<SlideDeck events={[]} />);
     expect(getDeck().getAttribute('data-current-slide-id')).toBe('today');
-    rerender(<SlideDeck eventsActive />);
+    rerender(<SlideDeck events={[AURORA_TODAY]} />);
     expect(getDeck().getAttribute('data-current-slide-id')).toBe('today');
     expect(getDeck().getAttribute('data-current-slide-index')).toBe('0');
   });
 
-  it('user on events falls back to current when events disappear', () => {
-    const { rerender } = render(<SlideDeck eventsActive />);
-    // 5 visible slides: today, seven-day, current, events, settings.
+  it('user on an event slide falls back to current when events disappear', () => {
+    const { rerender } = render(<SlideDeck events={[AURORA_TODAY]} />);
+    // 5 visible slides: today, seven-day, current, event:aurora, settings.
     fireEvent.click(screen.getByTestId('slide-deck-arrow-next')); // seven-day
     fireEvent.click(screen.getByTestId('slide-deck-arrow-next')); // current
-    fireEvent.click(screen.getByTestId('slide-deck-arrow-next')); // events
-    expect(getDeck().getAttribute('data-current-slide-id')).toBe('events');
+    fireEvent.click(screen.getByTestId('slide-deck-arrow-next')); // event:aurora
+    expect(getDeck().getAttribute('data-current-slide-id')).toBe(
+      'event:aurora',
+    );
 
-    rerender(<SlideDeck eventsActive={false} />);
+    rerender(<SlideDeck events={[]} />);
     expect(getDeck().getAttribute('data-current-slide-id')).toBe('current');
   });
 });
