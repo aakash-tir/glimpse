@@ -10,6 +10,16 @@ import type { ResizeCorner } from '../shared/window-position';
 import type { DataSnapshot } from '../shared/data-snapshot';
 import type { ResolvedTheme } from '../shared/theme';
 
+// Mirrors the GeocodingMatch shape from main/data/geocoding.ts. Kept
+// inline so the preload layer doesn't need to import from main/.
+export type GeocodingMatch = {
+  name: string;
+  latitude: number;
+  longitude: number;
+  country: string | null;
+  admin1: string | null;
+};
+
 const api = {
   getSettings: (): Promise<Settings> => ipcRenderer.invoke('settings:get'),
   setSettings: (patch: Partial<Settings>): Promise<Settings> =>
@@ -25,6 +35,8 @@ const api = {
     ipcRenderer.invoke('location:set-browser-coords', coords),
   markLocationPermissionAsked: (): Promise<void> =>
     ipcRenderer.invoke('location:mark-permission-asked'),
+  geocodeLocation: (name: string): Promise<GeocodingMatch | null> =>
+    ipcRenderer.invoke('location:geocode', name),
   onSettingsChanged: (cb: (settings: Settings) => void): (() => void) => {
     const handler = (_e: Electron.IpcRendererEvent, settings: Settings): void =>
       cb(settings);

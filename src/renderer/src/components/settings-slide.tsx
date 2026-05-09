@@ -1,10 +1,15 @@
 import type { CSSProperties, ReactNode } from 'react';
-import type {
-  Settings,
-  ThemeOverride,
-  TimeFormat,
-  Units,
+import {
+  findActiveOverride,
+  type Settings,
+  type ThemeOverride,
+  type TimeFormat,
+  type Units,
 } from '../../../shared/settings-store';
+import {
+  AdvancedLocation,
+  type AdvancedLocationPalette,
+} from './advanced-location';
 import { useWindowInnerWidth } from './use-window-width';
 
 // Plan/slides.md slide 6 — Settings. Vertical scroll within the slide;
@@ -43,11 +48,18 @@ export type SettingsSlideProps = {
   settings: Settings | null;
   /** When non-null, the row is rendered in light-mode palette. */
   luminance: 'dark' | 'light';
+  /**
+   * IP-detected city from the data snapshot. Used as the lookup key
+   * for the active location override (and as the placeholder city
+   * name in the Advanced location form).
+   */
+  detectedCity?: string | null;
 };
 
 export function SettingsSlide({
   settings,
   luminance,
+  detectedCity = null,
 }: SettingsSlideProps): JSX.Element {
   const windowWidth = useWindowInnerWidth();
   const compact = windowWidth < SETTINGS_COMPACT_THRESHOLD_PX;
@@ -263,6 +275,35 @@ export function SettingsSlide({
               ariaLabel="Track window position"
             />
           </Row>
+
+          {/* Advanced location is hidden in compact mode — its form
+              fields don't fit comfortably below the threshold. The
+              first-launch prompt suggests the user widen the window
+              for setup. The toggle gates the inline form below it. */}
+          {!compact ? (
+            <>
+              <Row
+                label="Advanced location"
+                defaultHint="off"
+                palette={palette}
+              >
+                <Switch
+                  testId="settings-advanced-location"
+                  checked={settings.advancedLocationEnabled}
+                  onChange={(v) => handleSet({ advancedLocationEnabled: v })}
+                  palette={palette}
+                  ariaLabel="Advanced location"
+                />
+              </Row>
+              {settings.advancedLocationEnabled ? (
+                <AdvancedLocation
+                  detectedCity={detectedCity}
+                  currentOverride={findActiveOverride(settings, detectedCity)}
+                  palette={advancedLocationPaletteFor(palette, luminance)}
+                />
+              ) : null}
+            </>
+          ) : null}
 
           <Row label="Reset icon position" palette={palette}>
             <ActionButton
@@ -623,4 +664,33 @@ function Switch({
       />
     </button>
   );
+}
+
+// Maps the SettingsSlide palette into the subset AdvancedLocation
+// needs. Kept as a separate adapter so AdvancedLocation can stay
+// reusable outside of Settings (no Palette dependency).
+function advancedLocationPaletteFor(
+  palette: Palette,
+  luminance: 'dark' | 'light',
+): AdvancedLocationPalette {
+  return {
+    text: palette.text,
+    textMuted: palette.textMuted,
+    inputBg:
+      luminance === 'light'
+        ? 'rgba(255, 255, 255, 0.9)'
+        : 'rgba(0, 0, 0, 0.25)',
+    inputBorder: palette.segBorder,
+    inputText: palette.text,
+    buttonBg: palette.buttonBg,
+    buttonText: palette.buttonText,
+    buttonBorder: palette.buttonBorder,
+    // Same red on both palettes — error visibility shouldn't depend
+    // on theme. Slightly darker on light backgrounds for contrast.
+    errorText:
+      luminance === 'light'
+        ? 'rgba(180, 30, 30, 0.95)'
+        : 'rgba(255, 120, 120, 0.95)',
+    divider: palette.divider,
+  };
 }

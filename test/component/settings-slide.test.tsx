@@ -95,7 +95,8 @@ describe('SettingsSlide — control reads', () => {
     expect(trackWindow.getAttribute('data-checked')).toBe('on');
   });
 
-  it('lists rows in the spec-required order', () => {
+  it('lists rows in the spec-required order (wide mode includes Advanced location)', () => {
+    // jsdom default 1024 px → wide mode → Advanced location row visible.
     render(<SettingsSlide settings={buildSettings()} luminance="dark" />);
     const rows = screen.getAllByTestId('settings-row');
     const labels = rows.map((r) => r.getAttribute('data-row-label'));
@@ -105,6 +106,7 @@ describe('SettingsSlide — control reads', () => {
       'Moon-phase slide',
       'Theme',
       'Track window position',
+      'Advanced location',
       'Reset icon position',
       'Manual refresh',
       'Replay tutorial',
@@ -337,8 +339,9 @@ describe('SettingsSlide — default-value hints in row labels', () => {
   it('renders the bracketed hint text alongside the row label', () => {
     render(<SettingsSlide settings={buildSettings()} luminance="dark" />);
     const hints = screen.getAllByTestId('settings-row-default-hint');
-    // 5 switchable rows → 5 hint elements.
-    expect(hints).toHaveLength(5);
+    // 6 switchable rows in wide mode (Units, Time, Moon, Theme,
+    // Track window, Advanced location).
+    expect(hints).toHaveLength(6);
     const texts = hints.map((h) => h.textContent);
     expect(texts).toContain('(metric)');
     expect(texts).toContain('(12 h)');
@@ -501,6 +504,70 @@ describe('SettingsSlide — compact mode (narrow window)', () => {
     // Currently auto + resolved-light → switch off → click flips to dark.
     fireEvent.click(screen.getByTestId('settings-theme'));
     expect(stub.setSettings).toHaveBeenCalledWith({ themeOverride: 'dark' });
+  });
+});
+
+describe('SettingsSlide — Advanced location toggle visibility', () => {
+  it('is hidden in compact mode (form fields too cramped below threshold)', () => {
+    setWindowWidth(SETTINGS_COMPACT_THRESHOLD_PX - 40);
+    installStub();
+    render(<SettingsSlide settings={buildSettings()} luminance="dark" />);
+    expect(
+      screen.queryByTestId('settings-advanced-location'),
+    ).not.toBeInTheDocument();
+    setWindowWidth(1024);
+  });
+
+  it('is visible in wide mode', () => {
+    render(<SettingsSlide settings={buildSettings()} luminance="dark" />);
+    expect(
+      screen.getByTestId('settings-advanced-location'),
+    ).toBeInTheDocument();
+  });
+
+  it('expands the form below it when the toggle is on', () => {
+    render(
+      <SettingsSlide
+        settings={buildSettings({ advancedLocationEnabled: true })}
+        luminance="dark"
+        detectedCity="Kelowna"
+      />,
+    );
+    expect(screen.getByTestId('advanced-location')).toBeInTheDocument();
+  });
+
+  it('hides the form when the toggle is off', () => {
+    render(
+      <SettingsSlide
+        settings={buildSettings({ advancedLocationEnabled: false })}
+        luminance="dark"
+        detectedCity="Kelowna"
+      />,
+    );
+    expect(screen.queryByTestId('advanced-location')).not.toBeInTheDocument();
+  });
+
+  it('passes the active override to the form when the user has saved one', () => {
+    render(
+      <SettingsSlide
+        settings={buildSettings({
+          advancedLocationEnabled: true,
+          locationOverrides: [
+            {
+              detectedCity: 'Kelowna',
+              city: 'Kelowna Airport',
+              latitude: 49.96,
+              longitude: -119.38,
+            },
+          ],
+        })}
+        luminance="dark"
+        detectedCity="Kelowna"
+      />,
+    );
+    expect(
+      (screen.getByTestId('advanced-location-city') as HTMLInputElement).value,
+    ).toBe('Kelowna Airport');
   });
 });
 

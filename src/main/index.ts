@@ -9,6 +9,7 @@ import {
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { fetchGeolocation } from './data/geolocation';
+import { geocodeByName, type GeocodingMatch } from './data/geocoding';
 import { fetchForecast } from './data/open-meteo';
 import { fetchKp } from './data/noaa-swpc';
 import { DataStore } from './data/store';
@@ -544,6 +545,16 @@ function registerIpc(): void {
     saveSettings({ locationPermissionAsked: true });
     broadcastSettings();
   });
+
+  // Forward-geocoding for the Advanced location form. Returns null
+  // when the city isn't found; throws on network failure so the
+  // renderer can show "couldn't find it" vs "couldn't reach server".
+  ipcMain.handle(
+    'location:geocode',
+    async (_evt, name: string): Promise<GeocodingMatch | null> => {
+      return geocodeByName(name);
+    },
+  );
 
   ipcMain.handle('data:get', () => dataStore.getSnapshot());
 

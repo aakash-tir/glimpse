@@ -56,6 +56,7 @@ export function WindowView({
   const forecast = snapshot?.forecast ?? null;
   const location = snapshot?.location ?? null;
   const lastUpdated = snapshot?.lastUpdated ?? null;
+  const detectedCity = snapshot?.detectedCity ?? null;
   // Live moon-phase reading; recomputes once per minute (much finer
   // than the ~28-day cycle). Drives the M7 moon-phase slide.
   const moonPhase = useMoonPhase();
@@ -218,6 +219,7 @@ export function WindowView({
         themeMode={resolvedTheme}
         location={location}
         lastUpdated={lastUpdated}
+        detectedCity={detectedCity}
       />
     </motion.div>
   );

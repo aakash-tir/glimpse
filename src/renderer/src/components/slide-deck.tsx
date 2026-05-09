@@ -153,6 +153,12 @@ export type SlideDeckProps = {
   // current data is.
   location?: DataLocation | null;
   lastUpdated?: string | null;
+  /**
+   * IP-detected city — lookup key for the active location override
+   * in the Settings → Advanced location form. May differ from
+   * `location.city` when an override is active.
+   */
+  detectedCity?: string | null;
 };
 
 type Transition = {
@@ -171,6 +177,7 @@ export function SlideDeck({
   settings = null,
   location = null,
   lastUpdated = null,
+  detectedCity = null,
 }: SlideDeckProps): JSX.Element {
   const visibleSlides = useMemo(
     () => computeVisibleSlides({ moonEnabled, eventsActive }),
@@ -370,6 +377,7 @@ export function SlideDeck({
           settings={settings}
           location={location}
           lastUpdated={lastUpdated}
+          detectedCity={detectedCity}
         />
         {transition && sideFaceSide ? (
           <SlideFace
@@ -384,6 +392,7 @@ export function SlideDeck({
             settings={settings}
             location={location}
             lastUpdated={lastUpdated}
+            detectedCity={detectedCity}
           />
         ) : null}
       </motion.div>
@@ -454,6 +463,7 @@ type SlideFaceProps = {
   settings: Settings | null;
   location: DataLocation | null;
   lastUpdated: string | null;
+  detectedCity: string | null;
 };
 
 function SlideFace({
@@ -468,6 +478,7 @@ function SlideFace({
   settings,
   location,
   lastUpdated,
+  detectedCity,
 }: SlideFaceProps): JSX.Element {
   const meta = SLIDE_META[slideId];
   const bg = meta.background(themeMode);
@@ -490,6 +501,7 @@ function SlideFace({
     settings,
     location,
     lastUpdated,
+    detectedCity,
     luminance: bg.luminance,
     label: meta.label,
   });
@@ -550,6 +562,7 @@ function renderSlideBody({
   settings,
   location,
   lastUpdated,
+  detectedCity,
   luminance,
   label,
 }: {
@@ -561,6 +574,7 @@ function renderSlideBody({
   settings: Settings | null;
   location: DataLocation | null;
   lastUpdated: string | null;
+  detectedCity: string | null;
   luminance: SlideBackgroundLuminance;
   label: string;
 }): JSX.Element | string {
@@ -582,7 +596,13 @@ function renderSlideBody({
     case 'moon':
       return <MoonSlide phase={moonPhase} />;
     case 'settings':
-      return <SettingsSlide settings={settings} luminance={luminance} />;
+      return (
+        <SettingsSlide
+          settings={settings}
+          luminance={luminance}
+          detectedCity={detectedCity}
+        />
+      );
     default:
       return label;
   }
