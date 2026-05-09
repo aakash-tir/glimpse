@@ -161,7 +161,7 @@
 
 ## M7 — Slides: Current conditions + Moon phase + Settings
 
-**Status:** Not started
+**Status:** Done (2026-05-09)
 
 **Scope.** Build the static-layout slides plus the settings UI and live theme switching.
 

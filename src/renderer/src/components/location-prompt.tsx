@@ -96,10 +96,13 @@ const overlayStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  // Above slide content (z-index 1-5) but below the auto-revealed
-  // title bar so the user can still close the app via the × button
-  // while the prompt is up.
-  zIndex: 50,
+  // Above slide content (z-index 1-5) but below the title bar
+  // (z-index 10) and resize handles (z-index 20). This keeps the
+  // × / minimize buttons reachable on top-edge hover and lets the
+  // user resize the window with the prompt still open. The dim
+  // colour at 60% opacity already conveys "modal" without needing
+  // to literally block every other surface.
+  zIndex: 8,
   padding: 12,
   boxSizing: 'border-box',
 };

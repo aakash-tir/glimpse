@@ -103,14 +103,16 @@ describe('LocationPrompt — actions', () => {
 });
 
 describe('LocationPrompt — z-index', () => {
-  it('sits above slide content (z-index ≥ 50)', () => {
+  it('sits above slide content (z-index > 5) but below the title bar (z-index 10) and resize handles (z-index 20)', () => {
     render(
       <LocationPrompt
         settings={settings({ locationPermissionAsked: false })}
       />,
     );
     const overlay = screen.getByTestId('location-prompt') as HTMLElement;
-    expect(Number(overlay.style.zIndex)).toBeGreaterThanOrEqual(50);
+    const z = Number(overlay.style.zIndex);
+    expect(z).toBeGreaterThan(5);
+    expect(z).toBeLessThan(10);
   });
 });
 

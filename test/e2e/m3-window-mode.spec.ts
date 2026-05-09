@@ -1,7 +1,7 @@
 import { test, expect, _electron as electron } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
 import { spawn } from 'node:child_process';
-import { rmSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -19,10 +19,24 @@ async function launch(): Promise<ElectronApplication> {
 // %APPDATA%\Glimpse\settings.json, which leaks state into later tests
 // since Electron always reads the same path. Tests that need a clean
 // slate call this before launching.
+//
+// We don't fully delete the file: a fresh-defaults profile would
+// trigger the M7 first-launch location prompt, whose overlay sits
+// over the slide deck and blocks panel interactions like drag /
+// resize. Pre-setting locationPermissionAsked = true skips the
+// prompt without changing any of the icon / window-mode behaviours
+// these tests are actually exercising.
 function resetSettings(): void {
   const appData = process.env['APPDATA'];
   if (!appData) return;
-  rmSync(join(appData, 'Glimpse', 'settings.json'), { force: true });
+  const path = join(appData, 'Glimpse', 'settings.json');
+  rmSync(path, { force: true });
+  mkdirSync(join(appData, 'Glimpse'), { recursive: true });
+  writeFileSync(
+    path,
+    JSON.stringify({ locationPermissionAsked: true }),
+    'utf-8',
+  );
 }
 
 async function spawnSecondInstance(): Promise<void> {
