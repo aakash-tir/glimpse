@@ -1,7 +1,15 @@
-import { app, BrowserWindow, ipcMain, powerMonitor, screen } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  ipcMain,
+  nativeTheme,
+  powerMonitor,
+  screen,
+} from 'electron';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { fetchGeolocation } from './data/geolocation';
+import { geocodeByName, type GeocodingMatch } from './data/geocoding';
 import { fetchForecast } from './data/open-meteo';
 import { fetchKp } from './data/noaa-swpc';
 import { DataStore } from './data/store';
@@ -34,8 +42,17 @@ import {
   WINDOW_MIN_SIZE_PX,
   type ResizeCorner,
 } from '../shared/window-position';
-import type { IconPosition, WindowBounds } from '../shared/settings-store';
+import {
+  removeLocationOverride,
+  upsertLocationOverride,
+  type BrowserGeolocation,
+  type IconPosition,
+  type LocationOverride,
+  type WindowBounds,
+} from '../shared/settings-store';
+import { resolveCoords } from '../shared/location-resolver';
 import type { Mode, ModeChange } from '../shared/mode';
+import { resolveTheme, type ResolvedTheme } from '../shared/theme';
 import { loadSettings, saveSettings } from './settings';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -52,6 +69,10 @@ const dataStore = new DataStore({
   fetchGeolocation,
   fetchForecast,
   fetchKp,
+  // The resolver picks final coords from (override → browser → IP).
+  // Reads current settings each call so changes from the Settings
+  // slide take effect on the very next refresh — no store restart.
+  resolveCoords: (detected) => resolveCoords(detected, loadSettings()),
 });
 const dataScheduler = new TickScheduler(async () => {
   const result = await dataStore.refresh();
@@ -426,9 +447,114 @@ function collapseToIcon(opts: CollapseOpts = {}): ModeChange {
   return payload;
 }
 
+function currentResolvedTheme(): ResolvedTheme {
+  const settings = loadSettings();
+  return resolveTheme(settings.themeOverride, nativeTheme.shouldUseDarkColors);
+}
+
 function registerIpc(): void {
   ipcMain.handle('settings:get', () => loadSettings());
-  ipcMain.handle('settings:set', (_evt, patch) => saveSettings(patch));
+  ipcMain.handle('settings:set', (_evt, patch) => {
+    const prevOverride = loadSettings().themeOverride;
+    const next = saveSettings(patch);
+    // Broadcast so every renderer-side reader (window-view's units /
+    // time-format / moon toggles, etc.) updates live without each one
+    // re-fetching. Settings changes from the Settings slide are the
+    // primary trigger for this push.
+    iconWindow?.webContents.send('settings:changed', next);
+    // If the user changed their themeOverride, push the newly-resolved
+    // theme too so the SlideDeck cross-fade fires immediately rather
+    // than waiting for the next nativeTheme.updated event.
+    if (next.themeOverride !== prevOverride) {
+      iconWindow?.webContents.send('theme:changed', currentResolvedTheme());
+    }
+    return next;
+  });
+
+  ipcMain.handle('theme:get', () => currentResolvedTheme());
+
+  // M7: Reset icon position — clears persisted iconPosition AND moves
+  // the window back to the default top-right corner. The settings
+  // write is broadcast so Settings slide updates its own state.
+  ipcMain.handle('settings:reset-icon-position', () => {
+    const next = saveSettings({ iconPosition: null });
+    iconWindow?.webContents.send('settings:changed', next);
+    if (iconWindow && mode === 'icon') {
+      const def = defaultIconPosition(primaryBounds());
+      applyIconPosition(def);
+    }
+  });
+
+  // M7: Manual refresh — kicks the data scheduler so the user can
+  // force a fresh fetch from the Settings slide.
+  ipcMain.handle('data:refresh', async () => {
+    await dataStore.refresh();
+  });
+
+  // ---- Location override + browser-geolocation IPC ----
+  // All four handlers persist the new settings AND broadcast the
+  // change so the renderer's useSettings() picks it up immediately,
+  // then trigger an immediate weather refresh so the new coords take
+  // effect on the very next tick.
+
+  function broadcastSettings(): void {
+    const settings = loadSettings();
+    iconWindow?.webContents.send('settings:changed', settings);
+  }
+
+  ipcMain.handle(
+    'location:set-override',
+    async (_evt, override: LocationOverride) => {
+      const current = loadSettings();
+      saveSettings({
+        locationOverrides: upsertLocationOverride(
+          current.locationOverrides,
+          override,
+        ),
+      });
+      broadcastSettings();
+      await dataStore.refresh();
+    },
+  );
+
+  ipcMain.handle(
+    'location:clear-override',
+    async (_evt, detectedCity: string) => {
+      const current = loadSettings();
+      saveSettings({
+        locationOverrides: removeLocationOverride(
+          current.locationOverrides,
+          detectedCity,
+        ),
+      });
+      broadcastSettings();
+      await dataStore.refresh();
+    },
+  );
+
+  ipcMain.handle(
+    'location:set-browser-coords',
+    async (_evt, coords: BrowserGeolocation | null) => {
+      saveSettings({ browserGeolocation: coords });
+      broadcastSettings();
+      await dataStore.refresh();
+    },
+  );
+
+  ipcMain.handle('location:mark-permission-asked', () => {
+    saveSettings({ locationPermissionAsked: true });
+    broadcastSettings();
+  });
+
+  // Forward-geocoding for the Advanced location form. Returns null
+  // when the city isn't found; throws on network failure so the
+  // renderer can show "couldn't find it" vs "couldn't reach server".
+  ipcMain.handle(
+    'location:geocode',
+    async (_evt, name: string): Promise<GeocodingMatch | null> => {
+      return geocodeByName(name);
+    },
+  );
 
   ipcMain.handle('data:get', () => dataStore.getSnapshot());
 
@@ -713,6 +839,16 @@ if (!gotLock) {
     // Fire an extra refresh on resume if the system slept past at
     // least one tick window — see TickScheduler.notifyResume.
     powerMonitor.on('resume', () => dataScheduler.notifyResume());
+
+    // Live theme switching: push the resolved theme any time the host
+    // OS toggles dark mode (or any other native-theme attribute the
+    // user might bind a system-wide hotkey to). When the user has
+    // themeOverride='auto' this is what keeps the Settings slide in
+    // sync with Windows; when override is locked light/dark the push
+    // still fires but the resolved value won't change.
+    nativeTheme.on('updated', () => {
+      iconWindow?.webContents.send('theme:changed', currentResolvedTheme());
+    });
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createIconWindow();

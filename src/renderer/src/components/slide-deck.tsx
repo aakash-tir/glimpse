@@ -8,8 +8,14 @@ import {
 } from 'react';
 import { motion, useAnimationControls } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import type { MoonPhase } from '../../../shared/astro';
+import type { DataLocation } from '../../../shared/data-snapshot';
 import type { Forecast } from '../../../shared/forecast';
-import type { TimeFormat } from '../../../shared/settings-store';
+import type {
+  Settings,
+  TimeFormat,
+  Units,
+} from '../../../shared/settings-store';
 import {
   computeVisibleSlides,
   reconcileCurrentSlideIndex,
@@ -17,6 +23,9 @@ import {
   type SlideId,
   type WrapDirection,
 } from '../../../shared/slides';
+import { CurrentSlide } from './current-slide';
+import { MoonSlide } from './moon-slide';
+import { SettingsSlide } from './settings-slide';
 import { SevenDaySlide } from './seven-day-slide';
 import {
   SlideIndicator,
@@ -28,6 +37,12 @@ import { TodaySlide } from './today-slide';
 // in the direction of the arrow click. No reverse-spin on wrap (loops
 // continue in click direction)."
 export const SLIDE_TRANSITION_DURATION_S = 0.5;
+
+// Plan/styling.md: "Theme switches use a 200 ms cross-fade between
+// palettes." Applied to the slide-face background + foreground when
+// the SlideDeck's themeMode prop changes (or, transitively, when
+// useResolvedTheme pushes a new value).
+export const THEME_TRANSITION_DURATION_S = 0.2;
 
 // Title bar trigger zone sits at the top, dot indicator hugs the
 // bottom; slide content reserves space for both so placeholder text
@@ -121,6 +136,29 @@ export type SlideDeckProps = {
   // User's 12 h / 24 h preference. Forwarded to TodaySlide for the
   // hourly time labels.
   timeFormat?: TimeFormat;
+  // Metric / imperial unit preference. Forwarded to CurrentSlide for
+  // wind speed + feels-like temperature unit suffix.
+  units?: Units;
+  // Current moon phase (computed via SunCalc in the host view). Null
+  // while waiting for the initial useEffect to fire — MoonSlide shows
+  // a loading skeleton in that brief window.
+  moonPhase?: MoonPhase | null;
+  // Full settings snapshot, forwarded to the Settings slide so each
+  // control can show its current value. Null until useSettings()
+  // resolves on first mount.
+  settings?: Settings | null;
+  // Geolocation + last-updated timestamp from the data snapshot,
+  // surfaced as a small subtitle on the Current slide so the user
+  // can verify where Open-Meteo geolocated to and how fresh the
+  // current data is.
+  location?: DataLocation | null;
+  lastUpdated?: string | null;
+  /**
+   * IP-detected city — lookup key for the active location override
+   * in the Settings → Advanced location form. May differ from
+   * `location.city` when an override is active.
+   */
+  detectedCity?: string | null;
 };
 
 type Transition = {
@@ -134,6 +172,12 @@ export function SlideDeck({
   themeMode = 'dark',
   forecast = null,
   timeFormat = '24h',
+  units = 'metric',
+  moonPhase = null,
+  settings = null,
+  location = null,
+  lastUpdated = null,
+  detectedCity = null,
 }: SlideDeckProps): JSX.Element {
   const visibleSlides = useMemo(
     () => computeVisibleSlides({ moonEnabled, eventsActive }),
@@ -292,6 +336,7 @@ export function SlideDeck({
       data-current-slide-index={String(safeIndex)}
       data-visible-slide-count={String(visibleSlides.length)}
       data-direction={direction}
+      data-theme-mode={themeMode}
       data-transition-duration-s={String(SLIDE_TRANSITION_DURATION_S)}
       style={{
         position: 'absolute',
@@ -327,6 +372,12 @@ export function SlideDeck({
           deckWidth={deckWidth}
           forecast={forecast}
           timeFormat={timeFormat}
+          units={units}
+          moonPhase={moonPhase}
+          settings={settings}
+          location={location}
+          lastUpdated={lastUpdated}
+          detectedCity={detectedCity}
         />
         {transition && sideFaceSide ? (
           <SlideFace
@@ -336,6 +387,12 @@ export function SlideDeck({
             deckWidth={deckWidth}
             forecast={forecast}
             timeFormat={timeFormat}
+            units={units}
+            moonPhase={moonPhase}
+            settings={settings}
+            location={location}
+            lastUpdated={lastUpdated}
+            detectedCity={detectedCity}
           />
         ) : null}
       </motion.div>
@@ -401,6 +458,12 @@ type SlideFaceProps = {
   deckWidth: number;
   forecast: Forecast | null;
   timeFormat: TimeFormat;
+  units: Units;
+  moonPhase: MoonPhase | null;
+  settings: Settings | null;
+  location: DataLocation | null;
+  lastUpdated: string | null;
+  detectedCity: string | null;
 };
 
 function SlideFace({
@@ -410,6 +473,12 @@ function SlideFace({
   deckWidth,
   forecast,
   timeFormat,
+  units,
+  moonPhase,
+  settings,
+  location,
+  lastUpdated,
+  detectedCity,
 }: SlideFaceProps): JSX.Element {
   const meta = SLIDE_META[slideId];
   const bg = meta.background(themeMode);
@@ -421,30 +490,43 @@ function SlideFace({
         ? `rotateY(90deg) translateZ(${halfW}px)`
         : `rotateY(-90deg) translateZ(${halfW}px)`;
 
-  // M6 wires the today + seven-day slides to real forecast data. The
-  // remaining slides (current, moon, events, settings) keep their M4
-  // placeholder label until their respective milestones land.
+  // M6 wires the today + seven-day slides; M7 adds current + moon +
+  // settings. The events slide keeps its M4 placeholder label until M8.
   const body = renderSlideBody({
     slideId,
     forecast,
     timeFormat,
+    units,
+    moonPhase,
+    settings,
+    location,
+    lastUpdated,
+    detectedCity,
+    luminance: bg.luminance,
     label: meta.label,
   });
 
+  const textColor =
+    bg.luminance === 'light'
+      ? 'rgba(15, 23, 42, 0.85)'
+      : 'rgba(255, 255, 255, 0.85)';
+
   return (
-    <div
+    <motion.div
       data-testid={`slide-${slideId}`}
       data-slide-id={slideId}
       data-slide-luminance={bg.luminance}
       data-slide-face={face}
+      data-theme-transition-duration-s={String(THEME_TRANSITION_DURATION_S)}
+      // Plan/styling.md: theme switches cross-fade between palettes
+      // over 200 ms. Animating both background + text color in sync
+      // keeps adaptive luminance text from snapping while the panel
+      // fades.
+      animate={{ backgroundColor: bg.color, color: textColor }}
+      transition={{ duration: THEME_TRANSITION_DURATION_S, ease: 'easeOut' }}
       style={{
         position: 'absolute',
         inset: 0,
-        background: bg.color,
-        color:
-          bg.luminance === 'light'
-            ? 'rgba(15, 23, 42, 0.85)'
-            : 'rgba(255, 255, 255, 0.85)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -467,7 +549,7 @@ function SlideFace({
       }}
     >
       {body}
-    </div>
+    </motion.div>
   );
 }
 
@@ -475,11 +557,25 @@ function renderSlideBody({
   slideId,
   forecast,
   timeFormat,
+  units,
+  moonPhase,
+  settings,
+  location,
+  lastUpdated,
+  detectedCity,
+  luminance,
   label,
 }: {
   slideId: SlideId;
   forecast: Forecast | null;
   timeFormat: TimeFormat;
+  units: Units;
+  moonPhase: MoonPhase | null;
+  settings: Settings | null;
+  location: DataLocation | null;
+  lastUpdated: string | null;
+  detectedCity: string | null;
+  luminance: SlideBackgroundLuminance;
   label: string;
 }): JSX.Element | string {
   switch (slideId) {
@@ -487,6 +583,26 @@ function renderSlideBody({
       return <TodaySlide forecast={forecast} timeFormat={timeFormat} />;
     case 'seven-day':
       return <SevenDaySlide forecast={forecast} />;
+    case 'current':
+      return (
+        <CurrentSlide
+          forecast={forecast}
+          timeFormat={timeFormat}
+          units={units}
+          location={location}
+          lastUpdated={lastUpdated}
+        />
+      );
+    case 'moon':
+      return <MoonSlide phase={moonPhase} />;
+    case 'settings':
+      return (
+        <SettingsSlide
+          settings={settings}
+          luminance={luminance}
+          detectedCity={detectedCity}
+        />
+      );
     default:
       return label;
   }

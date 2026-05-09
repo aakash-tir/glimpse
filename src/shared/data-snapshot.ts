@@ -15,6 +15,15 @@ export type DataErrorState = 'ok' | 'error';
 export type DataSnapshot = {
   /** Last successful geolocation. null until the first successful fetch. */
   location: DataLocation | null;
+  /**
+   * The IP-detected city from the most recent geolocation, regardless
+   * of whether a user override is active. The Settings UI uses this
+   * to decide which override entry (if any) is being edited — the
+   * override list is keyed by detected city, so `location.city` (which
+   * may be the user-entered city when an override is active) isn't
+   * the right key to look up.
+   */
+  detectedCity: string | null;
   /** Last successful forecast. null until the first successful fetch. */
   forecast: Forecast | null;
   /** Latest Kp from NOAA, null while unset or after an SWPC failure. */
@@ -44,6 +53,7 @@ export type DataSnapshot = {
 
 export const EMPTY_SNAPSHOT: DataSnapshot = {
   location: null,
+  detectedCity: null,
   forecast: null,
   kp: null,
   lastUpdated: null,

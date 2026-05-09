@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import type { TimeFormat } from '../../../shared/settings-store';
 import { ICON_SIZE } from '../../../shared/icon-position';
 import { TitleBar } from '../components/title-bar';
 import { useClickClassifier } from '../components/use-click-classifier';
 import { DragModeGlow } from '../components/drag-mode-glow';
+import { LocationPrompt } from '../components/location-prompt';
 import { ResizeHandles } from '../components/resize-handles';
 import { SlideDeck } from '../components/slide-deck';
 import { useDataSnapshot } from '../components/use-data-snapshot';
+import { useMoonPhase } from '../components/use-moon-phase';
+import { useResolvedTheme } from '../components/use-resolved-theme';
+import { useSettings } from '../components/use-settings';
 
 // Plan/styling.md: "Window open / close: scale animation, 200 ms
 // ease-out, anchored at the icon's position."
@@ -39,20 +42,29 @@ export function WindowView({
   enterBounds,
 }: WindowViewProps): JSX.Element {
   const [collapse, setCollapse] = useState<CollapseRequest | null>(null);
-  // Moon-phase slide visibility flag, sourced from settings on mount.
-  // M4 only wires this read path; the toggle in the Settings slide
-  // lands in M7. Events visibility is hard-coded false at M4 and
-  // becomes data-driven in M5 / M8.
-  const [moonEnabled, setMoonEnabled] = useState(false);
-  // 12 h / 24 h preference for the M6 hourly slide's time labels.
-  // Sourced from settings on mount; live updates land in M7 alongside
-  // the Settings-slide toggle.
-  const [timeFormat, setTimeFormat] = useState<TimeFormat>('24h');
+  // Live settings stream — pushed to every slide that depends on
+  // user preferences. Each settings:set in main triggers a broadcast
+  // that updates this hook, so the moon-phase visibility, time format,
+  // units, etc. all stay in sync without per-consumer re-fetching.
+  const settings = useSettings();
+  const moonEnabled = settings?.moonPhaseSlideEnabled ?? false;
+  const timeFormat = settings?.timeFormat ?? '24h';
+  const units = settings?.units ?? 'metric';
   // Forecast snapshot streamed from main via the data-snapshot hook.
   // Null while the first fetch is in flight — slide content components
   // swap in a loading skeleton in that case.
   const snapshot = useDataSnapshot();
   const forecast = snapshot?.forecast ?? null;
+  const location = snapshot?.location ?? null;
+  const lastUpdated = snapshot?.lastUpdated ?? null;
+  const detectedCity = snapshot?.detectedCity ?? null;
+  // Live moon-phase reading; recomputes once per minute (much finer
+  // than the ~28-day cycle). Drives the M7 moon-phase slide.
+  const moonPhase = useMoonPhase();
+  // Resolved theme (light / dark) — pushed from main on settings or
+  // nativeTheme changes. Drives the Settings slide background palette
+  // and the slide-indicator dot color.
+  const resolvedTheme = useResolvedTheme();
   // Hides the panel + title bar in the brief window between the scale
   // animation finishing and `mode:changed` arriving from main. Without
   // this, the BrowserWindow resizes to icon-mode bounds while WindowView
@@ -99,22 +111,6 @@ export function WindowView({
     },
     onDoubleClick: handlePanelDoubleClick,
   });
-
-  // Pull moon-phase visibility + time format from persisted settings on
-  // mount. Live updates from the Settings slide arrive in M7.
-  useEffect(() => {
-    let cancelled = false;
-    const api = window.glimpse;
-    if (!api) return;
-    void api.getSettings().then((settings) => {
-      if (cancelled) return;
-      setMoonEnabled(settings.moonPhaseSlideEnabled);
-      setTimeFormat(settings.timeFormat);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // Window blur exits drag mode (the user's focus moved elsewhere).
   useEffect(() => {
@@ -218,6 +214,13 @@ export function WindowView({
         eventsActive={false}
         forecast={forecast}
         timeFormat={timeFormat}
+        units={units}
+        moonPhase={moonPhase}
+        settings={settings}
+        themeMode={resolvedTheme}
+        location={location}
+        lastUpdated={lastUpdated}
+        detectedCity={detectedCity}
       />
     </motion.div>
   );
@@ -243,6 +246,11 @@ export function WindowView({
           separate absolutely-positioned overlay sibling. */}
       {panelInner}
       {dragMode ? <DragModeGlow fill /> : null}
+      {/* First-launch prompt — sits above slide content, below title
+          bar (which auto-reveals on top-edge hover). LocationPrompt
+          renders null when settings.locationPermissionAsked is true,
+          so this layer disappears after the user picks an option. */}
+      <LocationPrompt settings={settings} />
       <TitleBar
         background="dark"
         disabled={dragMode}

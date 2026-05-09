@@ -188,3 +188,53 @@ describe('DataStore — NOAA failure → eventsHidden (sticky), other data unaff
     expect(snap.kp).toBe(6);
   });
 });
+
+describe('DataStore — resolveCoords dep (location-priority handoff)', () => {
+  it('uses the resolver coords for the forecast fetch when provided', async () => {
+    const deps = makeDeps();
+    const store = new DataStore({
+      ...deps,
+      resolveCoords: () => ({
+        latitude: 49.96,
+        longitude: -119.38,
+        displayCity: 'Kelowna Airport',
+        source: 'override',
+      }),
+    });
+    await store.refresh();
+    expect(deps.fetchForecast).toHaveBeenCalledWith({
+      latitude: 49.96,
+      longitude: -119.38,
+    });
+  });
+
+  it('snapshots the resolver displayCity onto location.city, but exposes the IP-detected city separately', async () => {
+    const deps = makeDeps();
+    const store = new DataStore({
+      ...deps,
+      resolveCoords: () => ({
+        latitude: 49.96,
+        longitude: -119.38,
+        displayCity: 'Kelowna Airport',
+        source: 'override',
+      }),
+    });
+    await store.refresh();
+    const snap = store.getSnapshot();
+    expect(snap.location?.city).toBe('Kelowna Airport');
+    // detectedCity is always the IP-detected city, regardless of override.
+    expect(snap.detectedCity).toBe('Fairbanks');
+  });
+
+  it('falls back to IP-detected coords when no resolver is provided', async () => {
+    const deps = makeDeps();
+    const store = new DataStore(deps);
+    await store.refresh();
+    expect(deps.fetchForecast).toHaveBeenCalledWith({
+      latitude: 65,
+      longitude: -150,
+    });
+    expect(store.getSnapshot().location?.city).toBe('Fairbanks');
+    expect(store.getSnapshot().detectedCity).toBe('Fairbanks');
+  });
+});

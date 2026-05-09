@@ -25,12 +25,22 @@ type GlimpseStub = {
   resizeEnd: ReturnType<typeof vi.fn>;
   getSettings: ReturnType<typeof vi.fn>;
   setSettings: ReturnType<typeof vi.fn>;
+  resetIconPosition: ReturnType<typeof vi.fn>;
+  refreshData: ReturnType<typeof vi.fn>;
+  setLocationOverride: ReturnType<typeof vi.fn>;
+  clearLocationOverride: ReturnType<typeof vi.fn>;
+  setBrowserCoords: ReturnType<typeof vi.fn>;
+  markLocationPermissionAsked: ReturnType<typeof vi.fn>;
+  onSettingsChanged: ReturnType<typeof vi.fn>;
+  getTheme: ReturnType<typeof vi.fn>;
+  onThemeChanged: ReturnType<typeof vi.fn>;
   getData: ReturnType<typeof vi.fn>;
   onDataChanged: ReturnType<typeof vi.fn>;
 };
 
 const STUB_SNAPSHOT = {
   location: null,
+  detectedCity: null,
   forecast: null,
   kp: null,
   lastUpdated: null,
@@ -43,6 +53,10 @@ const STUB_SETTINGS = {
   units: 'metric',
   timeFormat: '24h',
   iconPosition: null,
+  advancedLocationEnabled: false,
+  locationOverrides: [],
+  browserGeolocation: null,
+  locationPermissionAsked: false,
   moonPhaseSlideEnabled: false,
   themeOverride: 'auto',
   trackWindowPosition: false,
@@ -66,6 +80,15 @@ function installGlimpseStub(): GlimpseStub {
     resizeEnd: vi.fn(),
     getSettings: vi.fn().mockResolvedValue(STUB_SETTINGS),
     setSettings: vi.fn().mockResolvedValue(STUB_SETTINGS),
+    resetIconPosition: vi.fn().mockResolvedValue(undefined),
+    refreshData: vi.fn().mockResolvedValue(undefined),
+    setLocationOverride: vi.fn().mockResolvedValue(undefined),
+    clearLocationOverride: vi.fn().mockResolvedValue(undefined),
+    setBrowserCoords: vi.fn().mockResolvedValue(undefined),
+    markLocationPermissionAsked: vi.fn().mockResolvedValue(undefined),
+    onSettingsChanged: vi.fn().mockReturnValue(() => {}),
+    getTheme: vi.fn().mockResolvedValue('dark'),
+    onThemeChanged: vi.fn().mockReturnValue(() => {}),
     getData: vi.fn().mockResolvedValue(STUB_SNAPSHOT),
     onDataChanged: vi.fn().mockReturnValue(() => {}),
   };

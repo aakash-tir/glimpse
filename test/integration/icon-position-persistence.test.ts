@@ -2,11 +2,11 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DEFAULT_SETTINGS } from '../../src/shared/settings-store';
 import {
-  DEFAULT_SETTINGS,
   readSettingsFromFile,
   writeSettingsToFile,
-} from '../../src/shared/settings-store';
+} from '../../src/main/settings-fs';
 import {
   defaultIconPosition,
   resolveIconPosition,
