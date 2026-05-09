@@ -119,6 +119,18 @@ const cardStyle: CSSProperties = {
   // Cap so the card stays readable in very wide windows without
   // stretching across the entire panel.
   maxWidth: 280,
+  // Cap height to the overlay's content area so the card never
+  // overflows the panel. The overlay itself uses padding: 12 +
+  // box-sizing border-box, so 100% here resolves to (panel − 24 px).
+  // overflowY: auto kicks in only when the card's intrinsic content
+  // height exceeds that cap — fully visible content stays still, an
+  // overflowing prompt becomes scrollable. Scrollbar is hidden via
+  // scrollbar-width: none (same trick the Settings slide uses).
+  maxHeight: '100%',
+  overflowY: 'auto',
+  overflowX: 'hidden',
+  scrollbarWidth: 'none',
+  msOverflowStyle: 'none',
   // Shadow gives the card lift over the dimmed deck.
   boxShadow: '0 8px 24px rgba(0, 0, 0, 0.45)',
 };

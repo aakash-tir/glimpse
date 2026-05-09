@@ -113,3 +113,29 @@ describe('LocationPrompt — z-index', () => {
     expect(Number(overlay.style.zIndex)).toBeGreaterThanOrEqual(50);
   });
 });
+
+describe('LocationPrompt — fits-or-scrolls layout', () => {
+  it('caps the card at the overlay height and scrolls only when overflowing', () => {
+    render(
+      <LocationPrompt
+        settings={settings({ locationPermissionAsked: false })}
+      />,
+    );
+    const card = screen.getByTestId('location-prompt-card') as HTMLElement;
+    // overflowY: auto means the browser shows a scrollbar only when
+    // the card's content actually exceeds maxHeight. When everything
+    // fits, the card renders normally with no scroll affordance.
+    expect(card.style.overflowY).toBe('auto');
+    expect(card.style.maxHeight).toBe('100%');
+  });
+
+  it('hides the native scrollbar when scrolling is necessary', () => {
+    render(
+      <LocationPrompt
+        settings={settings({ locationPermissionAsked: false })}
+      />,
+    );
+    const card = screen.getByTestId('location-prompt-card') as HTMLElement;
+    expect(card.style.scrollbarWidth).toBe('none');
+  });
+});
