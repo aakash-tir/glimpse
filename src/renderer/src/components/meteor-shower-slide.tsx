@@ -11,20 +11,31 @@
 //
 // The star field is generated once at mount with a deterministic seed
 // derived from the shower name so re-renders / cube transitions don't
-// reshuffle the points (which would read as twinkling, which the spec
-// does not call for). The shooting star is a single absolutely-
-// positioned line driven by Framer Motion's repeat loop with a delay
-// gap that produces the ~1-every-6 s cadence. Tests don't drive the
-// animation — they assert the duration / cadence values via data
-// attributes.
+// reshuffle the points (only their brightness twinkles — see below).
+// Each star slowly breathes between its base opacity and ~30 % of it
+// over a 10 s cycle, starting at a random phase so the field shimmers
+// instead of pulsing in unison. The shooting star fires ~once every 6 s;
+// each fire picks a fresh random trajectory — a random point on one
+// window edge to a random point on the opposite edge — so it streaks
+// across the pane at a random angle and exits the far side. A timer
+// bumps a counter every interval; the streak element is keyed on that
+// counter so it remounts and replays with the new trajectory. Tests
+// don't drive the animation — they assert the duration / cadence
+// values via data attributes.
 
 import { motion } from 'framer-motion';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { MeteorEvent } from '../../../shared/special-events';
 import { EventSlideShell } from './event-slide-shell';
 
 const BG_COLOR = '#0a0a1f';
 const STAR_COUNT = 36;
+// Each star breathes between its base opacity and ~30 % of it over
+// this period. Every star gets a random phase offset (see
+// generateStars / twinkleKeyframes) so they start at different points
+// in the cycle and the field shimmers instead of pulsing in unison.
+export const STAR_TWINKLE_PERIOD_S = 10;
+const STAR_TWINKLE_DIM = 0.3; // floor brightness as a fraction of base
 export const SHOOTING_STAR_DURATION_S = 0.6;
 export const SHOOTING_STAR_INTERVAL_S = 6;
 
@@ -97,8 +108,9 @@ function MeteorBackground({
           background: BG_COLOR,
         }}
       />
-      {/* Static star field. SVG so the points scale with the slide
-          and stay sharp at any window size. */}
+      {/* Star field — fixed positions, slowly twinkling brightness.
+          SVG so the points scale with the slide and stay sharp at any
+          window size. */}
       <svg
         data-testid="meteor-star-field"
         data-star-count={String(stars.length)}
@@ -113,51 +125,97 @@ function MeteorBackground({
         aria-hidden="true"
       >
         {stars.map((s, i) => (
-          <circle
+          <motion.path
             key={i}
-            cx={s.x}
-            cy={s.y}
-            r={s.r}
+            data-star=""
+            data-cx={s.x}
+            d={sparklePath(s.x, s.y, s.r)}
             fill="white"
-            opacity={s.opacity}
+            animate={{ opacity: twinkleKeyframes(s.opacity, s.phase) }}
+            transition={{
+              duration: STAR_TWINKLE_PERIOD_S,
+              repeat: Infinity,
+              ease: 'linear',
+            }}
           />
         ))}
       </svg>
-      {/* Shooting star: a single thin line that streaks across the
-          slide every ~6 s. Animated x/opacity via Framer Motion. */}
-      <motion.div
-        data-testid="meteor-shooting-star"
-        data-shooting-duration-s={String(SHOOTING_STAR_DURATION_S)}
-        data-shooting-interval-s={String(SHOOTING_STAR_INTERVAL_S)}
-        animate={{
-          x: ['-20%', '120%'],
-          opacity: [0, 1, 0],
-        }}
-        transition={{
-          duration: SHOOTING_STAR_DURATION_S,
-          ease: 'easeOut',
-          times: [0, 0.6, 1],
-          repeat: Infinity,
-          // Repeat-delay produces the gap between streaks. With a
-          // 0.6 s active streak and a 5.4 s gap, a new streak starts
-          // every ~6 s on average per the spec.
-          repeatDelay: SHOOTING_STAR_INTERVAL_S - SHOOTING_STAR_DURATION_S,
-        }}
-        style={{
-          position: 'absolute',
-          // Mid-upper third of the slide so the streak doesn't cross
-          // the centered content.
-          top: '28%',
-          left: 0,
-          width: '12%',
-          height: 1.5,
-          background:
-            'linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.95) 100%)',
-          borderRadius: 2,
-          boxShadow: '0 0 6px rgba(255, 255, 255, 0.4)',
-        }}
-      />
+      {/* Shooting star: a streak that crosses the pane edge-to-edge at
+          a random angle, re-randomized each fire. Sits behind the
+          content layer (zIndex 0) so it never obscures the text. */}
+      <ShootingStar />
     </>
+  );
+}
+
+type Trajectory = {
+  start: { x: number; y: number };
+  end: { x: number; y: number };
+};
+
+// A random straight crossing: a random point on one window edge to a
+// random point on the OPPOSITE edge (percentages of the slide). The
+// differing positions along the two edges give a random angle.
+function randomTrajectory(): Trajectory {
+  const r = (): number => Math.random() * 100;
+  switch (Math.floor(Math.random() * 4)) {
+    case 0:
+      return { start: { x: 0, y: r() }, end: { x: 100, y: r() } }; // L→R
+    case 1:
+      return { start: { x: 100, y: r() }, end: { x: 0, y: r() } }; // R→L
+    case 2:
+      return { start: { x: r(), y: 0 }, end: { x: r(), y: 100 } }; // T→B
+    default:
+      return { start: { x: r(), y: 100 }, end: { x: r(), y: 0 } }; // B→T
+  }
+}
+
+function ShootingStar(): JSX.Element {
+  // Each interval picks a fresh trajectory and bumps the remount key so
+  // the streak replays from the new start point.
+  const [fire, setFire] = useState(() => ({ n: 0, traj: randomTrajectory() }));
+  useEffect(() => {
+    const id = setInterval(
+      () => setFire((f) => ({ n: f.n + 1, traj: randomTrajectory() })),
+      SHOOTING_STAR_INTERVAL_S * 1000,
+    );
+    return () => clearInterval(id);
+  }, []);
+
+  const { start, end } = fire.traj;
+  // Angle of travel so the streak's bright head (gradient's right end)
+  // leads in the direction of motion.
+  const angle = (Math.atan2(end.y - start.y, end.x - start.x) * 180) / Math.PI;
+  const mid = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
+
+  return (
+    <motion.div
+      key={fire.n}
+      data-testid="meteor-shooting-star"
+      data-shooting-duration-s={String(SHOOTING_STAR_DURATION_S)}
+      data-shooting-interval-s={String(SHOOTING_STAR_INTERVAL_S)}
+      initial={{ left: `${start.x}%`, top: `${start.y}%`, opacity: 0 }}
+      animate={{
+        left: [`${start.x}%`, `${mid.x}%`, `${end.x}%`],
+        top: [`${start.y}%`, `${mid.y}%`, `${end.y}%`],
+        opacity: [0, 1, 0],
+      }}
+      transition={{ duration: SHOOTING_STAR_DURATION_S, ease: 'easeOut' }}
+      style={{
+        position: 'absolute',
+        width: '15%',
+        height: 1.5,
+        // x/y centre the streak on (left, top); rotate aims it along
+        // the travel direction. transform-origin defaults to centre.
+        x: '-50%',
+        y: '-50%',
+        rotate: angle,
+        background:
+          'linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.95) 100%)',
+        borderRadius: 2,
+        boxShadow: '0 0 6px rgba(255, 255, 255, 0.4)',
+      }}
+    />
   );
 }
 
@@ -166,6 +224,8 @@ type StarPoint = {
   y: number;
   r: number;
   opacity: number;
+  /** Random start position in the twinkle cycle, 0..1. */
+  phase: number;
 };
 
 /**
@@ -173,21 +233,94 @@ type StarPoint = {
  * Seed is the shower name so cube transitions / re-renders preserve
  * the layout instead of reshuffling.
  */
+// Minimum gap (in viewBox units) kept between two sparkles on top of
+// the sum of their spike radii, so even the tips never touch.
+const STAR_MIN_GAP = 0.8;
+// Cap on resample attempts per star before we give up and place it
+// anyway. The field is sparse enough that this is effectively never
+// hit; the cap only guards against a pathological infinite loop.
+const STAR_PLACE_ATTEMPTS = 60;
+
 function generateStars(seed: string): StarPoint[] {
   const rand = mulberry32(hashSeed(seed));
   const out: StarPoint[] = [];
   for (let i = 0; i < STAR_COUNT; i++) {
-    out.push({
-      x: rand() * 100,
-      y: rand() * 100,
-      // 0.4 → 0.9 SVG units inside a 100×100 viewBox. With
-      // preserveAspectRatio="none" the rendered radii scale with the
-      // slide; on a default ~240 px window that's ~1–2 px on screen.
-      r: 0.4 + rand() * 0.5,
-      opacity: 0.4 + rand() * 0.5,
-    });
+    // Size first — the overlap test needs the radius. Spike length
+    // (outer radius) in 100×100 viewBox units; cubed random biases
+    // toward small stars with a few prominent ones (real-sky look).
+    // The window is square-locked (M3) so preserveAspectRatio="none"
+    // keeps the sparkles symmetric.
+    const r = 0.6 + Math.pow(rand(), 2.5) * 0.7;
+    const opacity = 0.45 + rand() * 0.5;
+    let x = rand() * 100;
+    let y = rand() * 100;
+    for (
+      let attempt = 1;
+      attempt < STAR_PLACE_ATTEMPTS && overlapsAny(x, y, r, out);
+      attempt++
+    ) {
+      x = rand() * 100;
+      y = rand() * 100;
+    }
+    // Random point in the twinkle cycle so stars don't pulse together.
+    const phase = rand();
+    out.push({ x, y, r, opacity, phase });
   }
   return out;
+}
+
+// Phase-shifted twinkle keyframes for one star: a cosine sampled over
+// a full cycle starting at `phase`, oscillating between `base` opacity
+// and STAR_TWINKLE_DIM × base. Cosine is periodic so the first and
+// last samples match → seamless `repeat: Infinity` loop, and the
+// per-star phase makes each begin at a different brightness.
+function twinkleKeyframes(base: number, phase: number): number[] {
+  const STEPS = 12;
+  const dim = base * STAR_TWINKLE_DIM;
+  const mid = (base + dim) / 2;
+  const amp = (base - dim) / 2;
+  const kf: number[] = [];
+  for (let i = 0; i <= STEPS; i++) {
+    kf.push(mid + amp * Math.cos(2 * Math.PI * (phase + i / STEPS)));
+  }
+  return kf;
+}
+
+// True if a candidate star at (x, y) with spike radius r would touch
+// any already-placed star (centre distance < r1 + r2 + gap).
+function overlapsAny(
+  x: number,
+  y: number,
+  r: number,
+  placed: readonly StarPoint[],
+): boolean {
+  return placed.some((s) => {
+    const minDist = r + s.r + STAR_MIN_GAP;
+    const dx = x - s.x;
+    const dy = y - s.y;
+    return dx * dx + dy * dy < minDist * minDist;
+  });
+}
+
+// 4-point sparkle ("twinkle") star path centred at (cx, cy). `tip` is
+// the spike length (outer radius); the inner valley radius is a small
+// fraction of it so the four spikes taper to sharp points — the look
+// of the reference night-sky art rather than a plain dot.
+function sparklePath(cx: number, cy: number, tip: number): string {
+  const inner = tip * 0.28;
+  const d = inner * Math.SQRT1_2;
+  const r = (n: number): number => Math.round(n * 1000) / 1000;
+  const p = (x: number, y: number): string => `${r(x)} ${r(y)}`;
+  return (
+    `M ${p(cx, cy - tip)} ` +
+    `L ${p(cx + d, cy - d)} ` +
+    `L ${p(cx + tip, cy)} ` +
+    `L ${p(cx + d, cy + d)} ` +
+    `L ${p(cx, cy + tip)} ` +
+    `L ${p(cx - d, cy + d)} ` +
+    `L ${p(cx - tip, cy)} ` +
+    `L ${p(cx - d, cy - d)} Z`
+  );
 }
 
 // 32-bit hash of a string. Used purely as a seed for mulberry32 so the

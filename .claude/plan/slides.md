@@ -84,8 +84,8 @@ Only shown when ≥ 1 event is active today or calendar-tomorrow (system local t
 ### Meteor shower
 
 - Name (e.g. "Perseids") · peak date · expected ZHR (zenith hourly rate) · best viewing time.
-- **Background:** solid `#0a0a1f` (near-black indigo) + 30 – 40 small static white star points scattered across the slide (1 – 2 px, varied opacity).
-- **Motion:** occasional shooting star, roughly 1 every 6 s, ~0.6 s trajectory, fades at end.
+- **Background:** solid `#0a0a1f` (near-black indigo) + 30 – 40 small white 4-point sparkle stars scattered across the slide at fixed (non-overlapping) positions (varied size & opacity — mostly faint, a few prominent — sized by a cubed-random bias). Each star slowly twinkles, breathing between its base opacity and ~30 % of it over a ~10 s cycle, each starting at a random phase so the field shimmers rather than pulsing in unison.
+- **Motion:** occasional shooting star, roughly 1 every 6 s, ~0.6 s trajectory, fades at end. Each fire crosses the pane in a straight line from a random point on one window edge to a random point on the opposite edge (random angle), re-randomized per fire.
 
 ### Eclipse
 

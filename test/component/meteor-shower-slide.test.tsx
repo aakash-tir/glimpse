@@ -72,7 +72,8 @@ describe('MeteorShowerSlide — background + motion', () => {
     const count = Number(field.getAttribute('data-star-count'));
     expect(count).toBeGreaterThanOrEqual(30);
     expect(count).toBeLessThanOrEqual(40);
-    expect(field.querySelectorAll('circle').length).toBe(count);
+    // Each star is a 4-point sparkle <path> (data-star), not a circle.
+    expect(field.querySelectorAll('path[data-star]').length).toBe(count);
   });
 
   it('produces a deterministic star field across re-renders (seeded by name)', () => {
@@ -80,14 +81,14 @@ describe('MeteorShowerSlide — background + motion', () => {
     const firstX = Array.from(
       screen
         .getByTestId('meteor-star-field')
-        .querySelectorAll<SVGCircleElement>('circle'),
-    ).map((c) => c.getAttribute('cx'));
+        .querySelectorAll<SVGPathElement>('path[data-star]'),
+    ).map((c) => c.getAttribute('data-cx'));
     rerender(<MeteorShowerSlide event={PERSEIDS_TODAY} />);
     const secondX = Array.from(
       screen
         .getByTestId('meteor-star-field')
-        .querySelectorAll<SVGCircleElement>('circle'),
-    ).map((c) => c.getAttribute('cx'));
+        .querySelectorAll<SVGPathElement>('path[data-star]'),
+    ).map((c) => c.getAttribute('data-cx'));
     expect(secondX).toEqual(firstX);
   });
 
