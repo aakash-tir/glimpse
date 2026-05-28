@@ -13,6 +13,7 @@
 // motion.div so jsdom (used in component tests) just records the
 // intended values without trying to drive a real animation loop.
 
+import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import type { AuroraEvent } from '../../../shared/special-events';
 import type { TimeFormat } from '../../../shared/settings-store';
@@ -93,10 +94,50 @@ export function AuroraSlide({
   );
 }
 
+// Builds a randomized wandering keyframe path for a drifting ribbon.
+// x/y meander through `waypoints` pseudo-random offsets so the sheen
+// crosses the window unpredictably rather than on a fixed line. The
+// last keyframe is forced equal to the first so `repeat: Infinity`
+// loops seamlessly with no snap. Generated once per mount (useMemo) so
+// each time the aurora slide appears the path is different, but stable
+// across re-renders.
+function useDriftPath(
+  waypoints: number,
+  xAmp: number,
+  yAmp: number,
+): {
+  x: string[];
+  y: string[];
+  opacity: number[];
+} {
+  return useMemo(() => {
+    const rand = (min: number, max: number): number =>
+      Math.random() * (max - min) + min;
+    const x: string[] = [];
+    const y: string[] = [];
+    const opacity: number[] = [];
+    for (let i = 0; i < waypoints; i++) {
+      x.push(`${rand(-xAmp, xAmp).toFixed(1)}%`);
+      y.push(`${rand(-yAmp, yAmp).toFixed(1)}%`);
+      opacity.push(Number(rand(0.55, 1).toFixed(2)));
+    }
+    x.push(x[0]!);
+    y.push(y[0]!);
+    opacity.push(opacity[0]!);
+    return { x, y, opacity };
+  }, [waypoints, xAmp, yAmp]);
+}
+
 function AuroraBackground(): JSX.Element {
+  // Modest drift: hotspots wander but each radial is large enough that
+  // its transparent falloff always lands OUTSIDE the window (see the
+  // -70% insets below), so the wash covers every edge at all drift
+  // extremes — no internal dark rim, no hard clip line.
+  const teal = useDriftPath(6, 14, 10);
+  const violet = useDriftPath(6, 14, 10);
   return (
     <>
-      {/* Base gradient: stays at full opacity. */}
+      {/* Base gradient: stays at full opacity, full-bleed. */}
       <div
         data-testid="aurora-bg-gradient"
         style={{
@@ -105,27 +146,54 @@ function AuroraBackground(): JSX.Element {
           background: BG_GRADIENT,
         }}
       />
-      {/* Shimmer overlay: a translucent diagonal sheen that oscillates
-          its opacity between 0.85 and 1.0. The shimmer color leans
-          toward the violet end so it reads as a soft aurora ribbon
-          drifting across the gradient. */}
-      <motion.div
-        data-testid="aurora-shimmer"
-        data-shimmer-duration-s={String(AURORA_SHIMMER_DURATION_S)}
-        animate={{ opacity: [0.85, 1, 0.85] }}
-        transition={{
-          duration: AURORA_SHIMMER_DURATION_S,
-          repeat: Infinity,
-          ease: 'easeInOut',
-        }}
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background:
-            'radial-gradient(120% 60% at 50% 30%, rgba(120, 220, 180, 0.18) 0%, rgba(120, 220, 180, 0) 70%)',
-          mixBlendMode: 'screen',
-        }}
-      />
+      {/* Shimmer layer — clipped to the window so the aurora is always
+          bound by the pane. Each ribbon's radial is far larger than the
+          window (inset -70%) and fades to transparent only well beyond
+          the frame, so inside the pane the wash is everywhere non-zero
+          and only its bright field shifts as the hotspots drift. */}
+      <div
+        data-testid="aurora-shimmer-clip"
+        style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}
+      >
+        {/* Primary teal ribbon — hotspot biased to the upper-left. */}
+        <motion.div
+          data-testid="aurora-shimmer"
+          data-shimmer-duration-s={String(AURORA_SHIMMER_DURATION_S)}
+          animate={{ opacity: teal.opacity, x: teal.x, y: teal.y }}
+          transition={{
+            duration: AURORA_SHIMMER_DURATION_S,
+            repeat: Infinity,
+            ease: 'easeInOut',
+          }}
+          style={{
+            position: 'absolute',
+            inset: '-70%',
+            background:
+              'radial-gradient(55% 55% at 45% 38%, rgba(120, 220, 180, 0.42) 0%, rgba(120, 220, 180, 0) 90%)',
+            mixBlendMode: 'screen',
+          }}
+        />
+        {/* Second, violet-leaning ribbon — hotspot biased to the
+            lower-right and on its own independent random path, so the
+            two cross unpredictably for a layered, living-curtain look
+            while together blanketing the whole pane. */}
+        <motion.div
+          data-testid="aurora-shimmer-2"
+          animate={{ opacity: violet.opacity, x: violet.x, y: violet.y }}
+          transition={{
+            duration: AURORA_SHIMMER_DURATION_S,
+            repeat: Infinity,
+            ease: 'easeInOut',
+          }}
+          style={{
+            position: 'absolute',
+            inset: '-70%',
+            background:
+              'radial-gradient(55% 55% at 58% 60%, rgba(150, 120, 230, 0.34) 0%, rgba(150, 120, 230, 0) 90%)',
+            mixBlendMode: 'screen',
+          }}
+        />
+      </div>
     </>
   );
 }
