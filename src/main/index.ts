@@ -51,6 +51,7 @@ import {
   type WindowBounds,
 } from '../shared/settings-store';
 import { resolveCoords } from '../shared/location-resolver';
+import { onboardingWindowBounds } from '../shared/onboarding-window';
 import type { Mode, ModeChange } from '../shared/mode';
 import { resolveTheme, type ResolvedTheme } from '../shared/theme';
 import { loadSettings, saveSettings } from './settings';
@@ -59,6 +60,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 let iconWindow: BrowserWindow | null = null;
 let mode: Mode = 'icon';
+// True while the first-launch onboarding tutorial is running. When set,
+// the single window is sized to the onboarding panel (½-display-height,
+// top-right) and the renderer shows the OnboardingController instead of
+// the icon / window view.
+let onboardingActive = false;
 
 // Data layer — composed at app.whenReady so the constructors don't
 // run during test imports of this module. The store fans out to the
@@ -96,18 +102,28 @@ function allDisplayBounds(): DisplayBounds[] {
 
 function createIconWindow(): void {
   const settings = loadSettings();
+  // First launch (or never-completed): start in the onboarding panel.
+  onboardingActive = !settings.onboardingCompleted;
   const iconPos = resolveIconPosition(
     settings.iconPosition,
     primaryBounds(),
     allDisplayBounds(),
   );
   const winPos = windowPositionForIcon(iconPos);
+  const initial = onboardingActive
+    ? onboardingWindowBounds(primaryBounds())
+    : {
+        x: winPos.x,
+        y: winPos.y,
+        width: ICON_WINDOW_WIDTH,
+        height: ICON_WINDOW_HEIGHT,
+      };
 
   iconWindow = new BrowserWindow({
-    width: ICON_WINDOW_WIDTH,
-    height: ICON_WINDOW_HEIGHT,
-    x: winPos.x,
-    y: winPos.y,
+    width: initial.width,
+    height: initial.height,
+    x: initial.x,
+    y: initial.y,
     frame: false,
     transparent: true,
     resizable: false,
@@ -140,6 +156,8 @@ function createIconWindow(): void {
 
 function snapBackIfOffScreen(): void {
   if (!iconWindow) return;
+  // While onboarding owns the window bounds, leave them alone.
+  if (onboardingActive) return;
   // Display changes only re-anchor the icon; if the user is currently in
   // window mode we leave the panel where it is (the user is actively
   // looking at it). The next collapse will pick a sensible icon
@@ -555,6 +573,36 @@ function registerIpc(): void {
       return geocodeByName(name);
     },
   );
+
+  // ---- Onboarding ----
+  // Synchronous getter so the renderer can decide at first paint.
+  ipcMain.on('onboarding:get-sync', (evt) => {
+    evt.returnValue = onboardingActive;
+  });
+  // Finish (skip or complete): persist the flag and transition the
+  // window out of the onboarding panel back to the icon at the default
+  // top-right. (Landing 'complete' on the Settings slide is refined in
+  // a later commit; reason is intentionally ignored for now.)
+  ipcMain.handle('onboarding:finish', () => {
+    if (!onboardingActive) return;
+    onboardingActive = false;
+    const next = saveSettings({ onboardingCompleted: true });
+    iconWindow?.webContents.send('settings:changed', next);
+    if (!iconWindow) return;
+    mode = 'icon';
+    const def = defaultIconPosition(primaryBounds());
+    applyIconPosition(def);
+    const newBounds: WindowBounds = {
+      x: def.x - ICON_OFFSET_X,
+      y: def.y - ICON_OFFSET_Y,
+      width: ICON_WINDOW_WIDTH,
+      height: ICON_WINDOW_HEIGHT,
+    };
+    iconWindow.webContents.send(
+      'mode:changed',
+      modeChangePayload('icon', newBounds, null),
+    );
+  });
 
   ipcMain.handle('data:get', () => dataStore.getSnapshot());
 

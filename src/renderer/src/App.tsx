@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { Mode, ModeChange } from '../../shared/mode';
 import { IconView } from './views/icon-view';
 import { WindowView } from './views/window-view';
+import { OnboardingController } from './components/onboarding-controller';
 
 // Top-level mode router. Mode is owned by main; the renderer just
 // listens for transitions and swaps between views. The initial mode is
@@ -18,6 +19,11 @@ export function App(): JSX.Element {
     width: number;
     height: number;
   } | null>(null);
+  // Read synchronously at first paint so the icon view never flashes
+  // inside the larger onboarding panel.
+  const [onboarding, setOnboarding] = useState<boolean>(
+    () => window.glimpse?.isOnboardingActive() ?? false,
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -37,6 +43,9 @@ export function App(): JSX.Element {
     };
   }, []);
 
+  if (onboarding) {
+    return <OnboardingController onFinish={() => setOnboarding(false)} />;
+  }
   if (mode === 'window') {
     return <WindowView enterAnchor={enterAnchor} enterBounds={enterBounds} />;
   }

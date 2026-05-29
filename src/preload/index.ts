@@ -9,6 +9,7 @@ import type { Mode, ModeChange } from '../shared/mode';
 import type { ResizeCorner } from '../shared/window-position';
 import type { DataSnapshot } from '../shared/data-snapshot';
 import type { ResolvedTheme } from '../shared/theme';
+import type { OnboardingFinishReason } from '../shared/onboarding';
 
 // Mirrors the GeocodingMatch shape from main/data/geocoding.ts. Kept
 // inline so the preload layer doesn't need to import from main/.
@@ -84,6 +85,14 @@ const api = {
       ipcRenderer.off('theme:changed', handler);
     };
   },
+  // ---- Onboarding ----
+  // Synchronous so the renderer knows at first paint whether to show
+  // the tutorial — avoids flashing the icon view inside the larger
+  // onboarding panel.
+  isOnboardingActive: (): boolean =>
+    ipcRenderer.sendSync('onboarding:get-sync') as boolean,
+  onboardingFinish: (reason: OnboardingFinishReason): Promise<void> =>
+    ipcRenderer.invoke('onboarding:finish', reason),
   getData: (): Promise<DataSnapshot> => ipcRenderer.invoke('data:get'),
   onDataChanged: (cb: (snapshot: DataSnapshot) => void): (() => void) => {
     const handler = (

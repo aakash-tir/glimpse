@@ -25,6 +25,7 @@ type GlimpseStub = {
   resizeEnd: ReturnType<typeof vi.fn>;
   getData: ReturnType<typeof vi.fn>;
   onDataChanged: ReturnType<typeof vi.fn>;
+  isOnboardingActive: ReturnType<typeof vi.fn>;
 };
 
 function installGlimpseStub(): GlimpseStub {
@@ -47,6 +48,7 @@ function installGlimpseStub(): GlimpseStub {
     onDataChanged: vi.fn().mockReturnValue(() => {
       // unsubscribe noop
     }),
+    isOnboardingActive: vi.fn().mockReturnValue(false),
   };
   (window as unknown as { glimpse: GlimpseStub }).glimpse = stub;
   return stub;
