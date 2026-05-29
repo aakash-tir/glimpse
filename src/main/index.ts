@@ -613,6 +613,17 @@ function registerIpc(): void {
     },
   );
 
+  // Replay (from the Settings slide): re-enter the onboarding panel and
+  // tell the renderer to restart the tutorial from step 1. Does NOT
+  // clear onboardingCompleted — replay is an explicit, transient action.
+  ipcMain.handle('onboarding:replay', () => {
+    if (!iconWindow) return;
+    onboardingActive = true;
+    mode = 'icon';
+    iconWindow.setBounds(onboardingWindowBounds(primaryBounds()));
+    iconWindow.webContents.send('onboarding:replay-start');
+  });
+
   ipcMain.handle('data:get', () => dataStore.getSnapshot());
 
   // Renderer subscribes via the preload's onDataChanged. We forward

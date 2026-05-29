@@ -93,6 +93,18 @@ const api = {
     ipcRenderer.sendSync('onboarding:get-sync') as boolean,
   onboardingFinish: (reason: OnboardingFinishReason): Promise<void> =>
     ipcRenderer.invoke('onboarding:finish', reason),
+  // Replay from the Settings slide: re-enters the onboarding panel and
+  // restarts at step 1. Main resizes the window and pushes a
+  // replay-start event back so the renderer re-mounts the controller.
+  replayOnboarding: (): Promise<void> =>
+    ipcRenderer.invoke('onboarding:replay'),
+  onOnboardingReplay: (cb: () => void): (() => void) => {
+    const handler = (): void => cb();
+    ipcRenderer.on('onboarding:replay-start', handler);
+    return () => {
+      ipcRenderer.off('onboarding:replay-start', handler);
+    };
+  },
   getData: (): Promise<DataSnapshot> => ipcRenderer.invoke('data:get'),
   onDataChanged: (cb: (snapshot: DataSnapshot) => void): (() => void) => {
     const handler = (

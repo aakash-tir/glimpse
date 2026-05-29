@@ -25,6 +25,7 @@ type GlimpseStub = {
   setSettings: ReturnType<typeof vi.fn>;
   resetIconPosition: ReturnType<typeof vi.fn>;
   refreshData: ReturnType<typeof vi.fn>;
+  replayOnboarding: ReturnType<typeof vi.fn>;
 };
 
 function installStub(): GlimpseStub {
@@ -32,6 +33,7 @@ function installStub(): GlimpseStub {
     setSettings: vi.fn().mockResolvedValue(undefined),
     resetIconPosition: vi.fn().mockResolvedValue(undefined),
     refreshData: vi.fn().mockResolvedValue(undefined),
+    replayOnboarding: vi.fn().mockResolvedValue(undefined),
   };
   (window as unknown as { glimpse: GlimpseStub }).glimpse = stub;
   return stub;
@@ -212,13 +214,11 @@ describe('SettingsSlide — control writes', () => {
     expect(stub.refreshData).toHaveBeenCalledOnce();
   });
 
-  it('Replay tutorial button is rendered but disabled (M9 wires the actual flow)', () => {
+  it('Replay tutorial calls replayOnboarding', () => {
+    const stub = installStub();
     render(<SettingsSlide settings={buildSettings()} luminance="dark" />);
-    const replay = screen.getByTestId(
-      'settings-replay-tutorial',
-    ) as HTMLButtonElement;
-    expect(replay.disabled).toBe(true);
-    expect(replay.getAttribute('data-disabled')).toBe('on');
+    fireEvent.click(screen.getByTestId('settings-replay-tutorial'));
+    expect(stub.replayOnboarding).toHaveBeenCalledOnce();
   });
 });
 

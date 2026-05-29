@@ -46,6 +46,17 @@ export function App(): JSX.Element {
     };
   }, []);
 
+  // Replay from Settings: main re-enters the onboarding panel and pushes
+  // this event so the controller re-mounts at step 1.
+  useEffect(() => {
+    const api = window.glimpse;
+    if (!api?.onOnboardingReplay) return;
+    return api.onOnboardingReplay(() => {
+      setCompletedOnboarding(false);
+      setOnboarding(true);
+    });
+  }, []);
+
   if (onboarding) {
     return (
       <OnboardingController
