@@ -70,7 +70,7 @@ Inserted before the special-events slide. Default toggle state is **off**.
 Only shown when ≥ 1 event is active today or calendar-tomorrow (system local timezone). One slide per active event.
 
 - **Title style:** functional, not poetic — e.g. "Aurora", "Perseids meteor shower", "Total lunar eclipse", "Blood moon".
-- **Tomorrow badge:** plain "Tomorrow" text (no date).
+- **Tomorrow badge:** plain "Tomorrow" text (no date). Anchored top-right by default; if the centred title would overlap it (long title and/or narrow window) the badge drops to the bottom centre, just above the slide-count dots.
 - **Event ordering when multiple are active:** today's events first, then tomorrow's; within each day, alphabetical by event type.
 - **Theme:** event backgrounds **stay celestial-dark always**, regardless of the user's theme setting.
 - Strictly passive — no notifications. **Full moon is NOT a special event.**

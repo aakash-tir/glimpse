@@ -11,12 +11,22 @@
 // motion overlay below the content layer. Each per-type component
 // supplies its own `motionOverlay` (or none).
 
-import type { ReactNode } from 'react';
+import {
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 
 const TITLE_TOP_PX = 6;
 const TITLE_LINE_PX = 18;
 const TITLE_AREA_PX = TITLE_TOP_PX + TITLE_LINE_PX + 6;
 const BOTTOM_NAV_RESERVE_PX = 36;
+// Horizontal footprint the top-right badge needs (badge width + its
+// 8 px right offset). If the centred title's right edge would intrude
+// into this zone, the badge drops to the bottom instead.
+const BADGE_TOP_RESERVE_PX = 80;
 
 export type EventSlideShellProps = {
   title: string;
@@ -45,8 +55,37 @@ export function EventSlideShell({
   motionOverlay,
   children,
 }: EventSlideShellProps): JSX.Element {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const titleTextRef = useRef<HTMLSpanElement>(null);
+  // Whether the centred title would collide with the top-right badge,
+  // in which case the badge moves to the bottom (above the dots).
+  const [badgeAtBottom, setBadgeAtBottom] = useState(false);
+
+  useLayoutEffect(() => {
+    if (!isTomorrow) return;
+    const root = rootRef.current;
+    const titleText = titleTextRef.current;
+    if (!root || !titleText) return;
+    const measure = (): void => {
+      const w = root.clientWidth;
+      const textW = titleText.getBoundingClientRect().width;
+      // Title is centred, so its right edge is half the text width past
+      // centre. The badge zone starts BADGE_TOP_RESERVE_PX from the
+      // right edge; 6 px keeps a little breathing room.
+      const titleRight = w / 2 + textW / 2;
+      const badgeLeft = w - BADGE_TOP_RESERVE_PX;
+      setBadgeAtBottom(titleRight + 6 > badgeLeft);
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(root);
+    return () => ro.disconnect();
+  }, [isTomorrow, title]);
+
   return (
     <div
+      ref={rootRef}
       data-testid={`event-slide-${testIdToken}`}
       data-event-tomorrow={isTomorrow ? 'on' : 'off'}
       style={{ position: 'absolute', inset: 0 }}
@@ -87,10 +126,15 @@ export function EventSlideShell({
           zIndex: 2,
         }}
       >
-        {title}
+        <span ref={titleTextRef}>{title}</span>
       </div>
 
-      {isTomorrow ? <TomorrowBadge testIdToken={testIdToken} /> : null}
+      {isTomorrow ? (
+        <TomorrowBadge
+          testIdToken={testIdToken}
+          placement={badgeAtBottom ? 'bottom' : 'top'}
+        />
+      ) : null}
 
       <div
         data-testid="event-slide-body"
@@ -117,17 +161,32 @@ export function EventSlideShell({
 }
 
 // Plan/slides.md: "Tomorrow plain-text badge on events whose date is
-// tomorrow." Anchored top-right inside the slide. Plain text per the
-// spec — no calendar date attached, just the word "Tomorrow".
-function TomorrowBadge({ testIdToken }: { testIdToken: string }): JSX.Element {
+// tomorrow." Plain text per the spec — no calendar date attached, just
+// the word "Tomorrow". Anchored top-right by default; when the centred
+// title would overlap it (long title / narrow window) it drops to the
+// bottom centre, just above the slide-count dots.
+function TomorrowBadge({
+  testIdToken,
+  placement,
+}: {
+  testIdToken: string;
+  placement: 'top' | 'bottom';
+}): JSX.Element {
+  const positionStyle: CSSProperties =
+    placement === 'bottom'
+      ? {
+          bottom: BOTTOM_NAV_RESERVE_PX + 6,
+          left: '50%',
+          transform: 'translateX(-50%)',
+        }
+      : { top: TITLE_TOP_PX, right: 8, height: TITLE_LINE_PX };
   return (
     <span
       data-testid={`event-tomorrow-badge-${testIdToken}`}
+      data-badge-placement={placement}
       style={{
         position: 'absolute',
-        top: TITLE_TOP_PX,
-        right: 8,
-        height: TITLE_LINE_PX,
+        ...positionStyle,
         display: 'inline-flex',
         alignItems: 'center',
         padding: '0 8px',
