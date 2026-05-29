@@ -123,7 +123,7 @@ describe('computeActiveEvents — detection', () => {
     expect(out.map((e) => e.type)).toEqual(['eclipse']);
   });
 
-  it('generates BOTH an eclipse and a blood moon for total lunar eclipses', () => {
+  it('generates only a blood moon (not an eclipse) for total lunar eclipses', () => {
     const out = computeActiveEvents(
       baseInput({
         todayLocal: '2028-12-31',
@@ -131,7 +131,7 @@ describe('computeActiveEvents — detection', () => {
         eclipses: [TOTAL_LUNAR],
       }),
     );
-    expect(out.map((e) => e.type).sort()).toEqual(['blood-moon', 'eclipse']);
+    expect(out.map((e) => e.type)).toEqual(['blood-moon']);
   });
 
   it('does not detect aurora when latitude or kp is missing', () => {
@@ -162,8 +162,8 @@ describe('computeActiveEvents — detection', () => {
 
   it('full moon is never a special event (no full-moon entries are produced)', () => {
     // Even when the meteor list is empty and a total lunar eclipse
-    // is present, only eclipse + blood-moon are generated — never a
-    // bare "full moon" event. Sanity check on the contract.
+    // is present, only a blood-moon is generated — never a bare
+    // "full moon" event. Sanity check on the contract.
     const out = computeActiveEvents(
       baseInput({
         todayLocal: '2028-12-31',
@@ -208,15 +208,18 @@ describe('computeActiveEvents — ordering', () => {
     expect(out.map((e) => e.type)).toEqual(['eclipse', 'meteor']);
   });
 
-  it('blood-moon sorts before eclipse on the same day (alphabetical)', () => {
+  it('blood-moon sorts before meteor on the same day (alphabetical by type)', () => {
+    // A total lunar eclipse (→ blood-moon) and a meteor shower peaking
+    // the same night: TYPE_ORDER puts blood-moon (1) before meteor (3).
     const out = computeActiveEvents(
       baseInput({
         todayLocal: '2028-12-31',
         tomorrowLocal: '2029-01-01',
         eclipses: [TOTAL_LUNAR],
+        meteorShowers: [{ ...PERSEIDS, peakDate: '2028-12-31' }],
       }),
     );
-    expect(out.map((e) => e.type)).toEqual(['blood-moon', 'eclipse']);
+    expect(out.map((e) => e.type)).toEqual(['blood-moon', 'meteor']);
   });
 
   it('aurora (today) sorts ahead of any tomorrow event of any type', () => {
@@ -229,11 +232,10 @@ describe('computeActiveEvents — ordering', () => {
         eclipses: [TOTAL_LUNAR],
       }),
     );
-    // Aurora today, then alphabetical (blood-moon, eclipse) tomorrow.
+    // Aurora today, then the total-lunar's blood moon tomorrow.
     expect(out.map((e) => ({ type: e.type, day: e.dayOffset }))).toEqual([
       { type: 'aurora', day: 0 },
       { type: 'blood-moon', day: 1 },
-      { type: 'eclipse', day: 1 },
     ]);
   });
 
@@ -262,13 +264,15 @@ describe('computeActiveEvents — slide ids', () => {
         tomorrowLocal: '2029-01-01',
         latitude: 65,
         kp: 5,
-        eclipses: [TOTAL_LUNAR],
+        // Total lunar today → blood-moon id; a solar eclipse tomorrow
+        // → eclipse id. Together with aurora that's all three id forms.
+        eclipses: [TOTAL_LUNAR, { date: '2029-01-01', type: 'total-solar' }],
       }),
     );
     const ids = out.map((e: SpecialEvent) => e.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids).toContain('event:aurora');
-    expect(ids).toContain('event:eclipse:2028-12-31');
     expect(ids).toContain('event:blood-moon:2028-12-31');
+    expect(ids).toContain('event:eclipse:2029-01-01');
   });
 });

@@ -13,6 +13,8 @@ const BLOOD_MOON_TODAY: BloodMoonEvent = {
     date: '2028-12-31',
     type: 'total-lunar',
     peakTimeUtc: '2028-12-31T16:53:00Z',
+    startTimeUtc: '2028-12-31T15:08:00Z',
+    endTimeUtc: '2028-12-31T18:38:00Z',
     visibility: 'Visible from: Europe, Africa, Asia, Australia',
     magnitude: 1.25,
   },
@@ -57,11 +59,27 @@ describe('BloodMoonSlide — content', () => {
     );
   });
 
-  it('omits optional rows when the eclipse JSON has no peak/visibility', () => {
+  it('renders the start/end row when both times are present', () => {
+    render(<BloodMoonSlide event={BLOOD_MOON_TODAY} timeFormat="24h" />);
+    expect(screen.getByTestId('blood-moon-start-end').textContent).toMatch(
+      /^\d{2}:\d{2} – \d{2}:\d{2}$/,
+    );
+  });
+
+  it('renders the magnitude as a percentage', () => {
+    render(<BloodMoonSlide event={BLOOD_MOON_TODAY} timeFormat="24h" />);
+    const mag = screen.getByTestId('blood-moon-magnitude');
+    expect(mag.textContent).toBe('Magnitude 125%');
+    expect(mag.getAttribute('data-magnitude')).toBe('1.25');
+  });
+
+  it('omits optional rows when the eclipse JSON has no peak/visibility/times', () => {
     render(<BloodMoonSlide event={BLOOD_MOON_MINIMAL} timeFormat="24h" />);
     expect(screen.getByTestId('slide-title').textContent).toBe('Blood moon');
     expect(screen.queryByTestId('blood-moon-peak-time')).toBeNull();
     expect(screen.queryByTestId('blood-moon-visibility')).toBeNull();
+    expect(screen.queryByTestId('blood-moon-start-end')).toBeNull();
+    expect(screen.queryByTestId('blood-moon-magnitude')).toBeNull();
   });
 });
 

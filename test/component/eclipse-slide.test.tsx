@@ -9,13 +9,15 @@ import type { EclipseEvent } from '../../src/shared/special-events';
 
 afterEach(cleanup);
 
-const TOTAL_LUNAR_TODAY: EclipseEvent = {
+// Total-lunar eclipses route to the blood-moon slide now, so the
+// eclipse slide's representative fixture is a solar eclipse.
+const SOLAR_TODAY: EclipseEvent = {
   type: 'eclipse',
   id: 'event:eclipse:2028-12-31',
   dayOffset: 0,
   eclipse: {
     date: '2028-12-31',
-    type: 'total-lunar',
+    type: 'total-solar',
     peakTimeUtc: '2028-12-31T16:53:00Z',
     visibility: 'Visible from: Europe, Africa, Asia, Australia',
     magnitude: 1.25,
@@ -44,35 +46,35 @@ const MINIMAL_ECLIPSE: EclipseEvent = {
 
 describe('EclipseSlide — content', () => {
   it('renders the spec-formatted type label as the title', () => {
-    render(<EclipseSlide event={TOTAL_LUNAR_TODAY} timeFormat="24h" />);
+    render(<EclipseSlide event={SOLAR_TODAY} timeFormat="24h" />);
     expect(screen.getByTestId('slide-title').textContent).toBe(
-      'Total lunar eclipse',
+      'Total solar eclipse',
     );
   });
 
   it('renders the peak time in 24h format', () => {
-    render(<EclipseSlide event={TOTAL_LUNAR_TODAY} timeFormat="24h" />);
+    render(<EclipseSlide event={SOLAR_TODAY} timeFormat="24h" />);
     expect(screen.getByTestId('eclipse-peak-time').textContent).toMatch(
       /^Peak \d{2}:\d{2}$/,
     );
   });
 
   it('renders the peak time in 12h format with AM/PM', () => {
-    render(<EclipseSlide event={TOTAL_LUNAR_TODAY} timeFormat="12h" />);
+    render(<EclipseSlide event={SOLAR_TODAY} timeFormat="12h" />);
     expect(screen.getByTestId('eclipse-peak-time').textContent).toMatch(
       /^Peak \d{1,2}:\d{2} (AM|PM)$/,
     );
   });
 
   it('renders the visibility text from the JSON entry', () => {
-    render(<EclipseSlide event={TOTAL_LUNAR_TODAY} timeFormat="24h" />);
+    render(<EclipseSlide event={SOLAR_TODAY} timeFormat="24h" />);
     expect(screen.getByTestId('eclipse-visibility').textContent).toBe(
       'Visible from: Europe, Africa, Asia, Australia',
     );
   });
 
   it('renders the magnitude as a percentage', () => {
-    render(<EclipseSlide event={TOTAL_LUNAR_TODAY} timeFormat="24h" />);
+    render(<EclipseSlide event={SOLAR_TODAY} timeFormat="24h" />);
     const mag = screen.getByTestId('eclipse-magnitude');
     expect(mag.textContent).toBe('Magnitude 125%');
     expect(mag.getAttribute('data-magnitude')).toBe('1.25');
@@ -94,9 +96,9 @@ describe('EclipseSlide — content', () => {
     render(
       <EclipseSlide
         event={{
-          ...TOTAL_LUNAR_TODAY,
+          ...SOLAR_TODAY,
           eclipse: {
-            ...TOTAL_LUNAR_TODAY.eclipse,
+            ...SOLAR_TODAY.eclipse,
             startTimeUtc: '2028-12-31T15:08:00Z',
             endTimeUtc: '2028-12-31T18:38:00Z',
           },
@@ -112,7 +114,7 @@ describe('EclipseSlide — content', () => {
 
 describe('EclipseSlide — background + motion', () => {
   it('renders the radial gradient background with the spec-required pulse', () => {
-    render(<EclipseSlide event={TOTAL_LUNAR_TODAY} timeFormat="24h" />);
+    render(<EclipseSlide event={SOLAR_TODAY} timeFormat="24h" />);
     const pulse = screen.getByTestId('eclipse-bg-pulse');
     expect(pulse).toBeInTheDocument();
     expect(pulse.style.background).toMatch(/#1a0a0a/);
@@ -127,11 +129,16 @@ describe('EclipseSlide — background + motion', () => {
     expect(ECLIPSE_PULSE_DURATION_S).toBe(4);
     expect(ECLIPSE_PULSE_AMPLITUDE).toBeCloseTo(0.05);
   });
+
+  it('renders the eclipse silhouette disc', () => {
+    render(<EclipseSlide event={SOLAR_TODAY} timeFormat="24h" />);
+    expect(screen.getByTestId('eclipse-disc')).toBeInTheDocument();
+  });
 });
 
 describe('EclipseSlide — Tomorrow badge', () => {
   it('omits the Tomorrow badge when dayOffset is 0', () => {
-    render(<EclipseSlide event={TOTAL_LUNAR_TODAY} timeFormat="24h" />);
+    render(<EclipseSlide event={SOLAR_TODAY} timeFormat="24h" />);
     expect(screen.queryByTestId('event-tomorrow-badge-eclipse')).toBeNull();
   });
 

@@ -89,15 +89,16 @@ Only shown when ≥ 1 event is active today or calendar-tomorrow (system local t
 
 ### Eclipse
 
-- Type (lunar / solar / partial / total) · peak time in user's local time (start / end times shown when present in the bundled JSON) · visibility text · magnitude % if available.
+- Covers **solar eclipses and partial / penumbral lunar eclipses**. A **total** lunar eclipse is a blood moon, so it routes to the blood-moon slide instead (one slide per event, no duplicate eclipse slide).
+- Type label (in title) · peak time in user's local time (start / end times shown when present in the bundled JSON) · visibility text · magnitude % if available.
 - **Visibility text** is a static string per entry in the bundled JSON (e.g. "Visible from: Americas, Pacific, East Asia"). We don't compute per-user yes/no/partial geometry — the static regions string is a good-enough cue for "does this apply to me?" without dragging in solar-eclipse path-of-totality math or per-user moon-altitude computation. Same handling for blood moon.
-- **Background:** radial gradient `#1a0a0a` (center) → `#2a1010` (edges) — suggests an eclipse silhouette.
-- **Motion:** slow brightness pulse, 4 s period, ±5 % amplitude.
+- **Background:** radial gradient `#1a0a0a` (center) → `#2a1010` (edges) with a centred eclipse silhouette — a dark occulting disc ringed by a glowing corona (the total-solar look).
+- **Motion:** slow brightness pulse, 4 s period, ±5 % amplitude (the corona breathes on the same cadence).
 
 ### Blood moon
 
-- Title "Blood moon" · peak time in user's local time · visibility text (same static-string approach as eclipse).
-- A blood moon slide appears alongside the eclipse slide whenever a **total lunar eclipse** is active — the totality phase reddens the moon. Each event still gets its own slide.
+- Title "Blood moon" · peak time · start / end times (when present) · visibility text · magnitude % (same static-string / fields approach as eclipse — these are folded onto this slide since a total lunar eclipse no longer gets a separate eclipse slide).
+- A blood moon slide appears whenever a **total lunar eclipse** is active — the totality phase reddens the moon. It is the *only* slide for that event (the generic eclipse slide is not also shown).
 - **Background:** the same translucent dark-glass "window tint" the weather slides use (`rgba(15,23,42,0.92)`) so the desktop shows faintly through — not an opaque celestial gradient — with a faint, low-opacity blood-moon disc layered on top, centred behind the content. The disc is a red sphere gradient multiplied with a grayscale lunar-surface texture (`src/renderer/src/assets/moon.jpg`) so it shows craters/maria while staying red. (Diverges from the other event slides, which stay opaque celestial-dark; chosen so the blood moon reads as a tinted window with the reddened moon as the focal element.)
 - **Motion:** none — the tint and disc are static.
 

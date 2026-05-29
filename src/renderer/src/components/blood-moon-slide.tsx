@@ -41,6 +41,16 @@ export function BloodMoonSlide({
   const peak = eclipse.peakTimeUtc
     ? formatLocalClock(eclipse.peakTimeUtc, timeFormat)
     : null;
+  const start = eclipse.startTimeUtc
+    ? formatLocalClock(eclipse.startTimeUtc, timeFormat)
+    : null;
+  const end = eclipse.endTimeUtc
+    ? formatLocalClock(eclipse.endTimeUtc, timeFormat)
+    : null;
+  const magnitudePct =
+    eclipse.magnitude !== undefined
+      ? Math.round(eclipse.magnitude * 100)
+      : null;
 
   return (
     <EventSlideShell
@@ -69,6 +79,14 @@ export function BloodMoonSlide({
             Peak {peak}
           </div>
         ) : null}
+        {start && end ? (
+          <div
+            data-testid="blood-moon-start-end"
+            style={{ fontSize: 11, opacity: 0.75 }}
+          >
+            {start} – {end}
+          </div>
+        ) : null}
         {eclipse.visibility ? (
           <div
             data-testid="blood-moon-visibility"
@@ -80,6 +98,15 @@ export function BloodMoonSlide({
             }}
           >
             {eclipse.visibility}
+          </div>
+        ) : null}
+        {magnitudePct !== null ? (
+          <div
+            data-testid="blood-moon-magnitude"
+            data-magnitude={String(eclipse.magnitude)}
+            style={{ fontSize: 11, opacity: 0.7 }}
+          >
+            Magnitude {magnitudePct}%
           </div>
         ) : null}
       </div>

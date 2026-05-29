@@ -9,8 +9,10 @@
 //   - Aurora is active when (latitude, kp) crosses the visibility
 //     threshold (see aurora.ts). Aurora has no future date — it's
 //     today-only when active.
-//   - A total lunar eclipse generates BOTH an eclipse event AND a
-//     separate blood-moon event for the same date.
+//   - A total lunar eclipse IS a blood moon (the moon reddens during
+//     totality), so it generates a single blood-moon event — NOT a
+//     separate eclipse event. Every other eclipse type (solar,
+//     partial/penumbral lunar) generates an eclipse event instead.
 //   - Full moon is NEVER a special event (handled by not generating
 //     full-moon events here).
 //   - One slide per active event.
@@ -148,8 +150,9 @@ export function computeActiveEvents(input: ComputeEventsInput): SpecialEvent[] {
     });
   }
 
-  // Eclipses — today or tomorrow. Total lunar eclipses generate BOTH
-  // an eclipse event and a blood-moon event for the same date.
+  // Eclipses — today or tomorrow. A total lunar eclipse is a blood
+  // moon, so it yields a single blood-moon slide; every other eclipse
+  // type yields the generic eclipse slide.
   for (const eclipse of input.eclipses) {
     const offset = dayOffsetFor(
       eclipse.date,
@@ -157,16 +160,17 @@ export function computeActiveEvents(input: ComputeEventsInput): SpecialEvent[] {
       input.tomorrowLocal,
     );
     if (offset === null) continue;
-    events.push({
-      type: 'eclipse',
-      id: `event:eclipse:${eclipse.date}`,
-      dayOffset: offset,
-      eclipse,
-    });
     if (isBloodMoonEclipse(eclipse)) {
       events.push({
         type: 'blood-moon',
         id: `event:blood-moon:${eclipse.date}`,
+        dayOffset: offset,
+        eclipse,
+      });
+    } else {
+      events.push({
+        type: 'eclipse',
+        id: `event:eclipse:${eclipse.date}`,
         dayOffset: offset,
         eclipse,
       });
