@@ -24,6 +24,9 @@ export function App(): JSX.Element {
   const [onboarding, setOnboarding] = useState<boolean>(
     () => window.glimpse?.isOnboardingActive() ?? false,
   );
+  // True once the tutorial finished via "Done" (not skip), so the
+  // window opens on the Settings slide with the completion toast.
+  const [completedOnboarding, setCompletedOnboarding] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -44,10 +47,23 @@ export function App(): JSX.Element {
   }, []);
 
   if (onboarding) {
-    return <OnboardingController onFinish={() => setOnboarding(false)} />;
+    return (
+      <OnboardingController
+        onFinish={(reason) => {
+          setOnboarding(false);
+          if (reason === 'complete') setCompletedOnboarding(true);
+        }}
+      />
+    );
   }
   if (mode === 'window') {
-    return <WindowView enterAnchor={enterAnchor} enterBounds={enterBounds} />;
+    return (
+      <WindowView
+        enterAnchor={enterAnchor}
+        enterBounds={enterBounds}
+        justCompletedOnboarding={completedOnboarding}
+      />
+    );
   }
   return <IconView />;
 }

@@ -30,8 +30,9 @@ import {
 
 export type OnboardingControllerProps = {
   /** Called after the tutorial reports completion / skip to main, so
-   * the App can swap back to the normal icon / window view. */
-  onFinish: () => void;
+   * the App can swap back to the normal icon / window view. The reason
+   * lets the App land a completion on the Settings slide + toast. */
+  onFinish: (reason: OnboardingFinishReason) => void;
 };
 
 function frac(
@@ -64,6 +65,8 @@ function spotlightFor(
       return frac(w, h, 0.25, 0.3, 0.5, 0.4);
     case 'resize':
       return frac(w, h, 0.2, 0.28, 0.6, 0.44);
+    case 'offline':
+      return frac(w, h, 0.34, 0.32, 0.32, 0.3);
     default:
       return null;
   }
@@ -107,7 +110,7 @@ export function OnboardingController({
 
   const finish = (reason: OnboardingFinishReason): void => {
     void window.glimpse?.onboardingFinish(reason);
-    onFinish();
+    onFinish(reason);
   };
 
   const handleNext = (): void => {

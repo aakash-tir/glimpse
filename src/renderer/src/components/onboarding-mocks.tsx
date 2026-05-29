@@ -9,6 +9,7 @@ import { motion } from 'framer-motion';
 import { Minus, X } from 'lucide-react';
 import { WiDaySunny } from 'react-icons/wi';
 import type { OnboardingStepId } from '../../../shared/onboarding';
+import { SadCloud } from './sad-cloud';
 
 // ---- Animated cursor ---------------------------------------------------
 
@@ -175,8 +176,16 @@ export function OnboardingMock({
       );
     case 'resize':
       return <MockResizeFrame onGesture={onGesture} />;
+    case 'offline':
+      // A sample sad-cloud rendered inside the overlay — NOT the live
+      // icon (the user is normally online during onboarding).
+      return (
+        <div style={mockBox}>
+          <SadCloud size={84} />
+        </div>
+      );
     default:
-      // offline + settings are handled by the controller directly.
+      // settings is handled by the controller directly (no mock).
       return null;
   }
 }

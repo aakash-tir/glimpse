@@ -106,6 +106,19 @@ describe('OnboardingController — mocks & gestures', () => {
     expect(screen.getByTestId('mock-title-bar')).toBeInTheDocument();
   });
 
+  it('offline step shows a static sad-cloud and the two-line copy', () => {
+    render(<OnboardingController onFinish={vi.fn()} />);
+    for (let i = 0; i < 6; i++) next(); // → offline (index 6)
+    expect(screen.getByTestId('coachmark-title').textContent).toBe(
+      'Offline state',
+    );
+    // The sample sad-cloud lives inside the overlay (no live icon view
+    // exists during onboarding).
+    expect(screen.getByTestId('icon-sad-cloud')).toBeInTheDocument();
+    expect(screen.getByText(/sad cloud/i)).toBeInTheDocument();
+    expect(screen.getByText(/keeps retrying/i)).toBeInTheDocument();
+  });
+
   it('renders the animated cursor on gesture steps but not on welcome', () => {
     render(<OnboardingController onFinish={vi.fn()} />);
     expect(screen.queryByTestId('onboarding-cursor')).toBeNull(); // welcome

@@ -52,6 +52,7 @@ import {
 } from '../shared/settings-store';
 import { resolveCoords } from '../shared/location-resolver';
 import { onboardingWindowBounds } from '../shared/onboarding-window';
+import type { OnboardingFinishReason } from '../shared/onboarding';
 import type { Mode, ModeChange } from '../shared/mode';
 import { resolveTheme, type ResolvedTheme } from '../shared/theme';
 import { loadSettings, saveSettings } from './settings';
@@ -579,30 +580,38 @@ function registerIpc(): void {
   ipcMain.on('onboarding:get-sync', (evt) => {
     evt.returnValue = onboardingActive;
   });
-  // Finish (skip or complete): persist the flag and transition the
-  // window out of the onboarding panel back to the icon at the default
-  // top-right. (Landing 'complete' on the Settings slide is refined in
-  // a later commit; reason is intentionally ignored for now.)
-  ipcMain.handle('onboarding:finish', () => {
-    if (!onboardingActive) return;
-    onboardingActive = false;
-    const next = saveSettings({ onboardingCompleted: true });
-    iconWindow?.webContents.send('settings:changed', next);
-    if (!iconWindow) return;
-    mode = 'icon';
-    const def = defaultIconPosition(primaryBounds());
-    applyIconPosition(def);
-    const newBounds: WindowBounds = {
-      x: def.x - ICON_OFFSET_X,
-      y: def.y - ICON_OFFSET_Y,
-      width: ICON_WINDOW_WIDTH,
-      height: ICON_WINDOW_HEIGHT,
-    };
-    iconWindow.webContents.send(
-      'mode:changed',
-      modeChangePayload('icon', newBounds, null),
-    );
-  });
+  // Finish: persist the flag and leave the onboarding panel. The
+  // window is currently at onboarding-panel bounds, so reset to the
+  // default icon first (known state for the collapse/expand math),
+  // then — on 'complete' — expand so the user lands on the Settings
+  // slide; on 'skip' stay collapsed at the icon.
+  ipcMain.handle(
+    'onboarding:finish',
+    (_evt, reason: OnboardingFinishReason) => {
+      if (!onboardingActive) return;
+      onboardingActive = false;
+      const next = saveSettings({ onboardingCompleted: true });
+      iconWindow?.webContents.send('settings:changed', next);
+      if (!iconWindow) return;
+      mode = 'icon';
+      const def = defaultIconPosition(primaryBounds());
+      applyIconPosition(def);
+      if (reason === 'complete') {
+        expandToWindow();
+        return;
+      }
+      const newBounds: WindowBounds = {
+        x: def.x - ICON_OFFSET_X,
+        y: def.y - ICON_OFFSET_Y,
+        width: ICON_WINDOW_WIDTH,
+        height: ICON_WINDOW_HEIGHT,
+      };
+      iconWindow.webContents.send(
+        'mode:changed',
+        modeChangePayload('icon', newBounds, null),
+      );
+    },
+  );
 
   ipcMain.handle('data:get', () => dataStore.getSnapshot());
 
