@@ -66,3 +66,57 @@ describe('OnboardingController', () => {
     expect(onboardingFinish).not.toHaveBeenCalled();
   });
 });
+
+function stepIndex(): string | null {
+  return screen.getByTestId('coachmark').getAttribute('data-step-index');
+}
+
+describe('OnboardingController — mocks & gestures', () => {
+  it('welcome shows the mock icon; clicking it advances', () => {
+    render(<OnboardingController onFinish={vi.fn()} />);
+    expect(screen.getByTestId('mock-icon')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('mock-icon'));
+    expect(stepIndex()).toBe('1');
+  });
+
+  it('slides step: clicking a mock arrow advances the step', () => {
+    render(<OnboardingController onFinish={vi.fn()} />);
+    next(); // → slides
+    expect(screen.getByTestId('coachmark-title').textContent).toBe(
+      'Slide navigation',
+    );
+    fireEvent.click(screen.getByTestId('mock-arrow-right'));
+    expect(stepIndex()).toBe('2');
+  });
+
+  it('shows the mock title bar on the switch and minimize steps only', () => {
+    render(<OnboardingController onFinish={vi.fn()} />);
+    next();
+    next(); // → switch (index 2)
+    expect(screen.getByTestId('coachmark-title').textContent).toBe(
+      'Icon and window',
+    );
+    expect(screen.getByTestId('mock-title-bar')).toBeInTheDocument();
+    next(); // → drag (index 3): no title bar
+    expect(screen.queryByTestId('mock-title-bar')).toBeNull();
+    next(); // → minimize (index 4)
+    expect(screen.getByTestId('coachmark-title').textContent).toBe(
+      'Minimize button',
+    );
+    expect(screen.getByTestId('mock-title-bar')).toBeInTheDocument();
+  });
+
+  it('renders the animated cursor on gesture steps but not on welcome', () => {
+    render(<OnboardingController onFinish={vi.fn()} />);
+    expect(screen.queryByTestId('onboarding-cursor')).toBeNull(); // welcome
+    next(); // slides
+    expect(
+      screen.getByTestId('onboarding-cursor').getAttribute('data-gesture'),
+    ).toBe('click');
+    next();
+    next(); // → drag
+    expect(
+      screen.getByTestId('onboarding-cursor').getAttribute('data-gesture'),
+    ).toBe('double-click');
+  });
+});
