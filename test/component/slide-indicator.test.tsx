@@ -128,27 +128,85 @@ describe('SlideIndicator — wired through SlideDeck', () => {
   });
 
   it('grows the dot count when events become active', () => {
-    const { rerender } = render(<SlideDeck eventsActive={false} />);
+    const { rerender } = render(<SlideDeck events={[]} />);
     expect(
       screen.getByTestId('slide-indicator').getAttribute('data-slide-count'),
     ).toBe('4');
 
-    rerender(<SlideDeck eventsActive />);
+    rerender(
+      <SlideDeck
+        events={[
+          {
+            type: 'aurora',
+            id: 'event:aurora',
+            dayOffset: 0,
+            kp: 6,
+            latitude: 60,
+            visibilityText: 'Visible from your location',
+          },
+        ]}
+      />,
+    );
     expect(
       screen.getByTestId('slide-indicator').getAttribute('data-slide-count'),
     ).toBe('5');
   });
 
   it('shrinks the dot count when events disappear', () => {
-    const { rerender } = render(<SlideDeck eventsActive />);
+    const { rerender } = render(
+      <SlideDeck
+        events={[
+          {
+            type: 'aurora',
+            id: 'event:aurora',
+            dayOffset: 0,
+            kp: 6,
+            latitude: 60,
+            visibilityText: 'Visible from your location',
+          },
+        ]}
+      />,
+    );
     expect(
       screen.getByTestId('slide-indicator').getAttribute('data-slide-count'),
     ).toBe('5');
 
-    rerender(<SlideDeck eventsActive={false} />);
+    rerender(<SlideDeck events={[]} />);
     expect(
       screen.getByTestId('slide-indicator').getAttribute('data-slide-count'),
     ).toBe('4');
+  });
+
+  it('grows by one dot per active event when multiple are active', () => {
+    render(
+      <SlideDeck
+        events={[
+          {
+            type: 'aurora',
+            id: 'event:aurora',
+            dayOffset: 0,
+            kp: 6,
+            latitude: 60,
+            visibilityText: 'Visible from your location',
+          },
+          {
+            type: 'meteor',
+            id: 'event:meteor:Perseids',
+            dayOffset: 0,
+            shower: {
+              name: 'Perseids',
+              peakDate: '2026-08-12',
+              zhr: 100,
+              bestViewingTime: 'Late night to pre-dawn',
+              radiantConstellation: 'Perseus',
+            },
+          },
+        ]}
+      />,
+    );
+    expect(
+      screen.getByTestId('slide-indicator').getAttribute('data-slide-count'),
+    ).toBe('6');
   });
 
   it('uses light dots on dark slides (today, default theme)', () => {

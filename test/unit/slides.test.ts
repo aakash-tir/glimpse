@@ -1,43 +1,68 @@
 import { describe, it, expect } from 'vitest';
 import {
   computeVisibleSlides,
+  isStaticSlideId,
   reconcileCurrentSlideIndex,
   wrapStep,
+  type EventSlideId,
   type SlideId,
 } from '../../src/shared/slides';
+
+const NO_EVENTS: readonly EventSlideId[] = [];
 
 describe('computeVisibleSlides', () => {
   it('hides moon and events by default', () => {
     expect(
-      computeVisibleSlides({ moonEnabled: false, eventsActive: false }),
+      computeVisibleSlides({
+        moonEnabled: false,
+        eventSlideIds: NO_EVENTS,
+      }),
     ).toEqual(['today', 'seven-day', 'current', 'settings']);
   });
 
   it('inserts moon between current and (events|settings) when enabled', () => {
     expect(
-      computeVisibleSlides({ moonEnabled: true, eventsActive: false }),
+      computeVisibleSlides({
+        moonEnabled: true,
+        eventSlideIds: NO_EVENTS,
+      }),
     ).toEqual(['today', 'seven-day', 'current', 'moon', 'settings']);
   });
 
-  it('inserts events between current and settings when active', () => {
+  it('splices a single event slide between current and settings', () => {
     expect(
-      computeVisibleSlides({ moonEnabled: false, eventsActive: true }),
-    ).toEqual(['today', 'seven-day', 'current', 'events', 'settings']);
+      computeVisibleSlides({
+        moonEnabled: false,
+        eventSlideIds: ['event:aurora'],
+      }),
+    ).toEqual(['today', 'seven-day', 'current', 'event:aurora', 'settings']);
   });
 
-  it('shows all 6 slides when both flags are on', () => {
+  it('preserves the input order of multiple event slides', () => {
+    // Caller (computeActiveEvents) already sorts today-first then
+    // alphabetical-by-type — slides.ts must not re-shuffle that order.
+    const events: EventSlideId[] = [
+      'event:aurora',
+      'event:blood-moon:2028-12-31',
+      'event:eclipse:2028-12-31',
+      'event:meteor:Perseids',
+    ];
     expect(
-      computeVisibleSlides({ moonEnabled: true, eventsActive: true }),
-    ).toEqual(['today', 'seven-day', 'current', 'moon', 'events', 'settings']);
+      computeVisibleSlides({ moonEnabled: true, eventSlideIds: events }),
+    ).toEqual(['today', 'seven-day', 'current', 'moon', ...events, 'settings']);
   });
 
   it('keeps settings last regardless of flags', () => {
-    for (const flags of [
-      { moonEnabled: false, eventsActive: false },
-      { moonEnabled: true, eventsActive: false },
-      { moonEnabled: false, eventsActive: true },
-      { moonEnabled: true, eventsActive: true },
-    ]) {
+    const cases: { moonEnabled: boolean; eventSlideIds: EventSlideId[] }[] = [
+      { moonEnabled: false, eventSlideIds: [] },
+      { moonEnabled: true, eventSlideIds: [] },
+      { moonEnabled: false, eventSlideIds: ['event:aurora'] },
+      {
+        moonEnabled: true,
+        eventSlideIds: ['event:aurora', 'event:meteor:Perseids'],
+      },
+    ];
+    for (const flags of cases) {
       const list = computeVisibleSlides(flags);
       expect(list[list.length - 1]).toBe('settings');
     }
@@ -112,28 +137,28 @@ describe('reconcileCurrentSlideIndex', () => {
   });
 
   it('keeps the index when a slide is inserted after the current one', () => {
-    // User on `today` (index 0). Events become active. `today` is still
-    // at index 0.
+    // User on `today` (index 0). An event becomes active. `today` is
+    // still at index 0.
     const before: SlideId[] = ['today', 'seven-day', 'current', 'settings'];
     const after: SlideId[] = [
       'today',
       'seven-day',
       'current',
-      'events',
+      'event:aurora',
       'settings',
     ];
     expect(reconcileCurrentSlideIndex(before, 0, after)).toBe(0);
   });
 
-  it('falls back to the nearest preceding visible slide when the current one is removed', () => {
-    // User on `events` (index 3). Events disappear (data refresh found
-    // nothing). The nearest preceding slide that still exists is
-    // `current` (now at index 2 in the new list).
+  it('falls back to the nearest preceding visible slide when the current event slide vanishes', () => {
+    // User on the aurora event slide (index 3). Aurora drops out (Kp
+    // fell below threshold). The nearest preceding slide that still
+    // exists is `current` (now at index 2 in the new list).
     const before: SlideId[] = [
       'today',
       'seven-day',
       'current',
-      'events',
+      'event:aurora',
       'settings',
     ];
     const after: SlideId[] = ['today', 'seven-day', 'current', 'settings'];
@@ -150,5 +175,21 @@ describe('reconcileCurrentSlideIndex', () => {
     const before: SlideId[] = ['today', 'settings'];
     const after: SlideId[] = [];
     expect(reconcileCurrentSlideIndex(before, 1, after)).toBe(0);
+  });
+});
+
+describe('isStaticSlideId', () => {
+  it('returns true for known static IDs', () => {
+    expect(isStaticSlideId('today')).toBe(true);
+    expect(isStaticSlideId('seven-day')).toBe(true);
+    expect(isStaticSlideId('current')).toBe(true);
+    expect(isStaticSlideId('moon')).toBe(true);
+    expect(isStaticSlideId('settings')).toBe(true);
+  });
+
+  it('returns false for event IDs', () => {
+    expect(isStaticSlideId('event:aurora')).toBe(false);
+    expect(isStaticSlideId('event:meteor:Perseids')).toBe(false);
+    expect(isStaticSlideId('event:eclipse:2028-12-31')).toBe(false);
   });
 });

@@ -18,12 +18,17 @@ import type {
 } from '../../../shared/settings-store';
 import {
   computeVisibleSlides,
+  isStaticSlideId,
   reconcileCurrentSlideIndex,
   wrapStep,
+  type EventSlideId,
   type SlideId,
+  type StaticSlideId,
   type WrapDirection,
 } from '../../../shared/slides';
+import type { SpecialEvent } from '../../../shared/special-events';
 import { CurrentSlide } from './current-slide';
+import { EventSlide } from './event-slide';
 import { MoonSlide } from './moon-slide';
 import { SettingsSlide } from './settings-slide';
 import { SevenDaySlide } from './seven-day-slide';
@@ -64,7 +69,6 @@ const ARROW_SIZE_PX = 24;
 // dark dots on light Settings) is reachable in tests today.
 const BG_DARK_GLASS = 'rgba(15, 23, 42, 0.92)';
 const BG_MOON = '#0a1628';
-const BG_EVENTS_PLACEHOLDER = '#0a0a1f';
 const BG_SETTINGS_DARK = '#0f172a';
 const BG_SETTINGS_LIGHT = '#f8fafc';
 
@@ -72,8 +76,15 @@ export type ThemeMode = 'light' | 'dark';
 
 export type { SlideBackgroundLuminance };
 
-type SlideMeta = {
-  id: SlideId;
+// Module-level constant so the default `events` prop has a stable
+// reference across renders. Without this, the empty-array default
+// would produce a new reference each render, invalidating useMemo
+// dependencies and tripping the reconcileCurrentSlideIndex path on
+// every commit.
+const EMPTY_EVENTS: readonly SpecialEvent[] = Object.freeze([]);
+
+type StaticSlideMeta = {
+  id: StaticSlideId;
   label: string;
   background: (themeMode: ThemeMode) => {
     color: string;
@@ -81,7 +92,7 @@ type SlideMeta = {
   };
 };
 
-const SLIDE_META: Record<SlideId, SlideMeta> = {
+const STATIC_SLIDE_META: Record<StaticSlideId, StaticSlideMeta> = {
   today: {
     id: 'today',
     label: 'Today',
@@ -102,14 +113,6 @@ const SLIDE_META: Record<SlideId, SlideMeta> = {
     label: 'Moon',
     background: () => ({ color: BG_MOON, luminance: 'dark' }),
   },
-  events: {
-    id: 'events',
-    label: 'Events',
-    background: () => ({
-      color: BG_EVENTS_PLACEHOLDER,
-      luminance: 'dark',
-    }),
-  },
   settings: {
     id: 'settings',
     label: 'Settings',
@@ -120,11 +123,42 @@ const SLIDE_META: Record<SlideId, SlideMeta> = {
   },
 };
 
+// Plan/slides.md: special-event backgrounds always stay celestial-dark
+// regardless of the user's theme setting. SLIDE_META lookup folds these
+// into the same shape as the static slides.
+const EVENT_BACKGROUND_BY_TYPE: Record<SpecialEvent['type'], string> = {
+  aurora: '#0a2e1f',
+  meteor: '#0a0a1f',
+  eclipse: '#1a0a0a',
+  'blood-moon': '#2a0a05',
+};
+
+function backgroundForSlideId(
+  id: SlideId,
+  themeMode: ThemeMode,
+  events: readonly SpecialEvent[],
+): { color: string; luminance: SlideBackgroundLuminance } {
+  if (isStaticSlideId(id)) {
+    return STATIC_SLIDE_META[id].background(themeMode);
+  }
+  const event = events.find((e) => e.id === id);
+  const color = event
+    ? EVENT_BACKGROUND_BY_TYPE[event.type]
+    : EVENT_BACKGROUND_BY_TYPE.meteor;
+  return { color, luminance: 'dark' };
+}
+
 export type SlideDeckProps = {
   // Visibility flags fed into the dynamic-count math. Defaults make the
-  // deck render the M4 placeholder state (no moon, no events).
+  // deck render the no-moon-no-events state.
   moonEnabled?: boolean;
-  eventsActive?: boolean;
+  /**
+   * Active special events, already ordered today-first then
+   * alphabetical-by-type by computeActiveEvents. The deck renders one
+   * slide per entry between the moon (or current) slide and settings.
+   * Empty list = no event slides.
+   */
+  events?: readonly SpecialEvent[];
   // Theme mode used for the Settings slide's background. Real theme
   // resolution lands in M7; tests pass this directly.
   themeMode?: ThemeMode;
@@ -168,7 +202,7 @@ type Transition = {
 
 export function SlideDeck({
   moonEnabled = false,
-  eventsActive = false,
+  events = EMPTY_EVENTS,
   themeMode = 'dark',
   forecast = null,
   timeFormat = '24h',
@@ -179,9 +213,23 @@ export function SlideDeck({
   lastUpdated = null,
   detectedCity = null,
 }: SlideDeckProps): JSX.Element {
+  // Stable key derived from event ids so memo deps don't depend on
+  // the `events` array's reference identity — callers that pass
+  // `events={[]}` (or a freshly mapped list each render) would
+  // otherwise re-trigger the reconcile-during-render path on every
+  // commit and crash with "Too many re-renders".
+  const eventIdsKey = events.map((e) => e.id).join('|');
+  const eventSlideIds = useMemo<readonly EventSlideId[]>(
+    () => events.map((e) => e.id as EventSlideId),
+    // We intentionally key off the joined ids string rather than the
+    // events array reference. The lint rule can't statically verify
+    // that — disable narrowly here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [eventIdsKey],
+  );
   const visibleSlides = useMemo(
-    () => computeVisibleSlides({ moonEnabled, eventsActive }),
-    [moonEnabled, eventsActive],
+    () => computeVisibleSlides({ moonEnabled, eventSlideIds }),
+    [moonEnabled, eventSlideIds],
   );
 
   // The "currently-viewed slide does not shift when others appear /
@@ -215,8 +263,11 @@ export function SlideDeck({
     Math.max(0, visibleSlides.length - 1),
   );
   const currentSlideId = visibleSlides[safeIndex] ?? 'today';
-  const currentMeta = SLIDE_META[currentSlideId];
-  const currentBackground = currentMeta.background(themeMode);
+  const currentBackground = backgroundForSlideId(
+    currentSlideId,
+    themeMode,
+    events,
+  );
 
   // ---- Cube transition machinery ----
   //
@@ -378,6 +429,7 @@ export function SlideDeck({
           location={location}
           lastUpdated={lastUpdated}
           detectedCity={detectedCity}
+          events={events}
         />
         {transition && sideFaceSide ? (
           <SlideFace
@@ -393,6 +445,7 @@ export function SlideDeck({
             location={location}
             lastUpdated={lastUpdated}
             detectedCity={detectedCity}
+            events={events}
           />
         ) : null}
       </motion.div>
@@ -464,6 +517,7 @@ type SlideFaceProps = {
   location: DataLocation | null;
   lastUpdated: string | null;
   detectedCity: string | null;
+  events: readonly SpecialEvent[];
 };
 
 function SlideFace({
@@ -479,9 +533,9 @@ function SlideFace({
   location,
   lastUpdated,
   detectedCity,
+  events,
 }: SlideFaceProps): JSX.Element {
-  const meta = SLIDE_META[slideId];
-  const bg = meta.background(themeMode);
+  const bg = backgroundForSlideId(slideId, themeMode, events);
   const halfW = deckWidth / 2;
   const transform =
     face === 'front'
@@ -490,8 +544,6 @@ function SlideFace({
         ? `rotateY(90deg) translateZ(${halfW}px)`
         : `rotateY(-90deg) translateZ(${halfW}px)`;
 
-  // M6 wires the today + seven-day slides; M7 adds current + moon +
-  // settings. The events slide keeps its M4 placeholder label until M8.
   const body = renderSlideBody({
     slideId,
     forecast,
@@ -503,7 +555,7 @@ function SlideFace({
     lastUpdated,
     detectedCity,
     luminance: bg.luminance,
-    label: meta.label,
+    events,
   });
 
   const textColor =
@@ -564,7 +616,7 @@ function renderSlideBody({
   lastUpdated,
   detectedCity,
   luminance,
-  label,
+  events,
 }: {
   slideId: SlideId;
   forecast: Forecast | null;
@@ -576,8 +628,19 @@ function renderSlideBody({
   lastUpdated: string | null;
   detectedCity: string | null;
   luminance: SlideBackgroundLuminance;
-  label: string;
+  events: readonly SpecialEvent[];
 }): JSX.Element | string {
+  if (!isStaticSlideId(slideId)) {
+    const event = events.find((e) => e.id === slideId);
+    if (!event) return '';
+    return (
+      <EventSlide
+        event={event}
+        timeFormat={timeFormat}
+        lastUpdated={lastUpdated}
+      />
+    );
+  }
   switch (slideId) {
     case 'today':
       return <TodaySlide forecast={forecast} timeFormat={timeFormat} />;
@@ -603,8 +666,6 @@ function renderSlideBody({
           detectedCity={detectedCity}
         />
       );
-    default:
-      return label;
   }
 }
 

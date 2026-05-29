@@ -7,6 +7,7 @@ import { DragModeGlow } from '../components/drag-mode-glow';
 import { LocationPrompt } from '../components/location-prompt';
 import { ResizeHandles } from '../components/resize-handles';
 import { SlideDeck } from '../components/slide-deck';
+import { useActiveEvents } from '../components/use-active-events';
 import { useDataSnapshot } from '../components/use-data-snapshot';
 import { useMoonPhase } from '../components/use-moon-phase';
 import { useResolvedTheme } from '../components/use-resolved-theme';
@@ -58,6 +59,15 @@ export function WindowView({
   const location = snapshot?.location ?? null;
   const lastUpdated = snapshot?.lastUpdated ?? null;
   const detectedCity = snapshot?.detectedCity ?? null;
+  // Active special-event slides derived from current location + Kp
+  // and the bundled meteor-shower / eclipse catalogs. eventsHidden
+  // is sticky for the session — once true (NOAA failure), the deck
+  // collapses the events section even if a later fetch succeeds.
+  const events = useActiveEvents({
+    latitude: location?.latitude ?? null,
+    kp: snapshot?.kp ?? null,
+    eventsHidden: snapshot?.eventsHidden ?? false,
+  });
   // Live moon-phase reading; recomputes once per minute (much finer
   // than the ~28-day cycle). Drives the M7 moon-phase slide.
   const moonPhase = useMoonPhase();
@@ -211,7 +221,7 @@ export function WindowView({
     >
       <SlideDeck
         moonEnabled={moonEnabled}
-        eventsActive={false}
+        events={events}
         forecast={forecast}
         timeFormat={timeFormat}
         units={units}

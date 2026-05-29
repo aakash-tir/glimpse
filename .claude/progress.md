@@ -179,7 +179,7 @@
 
 ## M8 — Slides: Special events
 
-**Status:** Not started
+**Status:** Done (2026-05-09)
 
 **Scope.** Conditional special-events slides with per-event backgrounds and subtle motion.
 

@@ -4,6 +4,7 @@ import type { DataLocation } from '../../../shared/data-snapshot';
 import type { Forecast } from '../../../shared/forecast';
 import type { TimeFormat, Units } from '../../../shared/settings-store';
 import { formatHourTime, localDate } from '../../../shared/forecast-window';
+import { formatLocalClock } from '../../../shared/time-format';
 import { LoadingSkeleton } from './loading-skeleton';
 import { SlideShell } from './slide-shell';
 
@@ -189,24 +190,11 @@ function formatSubtitle(
   timeFormat: TimeFormat,
 ): string | null {
   const city = location?.city ?? null;
-  const time = lastUpdated ? formatLastUpdated(lastUpdated, timeFormat) : null;
+  const time = lastUpdated ? formatLocalClock(lastUpdated, timeFormat) : null;
   if (city && time) return `${city} · ${time}`;
   if (city) return city;
   if (time) return time;
   return null;
-}
-
-function formatLastUpdated(iso: string, timeFormat: TimeFormat): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  const hours24 = d.getHours();
-  const minutes = String(d.getMinutes()).padStart(2, '0');
-  if (timeFormat === '24h') {
-    return `${String(hours24).padStart(2, '0')}:${minutes}`;
-  }
-  const period = hours24 >= 12 ? 'PM' : 'AM';
-  const h12 = hours24 % 12 === 0 ? 12 : hours24 % 12;
-  return `${h12}:${minutes} ${period}`;
 }
 
 function Tile({
