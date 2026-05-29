@@ -1,9 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
-import {
-  BLOOD_MOON_PULSE_DURATION_S,
-  BloodMoonSlide,
-} from '../../src/renderer/src/components/blood-moon-slide';
+import { BloodMoonSlide } from '../../src/renderer/src/components/blood-moon-slide';
 import type { BloodMoonEvent } from '../../src/shared/special-events';
 
 afterEach(cleanup);
@@ -69,18 +66,14 @@ describe('BloodMoonSlide — content', () => {
 });
 
 describe('BloodMoonSlide — background + motion', () => {
-  it('renders the gradient background with the spec-required pulse', () => {
+  it('renders the dark-glass window tint and a centred blood-moon disc', () => {
     render(<BloodMoonSlide event={BLOOD_MOON_TODAY} timeFormat="24h" />);
-    const pulse = screen.getByTestId('blood-moon-bg-pulse');
-    expect(pulse).toBeInTheDocument();
-    // Cool gradient endpoints in the static style.
-    expect(pulse.style.background).toMatch(/#2a0a05/);
-    expect(pulse.style.background).toMatch(/#5a1a0a/);
-    // Plan: 5 s pulse period.
-    expect(pulse.getAttribute('data-pulse-duration-s')).toBe(
-      String(BLOOD_MOON_PULSE_DURATION_S),
-    );
-    expect(BLOOD_MOON_PULSE_DURATION_S).toBe(5);
+    const tint = screen.getByTestId('blood-moon-bg-tint');
+    expect(tint).toBeInTheDocument();
+    // Same translucent slate glass as the weather slides.
+    expect(tint.style.background).toMatch(/rgba\(15,\s*23,\s*42/);
+    // Faint blood-moon disc layered on top.
+    expect(screen.getByTestId('blood-moon-disc')).toBeInTheDocument();
   });
 });
 

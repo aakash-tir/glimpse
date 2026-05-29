@@ -98,8 +98,8 @@ Only shown when ≥ 1 event is active today or calendar-tomorrow (system local t
 
 - Title "Blood moon" · peak time in user's local time · visibility text (same static-string approach as eclipse).
 - A blood moon slide appears alongside the eclipse slide whenever a **total lunar eclipse** is active — the totality phase reddens the moon. Each event still gets its own slide.
-- **Background:** linear gradient `#2a0a05` (top) → `#5a1a0a` (bottom) — warmer / oranger than eclipse so the two read differently.
-- **Motion:** slow pulse with subtle color shift toward orange, 5 s period.
+- **Background:** the same translucent dark-glass "window tint" the weather slides use (`rgba(15,23,42,0.92)`) so the desktop shows faintly through — not an opaque celestial gradient — with a faint, low-opacity blood-moon disc layered on top, centred behind the content. The disc is a red sphere gradient multiplied with a grayscale lunar-surface texture (`src/renderer/src/assets/moon.jpg`) so it shows craters/maria while staying red. (Diverges from the other event slides, which stay opaque celestial-dark; chosen so the blood moon reads as a tinted window with the reddened moon as the focal element.)
+- **Motion:** none — the tint and disc are static.
 
 ## Slide 6 — Settings
 

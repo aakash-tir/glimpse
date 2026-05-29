@@ -1,29 +1,31 @@
 // Blood moon event slide. Plan/slides.md § Special events — blood moon.
 //
 //   Body fields: peak time in user's local time · visibility text.
-//   Background:  linear gradient #2a0a05 → #5a1a0a — warmer / oranger
-//                than the eclipse slide so the two read differently
-//                when both appear together.
-//   Motion:      slow pulse with subtle colour shift toward orange,
-//                5 s period.
+//   Background:  the same translucent dark-glass "window tint" the
+//                weather slides use (rgba(15,23,42,0.92)) so the desktop
+//                shows faintly through — NOT an opaque celestial
+//                gradient — with a faint blood-moon disc layered on top,
+//                centred behind the content. The disc is a red sphere
+//                gradient multiplied with a grayscale lunar-surface
+//                texture, so it shows craters/maria while staying red.
+//   Motion:      none — the disc and tint are static.
 //
 // Blood moon slides only appear alongside total lunar eclipses (see
 // computeActiveEvents) — every blood moon shares its date with an
 // eclipse slide, so the user sees both stacked back-to-back. The
-// per-slide gradient + warmer pulse make the totality reading distinct
-// from the surrounding eclipse silhouette.
+// centred red disc over the glass tint makes the totality reading
+// distinct from the surrounding eclipse silhouette.
 
-import { motion } from 'framer-motion';
+import moonTexture from '../assets/moon.jpg';
 import type { TimeFormat } from '../../../shared/settings-store';
 import type { BloodMoonEvent } from '../../../shared/special-events';
 import { formatLocalClock } from '../../../shared/time-format';
 import { EventSlideShell } from './event-slide-shell';
 
-const BG_COOL = 'linear-gradient(180deg, #2a0a05 0%, #5a1a0a 100%)';
-// "Subtle colour shift toward orange" — same gradient endpoints
-// nudged toward warmer hues at the pulse peak.
-const BG_WARM = 'linear-gradient(180deg, #3d150a 0%, #7a2810 100%)';
-export const BLOOD_MOON_PULSE_DURATION_S = 5;
+// Same translucent slate glass the weather slides paint (see
+// slide-deck BG_DARK_GLASS) so the blood-moon slide carries the app's
+// window-tint look instead of an opaque event gradient.
+const BG_TINT = 'rgba(15, 23, 42, 0.92)';
 
 export type BloodMoonSlideProps = {
   event: BloodMoonEvent;
@@ -87,20 +89,48 @@ export function BloodMoonSlide({
 
 function BloodMoonBackground(): JSX.Element {
   return (
-    <motion.div
-      data-testid="blood-moon-bg-pulse"
-      data-pulse-duration-s={String(BLOOD_MOON_PULSE_DURATION_S)}
-      animate={{ background: [BG_COOL, BG_WARM, BG_COOL] }}
-      transition={{
-        duration: BLOOD_MOON_PULSE_DURATION_S,
-        repeat: Infinity,
-        ease: 'easeInOut',
-      }}
-      style={{
-        position: 'absolute',
-        inset: 0,
-        background: BG_COOL,
-      }}
-    />
+    <>
+      {/* Window tint — the same translucent slate glass the weather
+          slides use, so the desktop shows faintly through rather than
+          an opaque celestial gradient. */}
+      <div
+        data-testid="blood-moon-bg-tint"
+        style={{ position: 'absolute', inset: 0, background: BG_TINT }}
+      />
+      {/* Faint blood-moon disc, centred and layered over the tint but
+          behind the content. Low opacity so it reads as a subtle
+          backdrop, not a foreground graphic. */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          pointerEvents: 'none',
+        }}
+      >
+        <div
+          data-testid="blood-moon-disc"
+          style={{
+            width: '55%',
+            aspectRatio: '1 / 1',
+            borderRadius: '50%',
+            // Red sphere shading MULTIPLIED with the grayscale moon
+            // texture: red × gray keeps the hue red while the craters
+            // and maria modulate brightness, so it reads as a red moon
+            // with surface detail. The radial also darkens the limb for
+            // a spherical feel.
+            backgroundImage: `radial-gradient(circle at 50% 42%, rgba(210, 85, 50, 1) 0%, rgba(150, 40, 22, 1) 58%, rgba(80, 18, 10, 1) 100%), url(${moonTexture})`,
+            backgroundBlendMode: 'multiply',
+            backgroundSize: 'cover, cover',
+            backgroundPosition: 'center, center',
+            backgroundRepeat: 'no-repeat, no-repeat',
+            boxShadow: '0 0 30px rgba(170, 50, 25, 0.5)',
+            opacity: 0.4,
+          }}
+        />
+      </div>
+    </>
   );
 }
