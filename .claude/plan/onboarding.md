@@ -42,10 +42,10 @@ For gesture steps, an animated cursor icon performs the gesture in place, with a
 
 ## Behavior
 
-- Runs **in parallel with first data fetch.** Slides show skeleton placeholders if reached before data arrives.
+- Runs **in parallel with first data fetch.** The data layer fetches in the background during onboarding; because the tutorial is a self-contained mock panel (see Rendering surface), the live slides aren't shown behind it — the real window reflects loading skeletons / error state only after the tutorial hands off.
 - **Skip:** marks `onboardingCompleted = true`; never auto-shows again.
 - **App closed mid-tutorial:** `onboardingCompleted` is **NOT** set; next launch restarts from step 1. (Skip and interrupt are deliberately differentiated — Skip is intentional, close is accidental.)
-- **Continues during error state:** if first fetch fails, sad cloud appears in the background but tutorial proceeds.
+- **Continues during error state:** a failed first fetch never blocks the tutorial — it runs entirely on its own mock surface. (The real icon's sad-cloud appears after hand-off if the fetch failed; step 7 previews that state with a static sample.)
 - **Completion criterion:** purely UX-driven — does not require the first fetch to have succeeded.
 - **Auto-launch interaction:** `onboardingCompleted` is respected; auto-launches do not re-trigger onboarding.
 - **Replay (from Settings):** closes the window, returns to icon mode, restarts from step 1.

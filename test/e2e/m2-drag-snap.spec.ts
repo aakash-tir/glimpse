@@ -1,7 +1,8 @@
 import { test, expect, _electron as electron } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
 import { spawn } from 'node:child_process';
-import { dirname, resolve } from 'node:path';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
@@ -13,6 +14,24 @@ const projectRoot = resolve(__dirname, '../..');
 async function launch(): Promise<ElectronApplication> {
   return await electron.launch({ args: ['.'], cwd: projectRoot });
 }
+
+// Clean profile with onboarding already completed so the icon view
+// (not the first-launch tutorial) is shown.
+test.beforeEach(() => {
+  const appData = process.env['APPDATA'];
+  if (!appData) return;
+  const path = join(appData, 'Glimpse', 'settings.json');
+  rmSync(path, { force: true });
+  mkdirSync(join(appData, 'Glimpse'), { recursive: true });
+  writeFileSync(
+    path,
+    JSON.stringify({
+      locationPermissionAsked: true,
+      onboardingCompleted: true,
+    }),
+    'utf-8',
+  );
+});
 
 async function getIconWindowBounds(
   app: ElectronApplication,
