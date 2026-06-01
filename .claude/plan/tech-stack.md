@@ -53,6 +53,5 @@ User can disable via Windows Settings → Apps → Startup like any other app.
 
 ## App icon
 
-- **Source asset:** `./app-icon.png` (256 × 256 RGBA PNG at the project root).
-- **Build:** electron-builder auto-generates the multi-resolution `.ico` from this asset at packaging time.
-- The current asset is a stopgap upscaled from the original 180 px source. User will replace with a 1024 × 1024 export of the same artwork before Phase 2 packaging for crisper Hi-DPI / Start-menu tile rendering. (See [packaging.md](./packaging.md).)
+- **Source asset:** `./app-icon.png` (1024 × 1024 RGBA PNG at the project root — the canonical artwork export, set at M10).
+- **Embedded icon:** `./app-icon.ico`, a committed multi-resolution `.ico` (16 → 256 px) that `build.win.icon` points at. We pre-generate it rather than let electron-builder convert the PNG, because v25 only emits a single 256 px entry from a PNG. (See [packaging.md](./packaging.md) § App icon for the regeneration command.)
