@@ -34,6 +34,7 @@ const SETTINGS: Settings = {
   locationOverrides: [],
   browserGeolocation: null,
   locationPermissionAsked: false,
+  cachedLocation: null,
 };
 
 const SNAPSHOT: DataSnapshot = {

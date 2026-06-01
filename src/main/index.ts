@@ -9,6 +9,7 @@ import {
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { fetchGeolocation } from './data/geolocation';
+import { withLocationCache } from './data/geolocation-cache';
 import { geocodeByName, type GeocodingMatch } from './data/geocoding';
 import { fetchForecast } from './data/open-meteo';
 import { fetchKp } from './data/noaa-swpc';
@@ -73,7 +74,16 @@ let onboardingActive = false;
 // the refresh loop on the :05 cadence with sleep/wake catch-up wired
 // to powerMonitor.
 const dataStore = new DataStore({
-  fetchGeolocation,
+  // Wrap the IP-geolocation client with the resilience cache: every
+  // successful detection is persisted to settings.json and reused when
+  // the provider is unreachable. First-ever launch has no cache, so a
+  // failure still surfaces as the error state. See geolocation-cache.ts.
+  fetchGeolocation: withLocationCache(fetchGeolocation, {
+    read: () => loadSettings().cachedLocation,
+    write: (result) => {
+      saveSettings({ cachedLocation: result });
+    },
+  }),
   fetchForecast,
   fetchKp,
   // The resolver picks final coords from (override → browser → IP).

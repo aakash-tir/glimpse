@@ -127,6 +127,36 @@ describe('mergeWithDefaults', () => {
     const merged = mergeWithDefaults({ browserGeolocation: null });
     expect(merged.browserGeolocation).toBeNull();
   });
+
+  it('defaults cachedLocation to null on an absent field', () => {
+    expect(mergeWithDefaults({}).cachedLocation).toBeNull();
+  });
+
+  it('accepts a well-formed cachedLocation (city may be null)', () => {
+    const withCity = mergeWithDefaults({
+      cachedLocation: {
+        latitude: 49.888,
+        longitude: -119.496,
+        city: 'Kelowna',
+      },
+    });
+    expect(withCity.cachedLocation).toEqual({
+      latitude: 49.888,
+      longitude: -119.496,
+      city: 'Kelowna',
+    });
+    const nullCity = mergeWithDefaults({
+      cachedLocation: { latitude: 10, longitude: 20, city: null },
+    });
+    expect(nullCity.cachedLocation?.city).toBeNull();
+  });
+
+  it('rejects malformed cachedLocation and falls back to null', () => {
+    const merged = mergeWithDefaults({
+      cachedLocation: { latitude: 'oops', longitude: -119.3, city: 'X' },
+    });
+    expect(merged.cachedLocation).toBeNull();
+  });
 });
 
 describe('readSettingsFromFile', () => {
