@@ -95,6 +95,13 @@ export type Settings = {
    * CachedLocation.
    */
   cachedLocation: CachedLocation | null;
+  /**
+   * True once the installed build has registered itself for open-at-login
+   * (first packaged run). Prevents re-registering on every launch so the
+   * user can disable startup via Windows Settings and have it stick. See
+   * shared/auto-launch.ts.
+   */
+  autoLaunchRegistered: boolean;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -111,6 +118,7 @@ export const DEFAULT_SETTINGS: Settings = {
   browserGeolocation: null,
   locationPermissionAsked: false,
   cachedLocation: null,
+  autoLaunchRegistered: false,
 };
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -206,6 +214,8 @@ export function mergeWithDefaults(raw: unknown): Settings {
     out.locationPermissionAsked = raw.locationPermissionAsked;
   if (raw.cachedLocation === null || isCachedLocation(raw.cachedLocation))
     out.cachedLocation = raw.cachedLocation;
+  if (typeof raw.autoLaunchRegistered === 'boolean')
+    out.autoLaunchRegistered = raw.autoLaunchRegistered;
 
   return out;
 }
