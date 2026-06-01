@@ -201,7 +201,7 @@
 
 ## M9 — First-launch onboarding
 
-**Status:** Not started
+**Status:** Done (2026-06-01)
 
 **Scope.** Custom 8-step coachmark tutorial that runs on first launch and is replayable from settings.
 
