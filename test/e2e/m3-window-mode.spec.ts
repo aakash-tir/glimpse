@@ -1,19 +1,11 @@
-import { test, expect, _electron as electron } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
-import { spawn } from 'node:child_process';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { resolve, dirname, join } from 'node:path';
-import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
-
-const require = createRequire(import.meta.url);
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const projectRoot = resolve(__dirname, '../..');
-
-async function launch(): Promise<ElectronApplication> {
-  return await electron.launch({ args: ['.'], cwd: projectRoot });
-}
+import { join } from 'node:path';
+import {
+  launchGlimpse as launch,
+  spawnSecondInstance as spawnRawSecondInstance,
+} from './launch';
 
 // Some tests in this file save iconPosition / windowBounds to
 // %APPDATA%\Glimpse\settings.json, which leaks state into later tests
@@ -51,8 +43,7 @@ test.beforeEach(() => {
 });
 
 async function spawnSecondInstance(): Promise<void> {
-  const electronBin = require('electron') as string;
-  const child = spawn(electronBin, ['.'], { cwd: projectRoot });
+  const child = spawnRawSecondInstance();
   await new Promise<void>((resolveExit, rejectExit) => {
     const timeout = setTimeout(() => {
       child.kill();

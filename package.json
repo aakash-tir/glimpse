@@ -20,6 +20,7 @@
     "test:integration": "vitest run --passWithNoTests test/integration",
     "test:build": "vitest run --passWithNoTests test/build",
     "test:e2e": "npm run build && playwright test",
+    "test:e2e:packaged": "electron-vite build && electron-builder --win --dir && playwright test --config playwright.packaged.config.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
   },
