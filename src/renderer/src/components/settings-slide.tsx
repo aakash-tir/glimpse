@@ -106,6 +106,10 @@ export function SettingsSlide({
     void window.glimpse?.refreshData();
   };
 
+  const handleReplayTutorial = (): void => {
+    void window.glimpse?.replayOnboarding();
+  };
+
   return (
     <div
       data-testid="slide-settings-shell"
@@ -326,16 +330,10 @@ export function SettingsSlide({
           </Row>
 
           <Row label="Replay tutorial" palette={palette}>
-            {/* M9 wires the actual replay flow. Rendering the row + a
-              disabled button now keeps the layout stable through the
-              milestone gap. */}
             <ActionButton
               testId="settings-replay-tutorial"
-              onClick={() => {
-                /* M9 */
-              }}
+              onClick={handleReplayTutorial}
               palette={palette}
-              disabled
             >
               Replay
             </ActionButton>

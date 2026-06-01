@@ -146,9 +146,8 @@ For each milestone below, every bullet is a test (or small group of related test
 - **Component:** replay tutorial button (Settings) closes window, returns to icon, restarts from step 1.
 - **Component:** title bar force-visible during steps 3 and 5.
 - **Component:** offline-preview step (step 7) renders a static sample sad-cloud (not the live icon) inside the overlay; two-line copy matches the spec.
-- **E2E:** full onboarding flow on a clean profile (no `settings.json`) — completes via Next button only; completes via gestures only; skip exits cleanly; interrupted run resumes from step 1 next launch.
-- **E2E:** onboarding running while first data fetch is in-flight → skeletons visible behind overlay.
-- **E2E:** onboarding running with mocked first-fetch failure → sad cloud visible behind overlay; tutorial proceeds.
+- **E2E:** full onboarding flow on a clean profile (no `settings.json`) — completes via Next/Done; advances via gestures on the mock elements; skip exits cleanly and marks completed; interrupted run (close mid-tutorial) resumes from step 1 on next launch.
+- _(Design note: the tutorial is a self-contained mock panel, so there is no live app "behind" the overlay — the original "skeletons / sad-cloud behind overlay" E2E tests do not apply. The data fetch still runs in the background during onboarding via the M5 data layer; the post-completion window reflects loading / error state through the existing M5/M6 tests.)_
 
 ## M10 — Polish & packaging
 

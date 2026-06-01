@@ -193,6 +193,11 @@ export type SlideDeckProps = {
    * `location.city` when an override is active.
    */
   detectedCity?: string | null;
+  /**
+   * Slide to open on (first mount only). Used by the onboarding
+   * completion handoff to land the window on Settings.
+   */
+  initialSlideId?: SlideId;
 };
 
 type Transition = {
@@ -212,6 +217,7 @@ export function SlideDeck({
   location = null,
   lastUpdated = null,
   detectedCity = null,
+  initialSlideId,
 }: SlideDeckProps): JSX.Element {
   // Stable key derived from event ids so memo deps don't depend on
   // the `events` array's reference identity — callers that pass
@@ -247,8 +253,13 @@ export function SlideDeck({
   );
   // Track index in a ref + a mirror state so the render uses the
   // reconciled index immediately on prop change without a stale
-  // double-render.
-  const [currentIndex, setCurrentIndex] = useState(reconciled);
+  // double-render. `initialSlideId` (onboarding completion handoff)
+  // overrides the starting index on first mount only.
+  const [currentIndex, setCurrentIndex] = useState(() =>
+    initialSlideId
+      ? Math.max(0, visibleSlides.indexOf(initialSlideId))
+      : reconciled,
+  );
 
   if (prevVisibleRef.current !== visibleSlides && reconciled !== currentIndex) {
     // Sync state to the reconciled index when the visibility list

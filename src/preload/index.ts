@@ -9,6 +9,7 @@ import type { Mode, ModeChange } from '../shared/mode';
 import type { ResizeCorner } from '../shared/window-position';
 import type { DataSnapshot } from '../shared/data-snapshot';
 import type { ResolvedTheme } from '../shared/theme';
+import type { OnboardingFinishReason } from '../shared/onboarding';
 
 // Mirrors the GeocodingMatch shape from main/data/geocoding.ts. Kept
 // inline so the preload layer doesn't need to import from main/.
@@ -82,6 +83,26 @@ const api = {
     ipcRenderer.on('theme:changed', handler);
     return () => {
       ipcRenderer.off('theme:changed', handler);
+    };
+  },
+  // ---- Onboarding ----
+  // Synchronous so the renderer knows at first paint whether to show
+  // the tutorial — avoids flashing the icon view inside the larger
+  // onboarding panel.
+  isOnboardingActive: (): boolean =>
+    ipcRenderer.sendSync('onboarding:get-sync') as boolean,
+  onboardingFinish: (reason: OnboardingFinishReason): Promise<void> =>
+    ipcRenderer.invoke('onboarding:finish', reason),
+  // Replay from the Settings slide: re-enters the onboarding panel and
+  // restarts at step 1. Main resizes the window and pushes a
+  // replay-start event back so the renderer re-mounts the controller.
+  replayOnboarding: (): Promise<void> =>
+    ipcRenderer.invoke('onboarding:replay'),
+  onOnboardingReplay: (cb: () => void): (() => void) => {
+    const handler = (): void => cb();
+    ipcRenderer.on('onboarding:replay-start', handler);
+    return () => {
+      ipcRenderer.off('onboarding:replay-start', handler);
     };
   },
   getData: (): Promise<DataSnapshot> => ipcRenderer.invoke('data:get'),

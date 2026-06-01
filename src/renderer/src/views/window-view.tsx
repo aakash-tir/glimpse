@@ -25,6 +25,9 @@ export type WindowViewProps = {
   // compute the start scale (icon size / window size) without depending
   // on `window.innerWidth`, which momentarily lags `setBounds`.
   enterBounds: { width: number; height: number } | null;
+  // Set when this window opened from finishing onboarding via "Done":
+  // start on the Settings slide and show the "You're all set" toast.
+  justCompletedOnboarding?: boolean;
 };
 
 type CollapseRequest = {
@@ -41,8 +44,18 @@ type CollapseRequest = {
 export function WindowView({
   enterAnchor,
   enterBounds,
+  justCompletedOnboarding = false,
 }: WindowViewProps): JSX.Element {
   const [collapse, setCollapse] = useState<CollapseRequest | null>(null);
+  // "You're all set" toast after onboarding completion (~3 s).
+  const [showCompletionToast, setShowCompletionToast] = useState(
+    justCompletedOnboarding,
+  );
+  useEffect(() => {
+    if (!showCompletionToast) return;
+    const id = setTimeout(() => setShowCompletionToast(false), 3000);
+    return () => clearTimeout(id);
+  }, [showCompletionToast]);
   // Live settings stream — pushed to every slide that depends on
   // user preferences. Each settings:set in main triggers a broadcast
   // that updates this hook, so the moon-phase visibility, time format,
@@ -231,6 +244,7 @@ export function WindowView({
         location={location}
         lastUpdated={lastUpdated}
         detectedCity={detectedCity}
+        initialSlideId={justCompletedOnboarding ? 'settings' : undefined}
       />
     </motion.div>
   );
@@ -261,6 +275,34 @@ export function WindowView({
           renders null when settings.locationPermissionAsked is true,
           so this layer disappears after the user picks an option. */}
       <LocationPrompt settings={settings} />
+      {showCompletionToast ? (
+        <motion.div
+          data-testid="onboarding-toast"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          style={{
+            position: 'absolute',
+            bottom: 44,
+            left: 0,
+            right: 0,
+            margin: '0 auto',
+            width: 'fit-content',
+            maxWidth: '80%',
+            padding: '8px 16px',
+            borderRadius: 999,
+            background: 'rgba(15, 23, 42, 0.92)',
+            border: '1px solid rgba(255, 255, 255, 0.16)',
+            color: 'rgba(255, 255, 255, 0.95)',
+            fontFamily: 'system-ui, sans-serif',
+            fontSize: 12,
+            fontWeight: 600,
+            pointerEvents: 'none',
+            zIndex: 40,
+          }}
+        >
+          You&apos;re all set
+        </motion.div>
+      ) : null}
       <TitleBar
         background="dark"
         disabled={dragMode}

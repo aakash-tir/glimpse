@@ -32,12 +32,23 @@ function resetSettings(): void {
   const path = join(appData, 'Glimpse', 'settings.json');
   rmSync(path, { force: true });
   mkdirSync(join(appData, 'Glimpse'), { recursive: true });
+  // onboardingCompleted = true so these window-mode tests bypass the
+  // first-launch tutorial (which would otherwise own the window).
   writeFileSync(
     path,
-    JSON.stringify({ locationPermissionAsked: true }),
+    JSON.stringify({
+      locationPermissionAsked: true,
+      onboardingCompleted: true,
+    }),
     'utf-8',
   );
 }
+
+// Every test starts from a clean profile with onboarding already
+// completed, so the icon / window view (not the tutorial) is shown.
+test.beforeEach(() => {
+  resetSettings();
+});
 
 async function spawnSecondInstance(): Promise<void> {
   const electronBin = require('electron') as string;
