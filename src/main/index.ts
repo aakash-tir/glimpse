@@ -69,6 +69,17 @@ let mode: Mode = 'icon';
 // the icon / window view.
 let onboardingActive = false;
 
+// Returns the icon window only when it exists AND hasn't been destroyed.
+// Main-side async callbacks (data-store pushes, nativeTheme updates,
+// display-change re-anchors) can fire during the teardown window after the
+// window is destroyed on quit; calling webContents.send / setBounds on a
+// destroyed window throws "Object has been destroyed". Optional-chaining
+// (`iconWindow?.`) only guards null, not destroyed-but-non-null — this does
+// both.
+function liveWindow(): BrowserWindow | null {
+  return iconWindow && !iconWindow.isDestroyed() ? iconWindow : null;
+}
+
 // Data layer — composed at app.whenReady so the constructors don't
 // run during test imports of this module. The store fans out to the
 // renderer via IPC ('data:get' / 'data:changed'). The scheduler runs
@@ -159,6 +170,15 @@ function createIconWindow(): void {
     iconWindow?.show();
   });
 
+  // Null the reference and drop any in-flight gesture sessions when the
+  // window goes away, so the liveWindow() guard and the session handlers
+  // can't act on a destroyed window during quit teardown.
+  iconWindow.on('closed', () => {
+    iconWindow = null;
+    dragSession = null;
+    resizeSession = null;
+  });
+
   if (process.env['ELECTRON_RENDERER_URL']) {
     void iconWindow.loadURL(process.env['ELECTRON_RENDERER_URL']);
   } else {
@@ -167,7 +187,8 @@ function createIconWindow(): void {
 }
 
 function snapBackIfOffScreen(): void {
-  if (!iconWindow) return;
+  const win = liveWindow();
+  if (!win) return;
   // While onboarding owns the window bounds, leave them alone.
   if (onboardingActive) return;
   // Display changes only re-anchor the icon; if the user is currently in
@@ -183,7 +204,7 @@ function snapBackIfOffScreen(): void {
     allDisplayBounds(),
   );
   const winPos = windowPositionForIcon(resolvedIcon);
-  iconWindow.setBounds({
+  win.setBounds({
     x: winPos.x,
     y: winPos.y,
     width: ICON_WINDOW_WIDTH,
@@ -529,7 +550,7 @@ function registerIpc(): void {
 
   function broadcastSettings(): void {
     const settings = loadSettings();
-    iconWindow?.webContents.send('settings:changed', settings);
+    liveWindow()?.webContents.send('settings:changed', settings);
   }
 
   ipcMain.handle(
@@ -640,7 +661,7 @@ function registerIpc(): void {
   // Renderer subscribes via the preload's onDataChanged. We forward
   // every snapshot push to whichever window is currently showing.
   dataStore.subscribe((snapshot: DataSnapshot) => {
-    iconWindow?.webContents.send('data:changed', snapshot);
+    liveWindow()?.webContents.send('data:changed', snapshot);
   });
 
   ipcMain.handle('mode:get', () => mode);
@@ -909,6 +930,14 @@ if (!gotLock) {
 } else {
   app.on('second-instance', () => {
     if (!iconWindow) return;
+    // During the first-launch tutorial the window IS the onboarding panel.
+    // mode is still 'icon', but expanding would resize away from the panel
+    // and tear the running tutorial — just focus the existing panel.
+    if (onboardingActive) {
+      if (iconWindow.isMinimized()) iconWindow.restore();
+      iconWindow.focus();
+      return;
+    }
     if (mode === 'window') {
       // Restore from minimize if needed and bring to front.
       if (iconWindow.isMinimized()) iconWindow.restore();
@@ -946,7 +975,7 @@ if (!gotLock) {
     // sync with Windows; when override is locked light/dark the push
     // still fires but the resolved value won't change.
     nativeTheme.on('updated', () => {
-      iconWindow?.webContents.send('theme:changed', currentResolvedTheme());
+      liveWindow()?.webContents.send('theme:changed', currentResolvedTheme());
     });
 
     app.on('activate', () => {
