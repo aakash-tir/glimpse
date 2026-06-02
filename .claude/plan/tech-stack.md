@@ -30,6 +30,12 @@ See [styling.md](./styling.md) for the visual / animation rules and [data-source
   | `trackWindowPosition` | `boolean` | `false` | When on, persist window bounds. |
   | `windowBounds` | `{ x, y, width, height } \| null` | `null` | Only set when `trackWindowPosition = true`. |
   | `onboardingCompleted` | `boolean` | `false` | See [onboarding.md](./onboarding.md). |
+  | `advancedLocationEnabled` | `boolean` | `false` | Gates manual location overrides. See [data-sources.md](./data-sources.md) § Location. |
+  | `locationOverrides` | `LocationOverride[]` | `[]` | User-entered cities keyed by IP-detected city. Tier 1 of the location chain. |
+  | `browserGeolocation` | `{ latitude, longitude, capturedAt } \| null` | `null` | Cached `navigator.geolocation` result. Tier 2. |
+  | `locationPermissionAsked` | `boolean` | `false` | True once the one-time location-permission prompt has been shown. |
+  | `cachedLocation` | `{ latitude, longitude, city } \| null` | `null` | Last successful IP detection, reused on provider failure (M10). |
+  | `autoLaunchRegistered` | `boolean` | `false` | True once open-at-login was registered (M10). Prevents re-registering every launch so a user opt-out sticks. |
 
 - **Secrets →** `.env` at project root. No keys currently required; placeholder for any future paid source.
 
@@ -43,7 +49,7 @@ See [styling.md](./styling.md) for the visual / animation rules and [data-source
 
 ## Auto-launch
 
-`app.setLoginItemSettings({ openAtLogin: true })` registered on installed-build first run.
+`app.setLoginItemSettings({ openAtLogin: true })` registered on installed-build first run **only** — a persisted `autoLaunchRegistered` flag prevents re-registering on every launch, so a user who later disables startup keeps it disabled (we never silently re-enable). The OS write is wrapped in try/catch so a failure can't abort startup. See `src/shared/auto-launch.ts`.
 
 User can disable via Windows Settings → Apps → Startup like any other app.
 
