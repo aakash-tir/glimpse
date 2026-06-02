@@ -1,19 +1,8 @@
-import { test, expect, _electron as electron } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
-import { spawn } from 'node:child_process';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
-
-const require = createRequire(import.meta.url);
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const projectRoot = resolve(__dirname, '../..');
-
-async function launch(): Promise<ElectronApplication> {
-  return await electron.launch({ args: ['.'], cwd: projectRoot });
-}
+import { join } from 'node:path';
+import { launchGlimpse as launch, spawnSecondInstance } from './launch';
 
 // Clean profile with onboarding already completed so the icon view
 // (not the first-launch tutorial) is shown.
@@ -167,8 +156,7 @@ test('a second app launch does not spawn a duplicate icon window', async () => {
     // process should exit on its own; we only need to confirm that no
     // duplicate icon window appeared and that the first instance is
     // unaffected.
-    const electronBin = require('electron') as string;
-    const child = spawn(electronBin, ['.'], { cwd: projectRoot });
+    const child = spawnSecondInstance();
     const exitCode = await new Promise<number | null>(
       (resolveExit, rejectExit) => {
         const timeout = setTimeout(() => {

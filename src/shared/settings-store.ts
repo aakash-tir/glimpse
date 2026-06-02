@@ -39,6 +39,20 @@ export type BrowserGeolocation = {
   capturedAt: string;
 };
 
+/**
+ * The most recent successful IP-geolocation result, persisted so we can
+ * fall back to it when the provider is unreachable (rate limit, transient
+ * outage). This is a resilience cache only — the primary path is still
+ * detect-on-launch per plan/data-sources.md. On a first-ever launch no
+ * cache exists, so a provider failure still surfaces as the error state.
+ */
+export type CachedLocation = {
+  latitude: number;
+  longitude: number;
+  /** IP-detected city at the time of caching. May be null. */
+  city: string | null;
+};
+
 export type Settings = {
   units: Units;
   timeFormat: TimeFormat;
@@ -75,6 +89,19 @@ export type Settings = {
    * Settings → "Re-ask location permission".
    */
   locationPermissionAsked: boolean;
+  /**
+   * Last successful IP-geolocation result, used as a fallback when the
+   * provider fails. null until the first successful detection. See
+   * CachedLocation.
+   */
+  cachedLocation: CachedLocation | null;
+  /**
+   * True once the installed build has registered itself for open-at-login
+   * (first packaged run). Prevents re-registering on every launch so the
+   * user can disable startup via Windows Settings and have it stick. See
+   * shared/auto-launch.ts.
+   */
+  autoLaunchRegistered: boolean;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -90,6 +117,8 @@ export const DEFAULT_SETTINGS: Settings = {
   locationOverrides: [],
   browserGeolocation: null,
   locationPermissionAsked: false,
+  cachedLocation: null,
+  autoLaunchRegistered: false,
 };
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -139,6 +168,16 @@ function isBrowserGeolocation(v: unknown): v is BrowserGeolocation {
     typeof v.capturedAt === 'string'
   );
 }
+function isCachedLocation(v: unknown): v is CachedLocation {
+  return (
+    isPlainObject(v) &&
+    typeof v.latitude === 'number' &&
+    Number.isFinite(v.latitude) &&
+    typeof v.longitude === 'number' &&
+    Number.isFinite(v.longitude) &&
+    (v.city === null || typeof v.city === 'string')
+  );
+}
 
 export function mergeWithDefaults(raw: unknown): Settings {
   const out: Settings = { ...DEFAULT_SETTINGS };
@@ -173,6 +212,10 @@ export function mergeWithDefaults(raw: unknown): Settings {
     out.browserGeolocation = raw.browserGeolocation;
   if (typeof raw.locationPermissionAsked === 'boolean')
     out.locationPermissionAsked = raw.locationPermissionAsked;
+  if (raw.cachedLocation === null || isCachedLocation(raw.cachedLocation))
+    out.cachedLocation = raw.cachedLocation;
+  if (typeof raw.autoLaunchRegistered === 'boolean')
+    out.autoLaunchRegistered = raw.autoLaunchRegistered;
 
   return out;
 }

@@ -16,6 +16,7 @@ export default defineConfig({
       'test/unit/**/*.test.{ts,tsx}',
       'test/component/**/*.test.{ts,tsx}',
       'test/integration/**/*.test.{ts,tsx}',
+      'test/build/**/*.test.{ts,tsx}',
     ],
     exclude: ['test/e2e/**', 'node_modules/**', 'out/**', 'release/**'],
     coverage: {

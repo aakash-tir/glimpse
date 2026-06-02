@@ -1,5 +1,4 @@
-import { test, expect, _electron as electron } from '@playwright/test';
-import type { ElectronApplication } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import {
   existsSync,
   mkdirSync,
@@ -7,11 +6,8 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const projectRoot = resolve(__dirname, '../..');
+import { dirname, join } from 'node:path';
+import { launchGlimpse as launch } from './launch';
 
 function settingsPath(): string | null {
   const appData = process.env['APPDATA'];
@@ -40,10 +36,6 @@ function onboardingCompleted(): boolean {
     onboardingCompleted?: boolean;
   };
   return raw.onboardingCompleted === true;
-}
-
-async function launch(): Promise<ElectronApplication> {
-  return await electron.launch({ args: ['.'], cwd: projectRoot });
 }
 
 test('shows the tutorial on a clean profile and completes via Next', async () => {

@@ -14,11 +14,13 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit && tsc -p tsconfig.e2e.json --noEmit",
-    "test": "npm run test:unit && npm run test:component && npm run test:integration && npm run test:e2e",
+    "test": "npm run test:unit && npm run test:component && npm run test:integration && npm run test:build && npm run test:e2e",
     "test:unit": "vitest run --passWithNoTests test/unit",
     "test:component": "vitest run --passWithNoTests test/component",
     "test:integration": "vitest run --passWithNoTests test/integration",
+    "test:build": "vitest run --passWithNoTests test/build",
     "test:e2e": "npm run build && playwright test",
+    "test:e2e:packaged": "electron-vite build && electron-builder --win --dir && playwright test --config playwright.packaged.config.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
   },
@@ -37,7 +39,7 @@
     "asar": true,
     "win": {
       "target": "nsis",
-      "icon": "app-icon.png"
+      "icon": "app-icon.ico"
     },
     "nsis": {
       "oneClick": false,

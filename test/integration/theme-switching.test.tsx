@@ -34,6 +34,8 @@ const SETTINGS: Settings = {
   locationOverrides: [],
   browserGeolocation: null,
   locationPermissionAsked: false,
+  cachedLocation: null,
+  autoLaunchRegistered: false,
 };
 
 const SNAPSHOT: DataSnapshot = {

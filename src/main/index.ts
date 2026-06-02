@@ -9,6 +9,7 @@ import {
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { fetchGeolocation } from './data/geolocation';
+import { withLocationCache } from './data/geolocation-cache';
 import { geocodeByName, type GeocodingMatch } from './data/geocoding';
 import { fetchForecast } from './data/open-meteo';
 import { fetchKp } from './data/noaa-swpc';
@@ -51,6 +52,7 @@ import {
   type WindowBounds,
 } from '../shared/settings-store';
 import { resolveCoords } from '../shared/location-resolver';
+import { shouldRegisterAutoLaunch } from '../shared/auto-launch';
 import { onboardingWindowBounds } from '../shared/onboarding-window';
 import type { OnboardingFinishReason } from '../shared/onboarding';
 import type { Mode, ModeChange } from '../shared/mode';
@@ -73,7 +75,16 @@ let onboardingActive = false;
 // the refresh loop on the :05 cadence with sleep/wake catch-up wired
 // to powerMonitor.
 const dataStore = new DataStore({
-  fetchGeolocation,
+  // Wrap the IP-geolocation client with the resilience cache: every
+  // successful detection is persisted to settings.json and reused when
+  // the provider is unreachable. First-ever launch has no cache, so a
+  // failure still surfaces as the error state. See geolocation-cache.ts.
+  fetchGeolocation: withLocationCache(fetchGeolocation, {
+    read: () => loadSettings().cachedLocation,
+    write: (result) => {
+      saveSettings({ cachedLocation: result });
+    },
+  }),
   fetchForecast,
   fetchKp,
   // The resolver picks final coords from (override → browser → IP).
@@ -861,6 +872,25 @@ function registerIpc(): void {
   });
 }
 
+// One-time auto-launch registration for the installed build. Runs on the
+// first packaged launch only (guarded by shouldRegisterAutoLaunch), then
+// records the fact in settings so a user who later disables startup via
+// Windows Settings isn't overridden on the next launch. No-op under
+// `npm run dev` because app.isPackaged is false there.
+function maybeRegisterAutoLaunch(): void {
+  const settings = loadSettings();
+  if (
+    !shouldRegisterAutoLaunch({
+      isPackaged: app.isPackaged,
+      alreadyRegistered: settings.autoLaunchRegistered,
+    })
+  ) {
+    return;
+  }
+  app.setLoginItemSettings({ openAtLogin: true });
+  saveSettings({ autoLaunchRegistered: true });
+}
+
 // Single-instance lock per plan/tech-stack.md.
 //
 // Per plan/window.md: "if collapsed, auto-expand; if window already
@@ -892,6 +922,7 @@ if (!gotLock) {
 
   void app.whenReady().then(() => {
     registerIpc();
+    maybeRegisterAutoLaunch();
     createIconWindow();
 
     screen.on('display-metrics-changed', snapBackIfOffScreen);
