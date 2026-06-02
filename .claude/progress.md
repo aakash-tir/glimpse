@@ -226,7 +226,7 @@
 
 ## M10 — Polish & packaging (Phase 2)
 
-**Status:** Not started
+**Status:** Done (2026-06-02)
 
 **Scope.** Replace placeholder icon with high-res original, package into a Windows installer, register auto-launch.
 
