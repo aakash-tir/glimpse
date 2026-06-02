@@ -19,6 +19,8 @@
 //     configured for keyless backend use (CORS open, no bot-fight) so
 //     Node fetch reaches it cleanly.
 
+import { fetchWithTimeout } from './http';
+
 const ENDPOINT = 'https://get.geojs.io/v1/ip/geo.json';
 
 export type GeolocationResult = {
@@ -36,7 +38,7 @@ export type Fetcher = (url: string) => Promise<{
 }>;
 
 const defaultFetcher: Fetcher = (url) =>
-  fetch(url).then((res) => ({
+  fetchWithTimeout(url).then((res) => ({
     ok: res.ok,
     status: res.status,
     json: () => res.json() as Promise<unknown>,

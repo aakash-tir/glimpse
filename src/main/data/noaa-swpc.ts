@@ -15,6 +15,8 @@
 // We only need the most recent Kp — the latest entry feeds the aurora
 // visibility filter.
 
+import { fetchWithTimeout } from './http';
+
 const ENDPOINT =
   'https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json';
 
@@ -32,7 +34,7 @@ export type Fetcher = (url: string) => Promise<{
 }>;
 
 const defaultFetcher: Fetcher = (url) =>
-  fetch(url).then((res) => ({
+  fetchWithTimeout(url).then((res) => ({
     ok: res.ok,
     status: res.status,
     json: () => res.json() as Promise<unknown>,

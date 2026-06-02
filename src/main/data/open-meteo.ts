@@ -22,6 +22,7 @@ import type {
   ForecastHour,
 } from '../../shared/forecast';
 import { wmoToCondition } from '../../shared/wmo';
+import { fetchWithTimeout } from './http';
 
 export type {
   Forecast,
@@ -39,7 +40,7 @@ export type Fetcher = (url: string) => Promise<{
 }>;
 
 const defaultFetcher: Fetcher = (url) =>
-  fetch(url).then((res) => ({
+  fetchWithTimeout(url).then((res) => ({
     ok: res.ok,
     status: res.status,
     json: () => res.json() as Promise<unknown>,
