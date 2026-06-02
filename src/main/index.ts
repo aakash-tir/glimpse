@@ -908,8 +908,16 @@ function maybeRegisterAutoLaunch(): void {
   ) {
     return;
   }
-  app.setLoginItemSettings({ openAtLogin: true });
-  saveSettings({ autoLaunchRegistered: true });
+  // A failed OS login-items write must not abort startup. Without this,
+  // the exception would propagate out of the whenReady callback, the
+  // window would never be created, and autoLaunchRegistered would never
+  // persist — so it would retry (and fail) on every subsequent launch.
+  try {
+    app.setLoginItemSettings({ openAtLogin: true });
+    saveSettings({ autoLaunchRegistered: true });
+  } catch (err) {
+    console.error('auto-launch registration failed:', err);
+  }
 }
 
 // Single-instance lock per plan/tech-stack.md.
@@ -949,39 +957,46 @@ if (!gotLock) {
     expandToWindow();
   });
 
-  void app.whenReady().then(() => {
-    registerIpc();
-    maybeRegisterAutoLaunch();
-    createIconWindow();
+  app
+    .whenReady()
+    .then(() => {
+      registerIpc();
+      maybeRegisterAutoLaunch();
+      createIconWindow();
 
-    screen.on('display-metrics-changed', snapBackIfOffScreen);
-    screen.on('display-removed', snapBackIfOffScreen);
-    screen.on('display-added', snapBackIfOffScreen);
+      screen.on('display-metrics-changed', snapBackIfOffScreen);
+      screen.on('display-removed', snapBackIfOffScreen);
+      screen.on('display-added', snapBackIfOffScreen);
 
-    // Kick off the immediate first fetch and start the :05 cadence.
-    // Per spec: fetch all data immediately on app start (covers the
-    // "fetch on window open" requirement since the icon window is
-    // always present), then refresh on the hourly clock-aligned tick.
-    void dataStore.refresh();
-    dataScheduler.start();
-    // Fire an extra refresh on resume if the system slept past at
-    // least one tick window — see TickScheduler.notifyResume.
-    powerMonitor.on('resume', () => dataScheduler.notifyResume());
+      // Kick off the immediate first fetch and start the :05 cadence.
+      // Per spec: fetch all data immediately on app start (covers the
+      // "fetch on window open" requirement since the icon window is
+      // always present), then refresh on the hourly clock-aligned tick.
+      void dataStore.refresh();
+      dataScheduler.start();
+      // Fire an extra refresh on resume if the system slept past at
+      // least one tick window — see TickScheduler.notifyResume.
+      powerMonitor.on('resume', () => dataScheduler.notifyResume());
 
-    // Live theme switching: push the resolved theme any time the host
-    // OS toggles dark mode (or any other native-theme attribute the
-    // user might bind a system-wide hotkey to). When the user has
-    // themeOverride='auto' this is what keeps the Settings slide in
-    // sync with Windows; when override is locked light/dark the push
-    // still fires but the resolved value won't change.
-    nativeTheme.on('updated', () => {
-      liveWindow()?.webContents.send('theme:changed', currentResolvedTheme());
+      // Live theme switching: push the resolved theme any time the host
+      // OS toggles dark mode (or any other native-theme attribute the
+      // user might bind a system-wide hotkey to). When the user has
+      // themeOverride='auto' this is what keeps the Settings slide in
+      // sync with Windows; when override is locked light/dark the push
+      // still fires but the resolved value won't change.
+      nativeTheme.on('updated', () => {
+        liveWindow()?.webContents.send('theme:changed', currentResolvedTheme());
+      });
+
+      app.on('activate', () => {
+        if (BrowserWindow.getAllWindows().length === 0) createIconWindow();
+      });
+    })
+    // A rejection in the startup chain would otherwise be an unhandled
+    // rejection with no window and no diagnostic. Surface it.
+    .catch((err: unknown) => {
+      console.error('startup failed:', err);
     });
-
-    app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) createIconWindow();
-    });
-  });
 
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();
