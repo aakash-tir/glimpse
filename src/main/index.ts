@@ -44,6 +44,7 @@ import {
   type ResizeCorner,
 } from '../shared/window-position';
 import {
+  isLocationOverride,
   removeLocationOverride,
   upsertLocationOverride,
   type BrowserGeolocation,
@@ -556,6 +557,14 @@ function registerIpc(): void {
   ipcMain.handle(
     'location:set-override',
     async (_evt, override: LocationOverride) => {
+      // Revalidate the renderer payload before persisting: the merge-time
+      // guard only runs on file *read*, so a malformed override (e.g. NaN
+      // lat/lon) would otherwise be written and later drive a forecast
+      // fetch with garbage coords.
+      if (!isLocationOverride(override)) {
+        console.error('location:set-override rejected malformed payload');
+        return;
+      }
       const current = loadSettings();
       saveSettings({
         locationOverrides: upsertLocationOverride(

@@ -146,7 +146,7 @@ function isWindowBounds(v: unknown): v is WindowBounds {
     typeof v.height === 'number'
   );
 }
-function isLocationOverride(v: unknown): v is LocationOverride {
+export function isLocationOverride(v: unknown): v is LocationOverride {
   return (
     isPlainObject(v) &&
     typeof v.detectedCity === 'string' &&
