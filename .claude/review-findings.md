@@ -6,6 +6,12 @@ follow-up, and what's deliberately deferred. Update the status column as
 items are addressed; remove an item only once it's done **and** any plan/
 change is folded in.
 
+> **Status (2026-08-10):** every code and documentation finding is fixed
+> and `npm audit` is clean. Only two things remain open, neither a
+> finding from this review: the **manual checks** listed at the bottom
+> (automation can't reach them), and the deliberate decision to keep
+> React 18 and Tailwind 3 until there's a reason to move.
+
 Severity: **High** = can crash/brick or corrupt data · **Medium** = real
 bug, narrow conditions · **Low** = polish / personal-app-acceptable.
 
@@ -42,8 +48,13 @@ _Reviewed and found correct (no action): the `eslint-disable` at `slide-deck.tsx
 
 | Finding | Status |
 |---|---|
-| `npm audit`: 21 vulns (2 critical, 11 high) — **all in the electron-builder dev toolchain** (`node-gyp`, `tmp`, `ws`); none shipped to users. | **Deferred** — `npm audit fix` clears most; low priority. |
-| Electron 33 → 41 (8 majors behind; Chromium CVEs). Low real risk (no remote content). Many deps a major behind (React 18→19, Tailwind 3→4, Vitest 2→4). | **Deferred** — schedule an Electron bump; defer framework majors for a personal app. |
+| `npm audit`: 21 vulns (2 critical, 11 high) — **all in the electron-builder dev toolchain** (`node-gyp`, `tmp`, `ws`); none shipped to users. (Had drifted to 30 by 2026-08-10.) | **Fixed (M10.1)** — `npm audit fix` cleared 10 lock-only; the Electron and vite/vitest bumps below cleared the rest. **0 vulnerabilities.** |
+| Electron 33 → 41 (8 majors behind; Chromium CVEs). Low real risk (no remote content). Many deps a major behind (React 18→19, Tailwind 3→4, Vitest 2→4). | **Fixed (M10.1)** — Electron 33 → **43** (latest; 41 would age out of support sooner), electron-builder 25 → 26, vite 5 → 7, vitest 2 → 4, electron-vite 2 → 5, plugin-react 4 → 5. React 18 → 19 and Tailwind 3 → 4 stay deferred: no advisories, and no feature need for a personal app. |
+
+**Fallout from the Electron bump, both resolved:**
+
+- Electron ≤ 40 clamped off-screen values inside `setBounds`, masking a latent M3 bug where a window edge-snap carried an unclamped axis. Electron 41+ honors the value, so a drag-release near an edge could park the window partly off-display. Fixed in `snapWindowToEdge` with 6 regression tests.
+- Electron 43 and its build toolchain declare `node >= 22.12.0`; this machine runs **Node v20.19.5**, so `npm install` emits `EBADENGINE` warnings. Everything works today (build, packaging, and all tests pass), but the toolchain is running on an unsupported Node — **worth upgrading Node to 22 LTS+ before relying on it.**
 
 ## Manual checks still outstanding
 
