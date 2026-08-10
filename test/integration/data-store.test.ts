@@ -1,7 +1,7 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, type Mock } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { DataStore } from '../../src/main/data/store';
+import { DataStore, type StoreDeps } from '../../src/main/data/store';
 import type { Forecast } from '../../src/shared/forecast';
 import { parseForecast } from '../../src/main/data/open-meteo';
 
@@ -29,9 +29,14 @@ function makeDeps(overrides?: {
   kpImpl?: () => Promise<{ kp: number; observedAtUtc: string }>;
   geoImpl?: () => Promise<typeof sampleLocation>;
 }): {
-  fetchGeolocation: ReturnType<typeof vi.fn>;
-  fetchForecast: ReturnType<typeof vi.fn>;
-  fetchKp: ReturnType<typeof vi.fn>;
+  // Typed from StoreDeps rather than ReturnType<typeof vi.fn>: since
+  // Vitest 4 a bare vi.fn() is Mock<Procedure | Constructable>, which
+  // carries no call signature and so isn't assignable to StoreDeps.
+  // Naming the contract here also keeps the mocks honest if StoreDeps
+  // changes shape.
+  fetchGeolocation: Mock<StoreDeps['fetchGeolocation']>;
+  fetchForecast: Mock<StoreDeps['fetchForecast']>;
+  fetchKp: Mock<StoreDeps['fetchKp']>;
 } {
   return {
     fetchGeolocation: vi.fn(
