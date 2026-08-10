@@ -18,9 +18,9 @@ bug, narrow conditions · **Low** = polish / personal-app-acceptable.
 | C | Medium | `src/main/data/*` | Bare `fetch` with no timeout — a hung connection stalls the awaited refresh tick indefinitely with no error-state transition. | **Fixed (M10.1)** — `fetchWithTimeout` (10 s) in all 4 clients. |
 | D | Medium | `src/main/index.ts` | `location:set-override` wrote the renderer payload without revalidation (merge-time guard only runs on read), so NaN lat/lon could be persisted and drive a forecast fetch. | **Fixed (M10.1)** — `isLocationOverride()` guard in the handler. |
 | L1 | Low | `src/main/index.ts` | A second launch during onboarding called `expandToWindow()`, tearing the tutorial panel. | **Fixed (M10.1)** — focus the panel instead when `onboardingActive`. |
-| E | Low | `src/main/index.ts` | `DataStore.refresh()` has no in-flight guard; overlapping refreshes (expand + `:05` tick) can both `commit()` and skew the backoff index. | **Deferred** — coalesce concurrent refreshes (return the in-flight promise). |
-| F | Low | `src/shared/time-format.ts`, `eclipse-slide.tsx` | Eclipse "Peak HH:MM" and the "last updated" subtitle render in the **host** timezone while all other times use the forecast location's zone. Coincides on a single-machine setup. | **Deferred** — document as host-local or thread the location tz offset through. |
-| G | Low | `coachmark.tsx`, `onboarding-controller.tsx` | Onboarding overlay has no focus management (no autofocus to Next on step change, no Escape-to-skip). Only real a11y miss. | **Deferred** — focus `coachmark-next` on step change + Escape → skip. |
+| E | Low | `src/main/index.ts` | `DataStore.refresh()` has no in-flight guard; overlapping refreshes (expand + `:05` tick) can both `commit()` and skew the backoff index. | **Fixed (M10.1)** — concurrent callers join the in-flight run and share its result. |
+| F | Low | `src/shared/time-format.ts`, `eclipse-slide.tsx` | Eclipse "Peak HH:MM" and the "last updated" subtitle render in the **host** timezone while all other times use the forecast location's zone. Coincides on a single-machine setup. | **Fixed (M10.1)** — `formatLocalClock` takes an IANA zone; callers pass `Forecast.timezone`, falling back to host-local when no forecast has loaded. |
+| G | Low | `coachmark.tsx`, `onboarding-controller.tsx` | Onboarding overlay has no focus management (no autofocus to Next on step change, no Escape-to-skip). Only real a11y miss. | **Fixed (M10.1)** — Next takes focus on mount + every step change; Escape skips; `role="dialog"` + `aria-modal`. |
 
 _Reviewed and found correct (no action): the `eslint-disable` at `slide-deck.tsx:233` (keyed on the joined-id string to avoid a reconcile-during-render loop — safe); timezone math in `forecast-window.ts`; aurora / eclipse / moon / special-events logic; all hook cleanup; null/loading/error states._
 
@@ -28,6 +28,8 @@ _Reviewed and found correct (no action): the `eslint-disable` at `slide-deck.tsx
 
 | Finding | Status |
 |---|---|
+| No plan file stated which timezone clock times render in (surfaced by finding F). | **Fixed (M10.1)** — `plan/slides.md` § Time rendering added; the eclipse bullet corrected from "user's local time". |
+| Onboarding keyboard / focus behavior was unspecified (surfaced by finding G). | **Fixed (M10.1)** — `plan/onboarding.md` § Keyboard & focus added. |
 | `open-questions.md` step-5 item was actually resolved in M9 (option c). | **Fixed (M10.1)** — entry removed, status set to "no open items". |
 | `plan/data-sources.md` § Location said IP-only / "no permission prompt", but the code ships a 3-tier resolver (override → browser geolocation → IP) + a permission prompt. | **Fixed (M10.1)** — Location section rewritten. |
 | `plan/tech-stack.md` schema listed 8 of the 14 real settings fields. | **Fixed (M10.1)** — added the 6 missing fields. |
