@@ -167,9 +167,12 @@
 
 - **Current conditions slide.** Four metric tiles: Wind (SVG arrow rotated by direction degrees + speed) · Humidity (% with drop icon) · Sunrise/sunset (two times stacked vertically with mini icons) · Feels-like temp.
 - **Moon phase slide** (controlled by Settings toggle, default off). Large stylized SVG moon graphic with curved shadow showing current phase. Below: phase name + illumination %. Background `#0a1628` deep navy.
-- **Settings slide.** Vertical scroll. In order: Units toggle (metric/imperial) · Time format (12h/24h) · Moon-phase slide toggle · Theme (auto/light/dark) · Track window position toggle · Reset icon position button · Manual refresh button · Replay tutorial button (wired in M9) · About (app name + credits line). Background adapts to resolved theme — `#0f172a` slate in dark mode, `#f8fafc` off-white in light mode.
+- **Settings slide.** Vertical scroll. In order: Units toggle (metric/imperial) · Time format (12h/24h) · Moon-phase slide toggle · Theme (auto/light/dark) · Track window position toggle · Advanced location toggle + inline form · Reset icon position button · Manual refresh button · Replay tutorial button (wired in M9) · About (app name + credits line). Background adapts to resolved theme — `#0f172a` slate in dark mode, `#f8fafc` off-white in light mode.
+- **Advanced location subsystem.** The 3-tier coordinate resolver (manual override → browser geolocation → IP detection), the one-time browser permission prompt, the Open-Meteo geocoding client backing the city search, and the `advancedLocationEnabled` / `locationOverrides` / `browserGeolocation` / `locationPermissionAsked` settings fields. The Settings form is hidden below a 280 px window width (`SETTINGS_COMPACT_THRESHOLD_PX`) since its fields don't fit. See [`plan/data-sources.md` § Location](./plan/data-sources.md).
 - Live theme switching via `nativeTheme.on('updated')` with 200 ms cross-fade.
 - Custom dark-glass tooltip component used wherever needed.
+
+_Scope note (added 2026-08-10): the advanced-location subsystem was built during M7 (commits `241ce8c`, `869e37a`) but was never written into this scope list — it was recorded retroactively rather than reassigned, since M7 is where it actually shipped._
 
 **Refs:** [`plan/slides.md`](./plan/slides.md), [`plan/data-sources.md`](./plan/data-sources.md), [`plan/styling.md`](./plan/styling.md). **Tests:** [`rules/testing.md` § M7](./rules/testing.md#m7--current--moon--settings).
 

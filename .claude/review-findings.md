@@ -36,7 +36,7 @@ _Reviewed and found correct (no action): the `eslint-disable` at `slide-deck.tsx
 | Cached-location fallback absent from `data-sources.md` failure handling. | **Fixed (M10.1)** — added a "Failure handling (location)" subsection. |
 | `tech-stack.md` § Auto-launch didn't mention the register-once `autoLaunchRegistered` nuance. | **Fixed (M10.1)** — noted. |
 | `progress.md` M10 provider parenthetical stale (says ipapi.co→ipwho.is; landed on geojs.io). | **Fixed (M10.1)** — corrected. |
-| The advanced-location / browser-geolocation subsystem appears in no milestone's scope/DoD. | **Deferred** — decide owning milestone (M5/M7 fit) and record it in `progress.md`. |
+| The advanced-location / browser-geolocation subsystem appears in no milestone's scope/DoD. | **Fixed (M10.1)** — git history puts it on the M7 branch (`241ce8c`, `869e37a`, 2026-05-08/09), so it was recorded in M7's scope in `progress.md` with a note that it was added retroactively. |
 
 ## Dependencies
 
