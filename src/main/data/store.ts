@@ -79,6 +79,9 @@ export class DataStore {
   // delay returned from refresh(). Reset to 0 on success.
   private weatherAttemptIndex = 0;
 
+  // The currently-running refresh, if any. See refresh() for why.
+  private inFlight: Promise<RefreshResult> | null = null;
+
   constructor(deps: StoreDeps) {
     this.deps = {
       ...deps,
@@ -100,7 +103,30 @@ export class DataStore {
   // Performs all fetches and updates the snapshot. Never throws —
   // errors map to state transitions (errorState, eventsHidden) instead
   // so the caller (scheduler) doesn't need try/catch around every tick.
-  async refresh(): Promise<RefreshResult> {
+  //
+  // Concurrent calls are COALESCED: a refresh that starts while another
+  // is still in flight joins the running one instead of starting its
+  // own. Without this, overlapping triggers (the clock-aligned :05 tick
+  // landing on top of an expand-time refresh, or a manual Settings
+  // refresh during either) would each run the full fetch chain and each
+  // commit() — doubling the network calls, racing two snapshots into
+  // the listeners, and, on failure, incrementing weatherAttemptIndex
+  // twice so the backoff skipped a rung (5 → 20 instead of 5 → 10).
+  //
+  // The shared RefreshResult is correct for every joiner: they all
+  // wanted "the data as of now", and the in-flight run delivers exactly
+  // that. A caller needing a guaranteed-fresh fetch must await this one
+  // first and then call again.
+  refresh(): Promise<RefreshResult> {
+    if (this.inFlight) return this.inFlight;
+    const run = this.runRefresh().finally(() => {
+      this.inFlight = null;
+    });
+    this.inFlight = run;
+    return run;
+  }
+
+  private async runRefresh(): Promise<RefreshResult> {
     let weatherOk = true;
     let location = this.snapshot.location;
     let forecast = this.snapshot.forecast;
