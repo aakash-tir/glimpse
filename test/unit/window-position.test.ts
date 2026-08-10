@@ -1048,6 +1048,57 @@ describe('snapWindowToEdge', () => {
     expect(result?.edge).toBe('bottom');
     expect(result?.position).toEqual({ x: 2500, y: 1080 - 200 });
   });
+
+  // Regression: an edge snap pins one axis and carries the other over
+  // from the drop point. That carried axis used to be written through
+  // unclamped, so a drop beyond a side of the screen but within the
+  // top-edge radius parked the window partly off-display. Electron <=40
+  // hid it by clamping inside setBounds; 41+ honors the value, which is
+  // what surfaced it (E2E B3a).
+  it('clamps the carried x when a top-edge drop is left of the display', () => {
+    const result = snapWindowToEdge({ x: -228, y: 0 }, size, [primary]);
+    expect(result?.edge).toBe('top');
+    expect(result?.position).toEqual({ x: 0, y: 0 });
+  });
+
+  it('clamps the carried x when a top-edge drop is right of the display', () => {
+    const result = snapWindowToEdge({ x: 5000, y: 10 }, size, [primary]);
+    expect(result?.edge).toBe('top');
+    // Max on-screen x for a 200 px window on a 1920 px display.
+    expect(result?.position).toEqual({ x: 1720, y: 0 });
+  });
+
+  it('clamps the carried y when a left-edge drop is above the display', () => {
+    const result = snapWindowToEdge({ x: 10, y: -500 }, size, [primary]);
+    expect(result?.edge).toBe('left');
+    expect(result?.position).toEqual({ x: 0, y: 0 });
+  });
+
+  it('clamps the carried y when a right-edge drop is below the display', () => {
+    const result = snapWindowToEdge({ x: 1710, y: 4000 }, size, [primary]);
+    expect(result?.edge).toBe('right');
+    expect(result?.position).toEqual({ x: 1720, y: 880 });
+  });
+
+  it('leaves an already-on-screen carried axis untouched', () => {
+    const result = snapWindowToEdge({ x: 640, y: 12 }, size, [primary]);
+    expect(result?.edge).toBe('top');
+    expect(result?.position).toEqual({ x: 640, y: 0 });
+  });
+
+  it('clamps against the display the drop is on, not the tie-winning one', () => {
+    // Two identical monitors offer the same bottom edge at the same
+    // distance; the first wins the tie. Clamping to it would drag a
+    // secondary-monitor drop back onto the primary.
+    const dispB: DisplayBounds = { x: 1920, y: 0, width: 1920, height: 1080 };
+    const result = snapWindowToEdge({ x: 3700, y: 870 }, size, [
+      primary,
+      dispB,
+    ]);
+    expect(result?.edge).toBe('bottom');
+    // Clamped to dispB's right limit (1920 + 1920 - 200), not primary's.
+    expect(result?.position).toEqual({ x: 3640, y: 880 });
+  });
 });
 
 describe('iconForCollapsedWindow — B3a (corner)', () => {
