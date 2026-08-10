@@ -51,3 +51,12 @@ For gesture steps, an animated cursor icon performs the gesture in place, with a
 - **Replay (from Settings):** closes the window, returns to icon mode, restarts from step 1.
 - **Title bar visibility during the title-bar steps:** the mock title bar is shown during steps 3 and 5 (the icon-↔-window step and the minimize step both involve title-bar elements). It is hidden on the other steps, matching the app's auto-hide behavior.
 - **Multi-monitor:** silent — onboarding runs on the primary monitor only.
+
+## Keyboard & focus
+
+The tutorial is the only modal surface in the app, so it is the one place where keyboard users can get stranded — the rest of Glimpse is pointer-driven by design.
+
+- **Focus moves to the Next button on every step change** (and on first mount). Advancing by gesture, by click, or by keyboard all land focus in the same place, so `Enter`/`Space` repeatedly walks the whole tutorial without touching the mouse. On the final step the same button reads "Done" and completes.
+- **`Escape` skips the tutorial** — identical to clicking "Skip tutorial", including setting `onboardingCompleted = true`. Escape is a deliberate, intentional exit, so it counts as a skip and not as an interrupt.
+- This is the tutorial only. `Esc` still does **not** close the normal window (see [`window.md`](./window.md)) — the two behaviors don't conflict because the coachmark is only mounted during onboarding.
+- Focus stays inside the overlay; the spotlit mock is click-driven and is not part of the tab order.

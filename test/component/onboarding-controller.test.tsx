@@ -133,3 +133,54 @@ describe('OnboardingController — mocks & gestures', () => {
     ).toBe('double-click');
   });
 });
+
+describe('OnboardingController — keyboard operation', () => {
+  // plan/onboarding.md § Keyboard & focus.
+  it('walks the entire tutorial with the keyboard alone', () => {
+    const onFinish = vi.fn();
+    render(<OnboardingController onFinish={onFinish} />);
+
+    // Focus starts on Next, so Enter advances without any mouse use.
+    for (let i = 0; i < ONBOARDING_STEP_COUNT - 1; i++) {
+      expect(
+        screen.getByTestId('coachmark').getAttribute('data-step-index'),
+      ).toBe(String(i));
+      expect(document.activeElement).toBe(screen.getByTestId('coachmark-next'));
+      fireEvent.click(document.activeElement!);
+    }
+    // Final step completes.
+    expect(screen.getByTestId('coachmark-next').textContent).toBe('Done');
+    fireEvent.click(screen.getByTestId('coachmark-next'));
+    expect(onboardingFinish).toHaveBeenCalledWith('complete');
+    expect(onFinish).toHaveBeenCalledWith('complete');
+  });
+
+  it('Escape ends the run as a skip, not an interrupt', () => {
+    const onFinish = vi.fn();
+    render(<OnboardingController onFinish={onFinish} />);
+    next();
+    fireEvent.keyDown(screen.getByTestId('coachmark'), { key: 'Escape' });
+    // 'skip' is what persists onboardingCompleted = true; an interrupt
+    // never calls onboardingFinish at all.
+    expect(onboardingFinish).toHaveBeenCalledWith('skip');
+    expect(onFinish).toHaveBeenCalledWith('skip');
+  });
+
+  it('returns focus to Next after a gesture advances the step', () => {
+    render(<OnboardingController onFinish={vi.fn()} />);
+    // A real click on the spotlit mock moves focus onto the mock, which
+    // is what would otherwise strand the keyboard user on the next step.
+    const mock = screen.getByTestId('mock-icon');
+    mock.focus();
+    expect(document.activeElement).toBe(mock);
+
+    fireEvent.click(mock);
+
+    // The gesture advanced the step...
+    expect(
+      screen.getByTestId('coachmark').getAttribute('data-step-index'),
+    ).toBe('1');
+    // ...and focus followed it back to the Next button.
+    expect(document.activeElement).toBe(screen.getByTestId('coachmark-next'));
+  });
+});
