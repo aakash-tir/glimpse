@@ -34,47 +34,89 @@ const BLOOD_MOON_MINIMAL: BloodMoonEvent = {
 
 describe('BloodMoonSlide — content', () => {
   it('renders the title "Blood moon"', () => {
-    render(<BloodMoonSlide event={BLOOD_MOON_TODAY} timeFormat="24h" />);
+    render(
+      <BloodMoonSlide
+        event={BLOOD_MOON_TODAY}
+        timeFormat="24h"
+        timeZone={null}
+      />,
+    );
     expect(screen.getByTestId('slide-title').textContent).toBe('Blood moon');
   });
 
   it('renders the peak time in 24h format', () => {
-    render(<BloodMoonSlide event={BLOOD_MOON_TODAY} timeFormat="24h" />);
+    render(
+      <BloodMoonSlide
+        event={BLOOD_MOON_TODAY}
+        timeFormat="24h"
+        timeZone={null}
+      />,
+    );
     expect(screen.getByTestId('blood-moon-peak-time').textContent).toMatch(
       /^Peak \d{2}:\d{2}$/,
     );
   });
 
   it('renders the peak time in 12h format with AM/PM', () => {
-    render(<BloodMoonSlide event={BLOOD_MOON_TODAY} timeFormat="12h" />);
+    render(
+      <BloodMoonSlide
+        event={BLOOD_MOON_TODAY}
+        timeFormat="12h"
+        timeZone={null}
+      />,
+    );
     expect(screen.getByTestId('blood-moon-peak-time').textContent).toMatch(
       /^Peak \d{1,2}:\d{2} (AM|PM)$/,
     );
   });
 
   it('renders the visibility text from the eclipse JSON', () => {
-    render(<BloodMoonSlide event={BLOOD_MOON_TODAY} timeFormat="24h" />);
+    render(
+      <BloodMoonSlide
+        event={BLOOD_MOON_TODAY}
+        timeFormat="24h"
+        timeZone={null}
+      />,
+    );
     expect(screen.getByTestId('blood-moon-visibility').textContent).toBe(
       'Visible from: Europe, Africa, Asia, Australia',
     );
   });
 
   it('renders the start/end row when both times are present', () => {
-    render(<BloodMoonSlide event={BLOOD_MOON_TODAY} timeFormat="24h" />);
+    render(
+      <BloodMoonSlide
+        event={BLOOD_MOON_TODAY}
+        timeFormat="24h"
+        timeZone={null}
+      />,
+    );
     expect(screen.getByTestId('blood-moon-start-end').textContent).toMatch(
       /^\d{2}:\d{2} – \d{2}:\d{2}$/,
     );
   });
 
   it('renders the magnitude as a percentage', () => {
-    render(<BloodMoonSlide event={BLOOD_MOON_TODAY} timeFormat="24h" />);
+    render(
+      <BloodMoonSlide
+        event={BLOOD_MOON_TODAY}
+        timeFormat="24h"
+        timeZone={null}
+      />,
+    );
     const mag = screen.getByTestId('blood-moon-magnitude');
     expect(mag.textContent).toBe('Magnitude 125%');
     expect(mag.getAttribute('data-magnitude')).toBe('1.25');
   });
 
   it('omits optional rows when the eclipse JSON has no peak/visibility/times', () => {
-    render(<BloodMoonSlide event={BLOOD_MOON_MINIMAL} timeFormat="24h" />);
+    render(
+      <BloodMoonSlide
+        event={BLOOD_MOON_MINIMAL}
+        timeFormat="24h"
+        timeZone={null}
+      />,
+    );
     expect(screen.getByTestId('slide-title').textContent).toBe('Blood moon');
     expect(screen.queryByTestId('blood-moon-peak-time')).toBeNull();
     expect(screen.queryByTestId('blood-moon-visibility')).toBeNull();
@@ -85,7 +127,13 @@ describe('BloodMoonSlide — content', () => {
 
 describe('BloodMoonSlide — background + motion', () => {
   it('renders the dark-glass window tint and a centred blood-moon disc', () => {
-    render(<BloodMoonSlide event={BLOOD_MOON_TODAY} timeFormat="24h" />);
+    render(
+      <BloodMoonSlide
+        event={BLOOD_MOON_TODAY}
+        timeFormat="24h"
+        timeZone={null}
+      />,
+    );
     const tint = screen.getByTestId('blood-moon-bg-tint');
     expect(tint).toBeInTheDocument();
     // Same translucent slate glass as the weather slides.
@@ -97,12 +145,24 @@ describe('BloodMoonSlide — background + motion', () => {
 
 describe('BloodMoonSlide — Tomorrow badge', () => {
   it('omits the Tomorrow badge when dayOffset is 0', () => {
-    render(<BloodMoonSlide event={BLOOD_MOON_TODAY} timeFormat="24h" />);
+    render(
+      <BloodMoonSlide
+        event={BLOOD_MOON_TODAY}
+        timeFormat="24h"
+        timeZone={null}
+      />,
+    );
     expect(screen.queryByTestId('event-tomorrow-badge-blood-moon')).toBeNull();
   });
 
   it('renders the Tomorrow badge when dayOffset is 1', () => {
-    render(<BloodMoonSlide event={BLOOD_MOON_TOMORROW} timeFormat="24h" />);
+    render(
+      <BloodMoonSlide
+        event={BLOOD_MOON_TOMORROW}
+        timeFormat="24h"
+        timeZone={null}
+      />,
+    );
     const badge = screen.getByTestId('event-tomorrow-badge-blood-moon');
     expect(badge.textContent).toBe('Tomorrow');
     expect(

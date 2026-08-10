@@ -21,12 +21,16 @@ export type EventSlideProps = {
   timeFormat: TimeFormat;
   /** Last successful data fetch — surfaced on the aurora slide. */
   lastUpdated: string | null;
+  /** Forecast location's IANA zone — every clock time renders in it.
+   * See plan/slides.md § Time rendering. */
+  timeZone: string | null;
 };
 
 export function EventSlide({
   event,
   timeFormat,
   lastUpdated,
+  timeZone,
 }: EventSlideProps): JSX.Element {
   switch (event.type) {
     case 'aurora':
@@ -35,13 +39,26 @@ export function EventSlide({
           event={event}
           timeFormat={timeFormat}
           lastUpdated={lastUpdated}
+          timeZone={timeZone}
         />
       );
     case 'meteor':
       return <MeteorShowerSlide event={event} />;
     case 'eclipse':
-      return <EclipseSlide event={event} timeFormat={timeFormat} />;
+      return (
+        <EclipseSlide
+          event={event}
+          timeFormat={timeFormat}
+          timeZone={timeZone}
+        />
+      );
     case 'blood-moon':
-      return <BloodMoonSlide event={event} timeFormat={timeFormat} />;
+      return (
+        <BloodMoonSlide
+          event={event}
+          timeFormat={timeFormat}
+          timeZone={timeZone}
+        />
+      );
   }
 }

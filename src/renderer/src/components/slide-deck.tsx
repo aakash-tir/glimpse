@@ -649,6 +649,7 @@ function renderSlideBody({
         event={event}
         timeFormat={timeFormat}
         lastUpdated={lastUpdated}
+        timeZone={forecast?.timezone ?? null}
       />
     );
   }

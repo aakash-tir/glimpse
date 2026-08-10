@@ -30,22 +30,25 @@ const BG_TINT = 'rgba(15, 23, 42, 0.92)';
 export type BloodMoonSlideProps = {
   event: BloodMoonEvent;
   timeFormat: TimeFormat;
+  /** Forecast location's IANA zone — see plan/slides.md § Time rendering. */
+  timeZone: string | null;
 };
 
 export function BloodMoonSlide({
   event,
   timeFormat,
+  timeZone,
 }: BloodMoonSlideProps): JSX.Element {
   const isTomorrow = event.dayOffset === 1;
   const { eclipse } = event;
   const peak = eclipse.peakTimeUtc
-    ? formatLocalClock(eclipse.peakTimeUtc, timeFormat)
+    ? formatLocalClock(eclipse.peakTimeUtc, timeFormat, timeZone)
     : null;
   const start = eclipse.startTimeUtc
-    ? formatLocalClock(eclipse.startTimeUtc, timeFormat)
+    ? formatLocalClock(eclipse.startTimeUtc, timeFormat, timeZone)
     : null;
   const end = eclipse.endTimeUtc
-    ? formatLocalClock(eclipse.endTimeUtc, timeFormat)
+    ? formatLocalClock(eclipse.endTimeUtc, timeFormat, timeZone)
     : null;
   const magnitudePct =
     eclipse.magnitude !== undefined

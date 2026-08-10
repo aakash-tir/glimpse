@@ -89,7 +89,14 @@ export function CurrentSlide({
   const windSpeed =
     units === 'imperial' ? current.windSpeed * KMH_TO_MPH : current.windSpeed;
 
-  const subtitle = formatSubtitle(location, lastUpdated, timeFormat);
+  // forecast is non-null past the guard above, so its zone is always
+  // the one we render the stamp in (plan/slides.md § Time rendering).
+  const subtitle = formatSubtitle(
+    location,
+    lastUpdated,
+    timeFormat,
+    forecast.timezone,
+  );
 
   return (
     <SlideShell
@@ -188,9 +195,12 @@ function formatSubtitle(
   location: DataLocation | null,
   lastUpdated: string | null,
   timeFormat: TimeFormat,
+  timeZone: string | null,
 ): string | null {
   const city = location?.city ?? null;
-  const time = lastUpdated ? formatLocalClock(lastUpdated, timeFormat) : null;
+  const time = lastUpdated
+    ? formatLocalClock(lastUpdated, timeFormat, timeZone)
+    : null;
   if (city && time) return `${city} · ${time}`;
   if (city) return city;
   if (time) return time;

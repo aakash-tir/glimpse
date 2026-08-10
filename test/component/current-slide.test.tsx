@@ -314,3 +314,40 @@ describe('CurrentSlide — feels-like tile', () => {
     expect(tile.textContent).toContain('°F');
   });
 });
+
+describe('CurrentSlide — subtitle renders in the forecast zone', () => {
+  // plan/slides.md § Time rendering: the last-updated stamp follows the
+  // forecast location's zone, not the host's. Pinned zones keep these
+  // assertions machine-independent.
+  const INSTANT = '2026-05-08T11:23:00.000Z';
+
+  function renderWithZone(timezone: string): string {
+    cleanup();
+    render(
+      <CurrentSlide
+        forecast={{ ...buildForecast(), timezone }}
+        timeFormat="24h"
+        units="metric"
+        location={{ latitude: 49.88, longitude: -119.5, city: 'Kelowna' }}
+        lastUpdated={INSTANT}
+      />,
+    );
+    return screen.getByTestId('slide-current-subtitle').textContent ?? '';
+  }
+
+  it('uses the forecast timezone rather than the host zone', () => {
+    // 11:23Z → 04:23 PDT, 20:23 JST, 11:23 UTC. All three read the same
+    // instant; only the forecast zone decides which clock is shown.
+    expect(renderWithZone('America/Los_Angeles')).toBe('Kelowna · 04:23');
+    expect(renderWithZone('Asia/Tokyo')).toBe('Kelowna · 20:23');
+    expect(renderWithZone('UTC')).toBe('Kelowna · 11:23');
+  });
+
+  it('degrades to the host zone when the forecast carries an unusable zone', () => {
+    const d = new Date(INSTANT);
+    const hostClock = `${String(d.getHours()).padStart(2, '0')}:${String(
+      d.getMinutes(),
+    ).padStart(2, '0')}`;
+    expect(renderWithZone('Not/AZone')).toBe(`Kelowna · ${hostClock}`);
+  });
+});

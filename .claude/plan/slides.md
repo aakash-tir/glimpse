@@ -24,6 +24,16 @@ Dot count grows / shrinks as the moon-phase toggle changes or events become acti
 
 When the window is opened before the first successful fetch, slides display **muted-grey skeleton placeholders** shaped like the real content (tiles, cards), with a **subtle horizontal sweep shimmer** repeating every ~1.5 s. Skeletons replace themselves with real content as data arrives.
 
+## Time rendering — which timezone
+
+**Every clock time shown anywhere in the app renders in the forecast location's timezone**, not the host machine's. The location is the subject of the whole app, so a user who has set a location override for another city must read that city's clock consistently — an eclipse peak or a sunrise stated in the host's zone next to hourly times stated in the location's zone would be silently wrong by the offset between them.
+
+The zone comes from `Forecast.timezone` (the IANA string Open-Meteo returns for the fetched coordinates). Hourly / daily / sunrise / sunset times already arrive as local-clock strings in that zone and need no conversion. UTC instants — eclipse start / peak / end, the last-updated stamp — are converted at render time.
+
+When no forecast has loaded yet (first launch, error state) there is no zone to convert into, so those values fall back to the **host** local zone. This only affects the last-updated stamp, since event slides don't render without data.
+
+Note that event *day* assignment (today vs. calendar-tomorrow, and the Tomorrow badge) is a separate question and stays on the **system** local timezone — see § Slide 5.
+
 ---
 
 ## Slide 1 — Today (hourly)
@@ -90,7 +100,7 @@ Only shown when ≥ 1 event is active today or calendar-tomorrow (system local t
 ### Eclipse
 
 - Covers **solar eclipses and partial / penumbral lunar eclipses**. A **total** lunar eclipse is a blood moon, so it routes to the blood-moon slide instead (one slide per event, no duplicate eclipse slide).
-- Type label (in title) · peak time in user's local time (start / end times shown when present in the bundled JSON) · visibility text · magnitude % if available.
+- Type label (in title) · peak time in the forecast location's timezone (start / end times shown when present in the bundled JSON) · visibility text · magnitude % if available. See § Time rendering.
 - **Visibility text** is a static string per entry in the bundled JSON (e.g. "Visible from: Americas, Pacific, East Asia"). We don't compute per-user yes/no/partial geometry — the static regions string is a good-enough cue for "does this apply to me?" without dragging in solar-eclipse path-of-totality math or per-user moon-altitude computation. Same handling for blood moon.
 - **Background:** radial gradient `#1a0a0a` (center) → `#2a1010` (edges) with a centred eclipse silhouette — a dark occulting disc ringed by a glowing corona (the total-solar look).
 - **Motion:** slow brightness pulse, 4 s period, ±5 % amplitude (the corona breathes on the same cadence).
