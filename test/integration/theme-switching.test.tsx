@@ -47,6 +47,7 @@ const SNAPSHOT: DataSnapshot = {
   errorState: 'ok',
   eventsHidden: false,
   auroraVisibleFromUserLocation: false,
+  alerts: [],
 };
 
 type ThemeListener = (theme: ResolvedTheme) => void;

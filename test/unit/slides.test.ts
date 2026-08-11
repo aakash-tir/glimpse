@@ -193,3 +193,132 @@ describe('isStaticSlideId', () => {
     expect(isStaticSlideId('event:eclipse:2028-12-31')).toBe(false);
   });
 });
+
+describe('computeVisibleSlides — severe weather alerts', () => {
+  // plan/slides.md § Severe weather alerts. A `warning` promotes the
+  // whole alert group ahead of Today; anything less urgent rides with
+  // the special events.
+  const alertIds = ['alert:a1', 'alert:a2'] as const;
+
+  it('puts the alert group first when a warning is active', () => {
+    const out = computeVisibleSlides({
+      moonEnabled: false,
+      eventSlideIds: [],
+      alertSlideIds: alertIds,
+      alertsPromoted: true,
+    });
+    expect(out.slice(0, 2)).toEqual(['alert:a1', 'alert:a2']);
+    expect(out[2]).toBe('today');
+    expect(out[out.length - 1]).toBe('settings');
+  });
+
+  it('keeps un-promoted alerts with the events, ahead of settings', () => {
+    const out = computeVisibleSlides({
+      moonEnabled: false,
+      eventSlideIds: ['event:aurora'],
+      alertSlideIds: alertIds,
+      alertsPromoted: false,
+    });
+    expect(out[0]).toBe('today');
+    expect(out.slice(-4)).toEqual([
+      'alert:a1',
+      'alert:a2',
+      'event:aurora',
+      'settings',
+    ]);
+  });
+
+  it('preserves the order the store sorted them into', () => {
+    const out = computeVisibleSlides({
+      moonEnabled: false,
+      eventSlideIds: [],
+      alertSlideIds: ['alert:z', 'alert:a'],
+      alertsPromoted: true,
+    });
+    expect(out.slice(0, 2)).toEqual(['alert:z', 'alert:a']);
+  });
+
+  it('changes nothing when there are no alerts', () => {
+    const withNone = computeVisibleSlides({
+      moonEnabled: true,
+      eventSlideIds: ['event:aurora'],
+      alertSlideIds: [],
+      alertsPromoted: true,
+    });
+    const legacy = computeVisibleSlides({
+      moonEnabled: true,
+      eventSlideIds: ['event:aurora'],
+    });
+    expect(withNone).toEqual(legacy);
+  });
+
+  it('never promotes an empty group to the front', () => {
+    const out = computeVisibleSlides({
+      moonEnabled: false,
+      eventSlideIds: [],
+      alertSlideIds: [],
+      alertsPromoted: true,
+    });
+    expect(out[0]).toBe('today');
+  });
+});
+
+describe('promotion does not move the user (plan/slides.md § Severe weather)', () => {
+  // The M4 rule — "the currently-viewed slide does not shift" — is
+  // implemented by tracking slide *ids*, so inserting slides at index 0
+  // must leave the viewer looking at the same slide.
+  it('keeps the viewer on their slide when a warning arrives', () => {
+    const before = computeVisibleSlides({
+      moonEnabled: false,
+      eventSlideIds: [],
+    });
+    const viewing = before.indexOf('current');
+    expect(viewing).toBeGreaterThan(0);
+
+    const after = computeVisibleSlides({
+      moonEnabled: false,
+      eventSlideIds: [],
+      alertSlideIds: ['alert:tornado'],
+      alertsPromoted: true,
+    });
+    const next = reconcileCurrentSlideIndex(before, viewing, after);
+
+    // The index moved (everything shifted down by one)...
+    expect(next).not.toBe(viewing);
+    // ...but the slide under the user did not.
+    expect(after[next]).toBe('current');
+  });
+
+  it('keeps the viewer in place when the warning later clears', () => {
+    const withAlert = computeVisibleSlides({
+      moonEnabled: false,
+      eventSlideIds: [],
+      alertSlideIds: ['alert:tornado'],
+      alertsPromoted: true,
+    });
+    const viewing = withAlert.indexOf('seven-day');
+    const cleared = computeVisibleSlides({
+      moonEnabled: false,
+      eventSlideIds: [],
+    });
+    const next = reconcileCurrentSlideIndex(withAlert, viewing, cleared);
+    expect(cleared[next]).toBe('seven-day');
+  });
+
+  it('falls back to a preceding slide when the alert being viewed expires', () => {
+    const withAlert = computeVisibleSlides({
+      moonEnabled: false,
+      eventSlideIds: [],
+      alertSlideIds: ['alert:tornado'],
+      alertsPromoted: true,
+    });
+    const cleared = computeVisibleSlides({
+      moonEnabled: false,
+      eventSlideIds: [],
+    });
+    // Viewing the alert itself at index 0 when it clears.
+    const next = reconcileCurrentSlideIndex(withAlert, 0, cleared);
+    expect(next).toBe(0);
+    expect(cleared[next]).toBe('today');
+  });
+});

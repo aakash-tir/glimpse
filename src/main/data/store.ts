@@ -20,6 +20,12 @@
 import { evaluateAuroraVisibility } from '../../shared/aurora';
 import { backoffMinutesForAttempt } from '../../shared/backoff';
 import { EMPTY_SNAPSHOT, type DataSnapshot } from '../../shared/data-snapshot';
+import {
+  dedupeAlerts,
+  dropExpired,
+  sortAlerts,
+  type WeatherAlert,
+} from '../../shared/alerts';
 import type { GeolocationResult } from './geolocation';
 import type { KpReading } from './noaa-swpc';
 import type { Forecast } from '../../shared/forecast';
@@ -47,6 +53,15 @@ export type StoreDeps = {
   }) => Promise<Forecast>;
   fetchKp: () => Promise<KpReading>;
   /**
+   * Environment Canada alerts for the fetched coordinates. Optional so
+   * existing tests (and any future non-Canadian build) can leave it
+   * out — omitted means "no alerts", same as a failure.
+   */
+  fetchAlerts?: (input: {
+    latitude: number;
+    longitude: number;
+  }) => Promise<WeatherAlert[]>;
+  /**
    * Resolves the IP-detected location to the coordinates we should
    * actually fetch with. The host implementation reads current
    * settings (advancedLocationEnabled, locationOverrides,
@@ -63,6 +78,8 @@ export type RefreshResult = {
   weatherOk: boolean;
   /** True if NOAA succeeded this attempt. */
   noaaOk: boolean;
+  /** True if the alerts fetch succeeded (or wasn't configured). */
+  alertsOk: boolean;
   /** Minutes until the next retry, when weatherOk is false. */
   nextRetryMinutes: number | null;
 };
@@ -188,6 +205,30 @@ export class DataStore {
       noaaOk = false;
     }
 
+    // Step 4: severe-weather alerts. Independent of both the weather
+    // outcome and NOAA — a failure here hides the alert slides and
+    // nothing else. Alerts must never drive the icon's error state:
+    // the warning feed being down is not a weather-fetch failure.
+    let alertsOk = true;
+    let alerts = this.snapshot.alerts;
+    if (this.deps.fetchAlerts && weatherOk && location) {
+      try {
+        const fresh = await this.deps.fetchAlerts({
+          latitude: fetchLat,
+          longitude: fetchLon,
+        });
+        alerts = sortAlerts(dedupeAlerts(dropExpired(fresh, this.deps.now())));
+      } catch {
+        alertsOk = false;
+        // Drop stale alerts rather than showing a warning we can no
+        // longer confirm is live.
+        alerts = [];
+      }
+    } else if (this.deps.fetchAlerts) {
+      // No usable location this tick — nothing to key alerts off.
+      alerts = [];
+    }
+
     // Update backoff counter and compute next-retry minutes.
     let nextRetryMinutes: number | null = null;
     if (weatherOk) {
@@ -220,11 +261,12 @@ export class DataStore {
       // launch sees fresh data immediately.
       eventsHidden: this.snapshot.eventsHidden || !noaaOk,
       auroraVisibleFromUserLocation,
+      alerts,
     };
 
     this.commit(next);
 
-    return { weatherOk, noaaOk, nextRetryMinutes };
+    return { weatherOk, noaaOk, alertsOk, nextRetryMinutes };
   }
 
   private commit(next: DataSnapshot): void {

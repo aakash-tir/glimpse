@@ -18,6 +18,7 @@ import type {
 } from '../../../shared/settings-store';
 import {
   computeVisibleSlides,
+  isAlertSlideId,
   isStaticSlideId,
   reconcileCurrentSlideIndex,
   wrapStep,
@@ -27,6 +28,13 @@ import {
   type WrapDirection,
 } from '../../../shared/slides';
 import type { SpecialEvent } from '../../../shared/special-events';
+import {
+  alertBackground,
+  alertSlideId,
+  hasWarning,
+  type WeatherAlert,
+} from '../../../shared/alerts';
+import { AlertSlide } from './alert-slide';
 import { CurrentSlide } from './current-slide';
 import { EventSlide } from './event-slide';
 import { MoonSlide } from './moon-slide';
@@ -82,6 +90,7 @@ export type { SlideBackgroundLuminance };
 // dependencies and tripping the reconcileCurrentSlideIndex path on
 // every commit.
 const EMPTY_EVENTS: readonly SpecialEvent[] = Object.freeze([]);
+const EMPTY_ALERTS: readonly WeatherAlert[] = Object.freeze([]);
 
 type StaticSlideMeta = {
   id: StaticSlideId;
@@ -137,9 +146,17 @@ function backgroundForSlideId(
   id: SlideId,
   themeMode: ThemeMode,
   events: readonly SpecialEvent[],
+  alerts: readonly WeatherAlert[] = [],
 ): { color: string; luminance: SlideBackgroundLuminance } {
   if (isStaticSlideId(id)) {
     return STATIC_SLIDE_META[id].background(themeMode);
+  }
+  if (isAlertSlideId(id)) {
+    const alert = alerts.find((a) => alertSlideId(a) === id);
+    return {
+      color: alert ? alertBackground(alert) : EVENT_BACKGROUND_BY_TYPE.meteor,
+      luminance: 'dark',
+    };
   }
   const event = events.find((e) => e.id === id);
   const color = event
@@ -159,6 +176,12 @@ export type SlideDeckProps = {
    * Empty list = no event slides.
    */
   events?: readonly SpecialEvent[];
+  /**
+   * Active severe-weather alerts, already sorted most-urgent-first by
+   * the data store. A `warning` among them promotes the whole group to
+   * the front of the deck (plan/slides.md § Severe weather alerts).
+   */
+  alerts?: readonly WeatherAlert[];
   // Theme mode used for the Settings slide's background. Real theme
   // resolution lands in M7; tests pass this directly.
   themeMode?: ThemeMode;
@@ -208,6 +231,7 @@ type Transition = {
 export function SlideDeck({
   moonEnabled = false,
   events = EMPTY_EVENTS,
+  alerts = EMPTY_ALERTS,
   themeMode = 'dark',
   forecast = null,
   timeFormat = '24h',
@@ -233,9 +257,27 @@ export function SlideDeck({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [eventIdsKey],
   );
+  // Same reference-identity guard as eventIdsKey above.
+  const alertIdsKey = alerts.map((a) => a.id).join('|');
+  const alertSlideIds = useMemo(
+    () => alerts.map((a) => alertSlideId(a)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [alertIdsKey],
+  );
+  const alertsPromoted = useMemo(
+    () => hasWarning(alerts),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [alertIdsKey],
+  );
   const visibleSlides = useMemo(
-    () => computeVisibleSlides({ moonEnabled, eventSlideIds }),
-    [moonEnabled, eventSlideIds],
+    () =>
+      computeVisibleSlides({
+        moonEnabled,
+        eventSlideIds,
+        alertSlideIds,
+        alertsPromoted,
+      }),
+    [moonEnabled, eventSlideIds, alertSlideIds, alertsPromoted],
   );
 
   // The "currently-viewed slide does not shift when others appear /
@@ -278,6 +320,7 @@ export function SlideDeck({
     currentSlideId,
     themeMode,
     events,
+    alerts,
   );
 
   // ---- Cube transition machinery ----
@@ -441,6 +484,7 @@ export function SlideDeck({
           lastUpdated={lastUpdated}
           detectedCity={detectedCity}
           events={events}
+          alerts={alerts}
         />
         {transition && sideFaceSide ? (
           <SlideFace
@@ -457,6 +501,7 @@ export function SlideDeck({
             lastUpdated={lastUpdated}
             detectedCity={detectedCity}
             events={events}
+            alerts={alerts}
           />
         ) : null}
       </motion.div>
@@ -516,6 +561,7 @@ export function SlideDeck({
 
 type SlideFaceProps = {
   slideId: SlideId;
+  alerts: readonly WeatherAlert[];
   themeMode: ThemeMode;
   // Which face of the cube this slide is mounted on.
   face: 'front' | 'right' | 'left';
@@ -545,8 +591,9 @@ function SlideFace({
   lastUpdated,
   detectedCity,
   events,
+  alerts,
 }: SlideFaceProps): JSX.Element {
-  const bg = backgroundForSlideId(slideId, themeMode, events);
+  const bg = backgroundForSlideId(slideId, themeMode, events, alerts);
   const halfW = deckWidth / 2;
   const transform =
     face === 'front'
@@ -567,6 +614,7 @@ function SlideFace({
     detectedCity,
     luminance: bg.luminance,
     events,
+    alerts,
   });
 
   const textColor =
@@ -628,6 +676,7 @@ function renderSlideBody({
   detectedCity,
   luminance,
   events,
+  alerts,
 }: {
   slideId: SlideId;
   forecast: Forecast | null;
@@ -640,7 +689,19 @@ function renderSlideBody({
   detectedCity: string | null;
   luminance: SlideBackgroundLuminance;
   events: readonly SpecialEvent[];
+  alerts: readonly WeatherAlert[];
 }): JSX.Element | string {
+  if (isAlertSlideId(slideId)) {
+    const alert = alerts.find((a) => alertSlideId(a) === slideId);
+    if (!alert) return '';
+    return (
+      <AlertSlide
+        alert={alert}
+        timeFormat={timeFormat}
+        timeZone={forecast?.timezone ?? null}
+      />
+    );
+  }
   if (!isStaticSlideId(slideId)) {
     const event = events.find((e) => e.id === slideId);
     if (!event) return '';

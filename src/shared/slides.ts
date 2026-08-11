@@ -30,7 +30,12 @@ export type StaticSlideId =
  */
 export type EventSlideId = `event:${string}`;
 
-export type SlideId = StaticSlideId | EventSlideId;
+/**
+ * Per-alert slide id. Built by alertSlideId() in shared/alerts.ts.
+ */
+export type AlertSlideId = `alert:${string}`;
+
+export type SlideId = StaticSlideId | EventSlideId | AlertSlideId;
 
 // Canonical ordering of the static slides. Event slides slot in between
 // `moon` and `settings` (or between `current` and `settings` when moon
@@ -51,15 +56,37 @@ export type VisibilityFlags = {
    * this order verbatim.
    */
   eventSlideIds: readonly EventSlideId[];
+  /**
+   * Ordered list of alert slide IDs — already sorted most-urgent-first
+   * by sortAlerts. Empty when there are no alerts, the fetch failed, or
+   * the location is outside Environment Canada's coverage.
+   */
+  alertSlideIds?: readonly AlertSlideId[];
+  /**
+   * True when at least one active alert is a full `warning`. Promotes
+   * the whole alert group to the front of the deck — see
+   * plan/slides.md § Severe weather alerts. Promotion changes where
+   * the slides sit, never what the user is currently looking at:
+   * reconcileCurrentSlideIndex tracks slide *ids*, so re-ordering
+   * around the viewer is invisible to them.
+   */
+  alertsPromoted?: boolean;
 };
 
 export function computeVisibleSlides(flags: VisibilityFlags): SlideId[] {
   const out: SlideId[] = [];
+  const alertIds = flags.alertSlideIds ?? [];
+  const promoted = alertIds.length > 0 && flags.alertsPromoted === true;
+  // A warning puts the alert group ahead of everything, including
+  // Today. Anything less urgent sits with the special events.
+  if (promoted) out.push(...alertIds);
   for (const id of STATIC_ORDER) {
     if (id === 'moon' && !flags.moonEnabled) continue;
     if (id === 'settings') {
       // Splice the event slides in just before settings so settings
-      // stays last per plan/slides.md.
+      // stays last per plan/slides.md. Un-promoted alerts ride along
+      // here, ahead of the events.
+      if (!promoted) out.push(...alertIds);
       for (const ev of flags.eventSlideIds) out.push(ev);
       out.push('settings');
       continue;
@@ -113,6 +140,10 @@ export function reconcileCurrentSlideIndex(
  * slide kinds (which are fully data-driven) from the five static slides
  * (which have dedicated components).
  */
+export function isAlertSlideId(id: SlideId): id is AlertSlideId {
+  return id.startsWith('alert:');
+}
+
 export function isStaticSlideId(id: SlideId): id is StaticSlideId {
   return (
     id === 'today' ||

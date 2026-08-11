@@ -244,3 +244,21 @@ _Scope note (added 2026-08-10): the advanced-location subsystem was built during
 **Refs:** [`plan/packaging.md`](./plan/packaging.md), [`plan/tech-stack.md`](./plan/tech-stack.md). **Tests:** [`rules/testing.md` § M10](./rules/testing.md#m10--polish--packaging).
 
 **Definition of done.** Installer installs cleanly, app auto-launches at next login, all M1 – M9 behaviors work in the installed build, uninstall is clean.
+
+---
+
+## M11 — Cleanup, blind spots & severe weather
+
+**Status:** In progress (branch `M11-cleanup`)
+
+**Scope.** Post-M10.1 follow-up from the improvement review, plus the first new feature since M10.
+
+- **Removed the unused Tailwind + shadcn/ui stack.** 0 `className` usages against 139 inline `style={{}}` usages; no `components/ui/`, no `cn()`/`cva()` call sites. Dropped 7 packages and their configs. `index.css` reproduces the parts of Preflight the inline styles actually depended on — including the root font stack and `line-height: 1.5`, both of which turned out to be load-bearing. Verified by before/after screenshots of every slide, since no automated test covers CSS.
+- **Coverage now measures `src/main`.** The old exclude made the headline number describe only the renderer + shared layers. Honest baseline 81.95 % lines.
+- **CI** (`.github/workflows/ci.yml`) — lint, format, typecheck, Vitest and E2E on `windows-latest` on every push.
+- **Extracted `GestureController`** from `main/index.ts` (1,013 → 848 lines). Electron-free, 100 % covered, 23 unit tests for logic that was previously reachable only through Playwright.
+- **Severe weather alerts.** Environment Canada (MSC GeoMet) client, alert model, per-alert slide, and the promotion rule: a `warning` moves the alert group ahead of Today. Strictly passive — no notification, and promotion never moves the viewer off the slide they're on. Canada-only by deliberate choice.
+
+**Refs:** [`plan/data-sources.md` § Severe weather alerts](./plan/data-sources.md), [`plan/slides.md` § Severe weather alerts](./plan/slides.md), [`plan/tech-stack.md` § Styling](./plan/tech-stack.md), [`review-findings.md`](./review-findings.md).
+
+**Definition of done.** All findings from the improvement review closed; alerts render for a real Environment Canada warning; lint + typecheck + 965 automated tests green; manual tests signed off.

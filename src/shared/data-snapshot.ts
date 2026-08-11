@@ -3,6 +3,7 @@
 // bouncing through a network-style discriminator.
 
 import type { Forecast } from './forecast';
+import type { WeatherAlert } from './alerts';
 
 export type DataLocation = {
   latitude: number;
@@ -49,6 +50,14 @@ export type DataSnapshot = {
    * False when either input is missing.
    */
   auroraVisibleFromUserLocation: boolean;
+  /**
+   * Active Environment Canada alerts for the resolved location, already
+   * sorted most-urgent-first and stripped of expired entries. Empty
+   * outside Canada, when there are none, or after a failed fetch — the
+   * three are deliberately indistinguishable to the renderer, which
+   * just renders no alert slides.
+   */
+  alerts: readonly WeatherAlert[];
 };
 
 export const EMPTY_SNAPSHOT: DataSnapshot = {
@@ -60,4 +69,5 @@ export const EMPTY_SNAPSHOT: DataSnapshot = {
   errorState: 'ok',
   eventsHidden: false,
   auroraVisibleFromUserLocation: false,
+  alerts: [],
 };

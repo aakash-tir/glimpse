@@ -112,6 +112,25 @@ Only shown when ≥ 1 event is active today or calendar-tomorrow (system local t
 - **Background:** the same translucent dark-glass "window tint" the weather slides use (`rgba(15,23,42,0.92)`) so the desktop shows faintly through — not an opaque celestial gradient — with a faint, low-opacity blood-moon disc layered on top, centred behind the content. The disc is a red sphere gradient multiplied with a grayscale lunar-surface texture (`src/renderer/src/assets/moon.jpg`) so it shows craters/maria while staying red. (Diverges from the other event slides, which stay opaque celestial-dark; chosen so the blood moon reads as a tinted window with the reddened moon as the focal element.)
 - **Motion:** none — the tint and disc are static.
 
+## Severe weather alerts *(conditional)*
+
+Environment Canada alerts for the resolved location — see [`data-sources.md` § Severe weather alerts](./data-sources.md#severe-weather-alerts-environment-canada). One slide per active alert. Absent entirely when there are none, when the fetch failed, or when the location is outside Canada.
+
+- **Content:** alert name as the title (e.g. "Severe thunderstorm watch") · the alert body text · severity label · expiry time (in the forecast location's zone, per § Time rendering).
+- **Background:** derived from `risk_colour_en` — a dark tint in the alert's own risk colour rather than an invented palette. Stays dark in both themes, like the event slides.
+- **Motion:** none. These slides are read, not admired; a pulsing severe-weather warning would read as an alarm, and the app is passive.
+
+### Ordering — the one rule that reorders the deck
+
+**If any active alert is a `warning`, the whole alert group moves to the front, ahead of Today.** Otherwise the group sits with the special events, just before Settings.
+
+This is deliberately the only thing in the app that changes slide order. Two consequences worth stating:
+
+- **It never interrupts.** Promotion changes where the slide *sits*, not what the user is *looking at*. Nothing raises the window, steals focus, or jumps the viewer to the alert. A user reading the 7-day forecast when a warning arrives stays on the 7-day forecast.
+- **It does not conflict with § Dynamic slide count.** That rule ("the currently-viewed slide does not shift") is implemented by `reconcileCurrentSlideIndex`, which tracks the slide's **id**, not its index. Inserting a slide at position 0 changes every index underneath it and changes nothing the user sees. The rule holds unchanged; it was always about the viewed slide, never about the numbering.
+
+The promotion is what the user sees **next time they open the window**, since the deck opens on the first slide. That is the intended prominence: unmissable when you next look, invisible until then.
+
 ## Slide 6 — Settings
 
 Always last. **Vertically scrollable** within the slide.

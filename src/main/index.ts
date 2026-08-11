@@ -13,6 +13,7 @@ import { withLocationCache } from './data/geolocation-cache';
 import { geocodeByName, type GeocodingMatch } from './data/geocoding';
 import { fetchForecast } from './data/open-meteo';
 import { fetchKp } from './data/noaa-swpc';
+import { fetchAlerts } from './data/msc-alerts';
 import { DataStore } from './data/store';
 import { TickScheduler } from '../shared/scheduler';
 import type { DataSnapshot } from '../shared/data-snapshot';
@@ -90,6 +91,7 @@ const dataStore = new DataStore({
   }),
   fetchForecast,
   fetchKp,
+  fetchAlerts,
   // The resolver picks final coords from (override → browser → IP).
   // Reads current settings each call so changes from the Settings
   // slide take effect on the very next refresh — no store restart.

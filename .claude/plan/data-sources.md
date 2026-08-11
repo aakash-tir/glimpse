@@ -59,6 +59,20 @@ Visibility text on the slide is user-aware:
 - Bundled at build time, sourced from the NASA eclipse catalog.
 - SunCalc itself does not compute eclipses, hence the static catalog. Same yearly-lag tradeoff as meteor showers — major eclipse dates are well known years out, so refresh-at-version-bumps is fine.
 
+## Severe weather alerts (Environment Canada)
+
+**Source:** Meteorological Service of Canada, GeoMet-OGC-API — `https://api.weather.gc.ca/collections/weather-alerts/items`. GeoJSON, no API key, filtered to a small bounding box around the resolved location.
+
+**Coverage is Canada only.** This is a deliberate limitation, not an oversight. Open-Meteo publishes no alerts product, and the free per-country feeds (MSC here, NWS for the US, MeteoAlarm for Europe) have unrelated shapes — supporting all three would roughly triple the work for places this app is not used from. Outside Canada the query simply returns nothing and the alert slides do not appear, which is the same behavior the special-event slides already have when there is no event.
+
+**Fields consumed:** `alert_type` (drives severity), `alert_name_en` (title), `alert_text_en` (body), `risk_colour_en` (background tint), `expiration_datetime` (drop expired alerts).
+
+**Severity** maps from `alert_type`: `warning` › `watch` › `advisory` › `statement`. Any unrecognized value degrades to `statement` — the least prominent — so an unexpected upstream type can never promote itself to the front of the deck.
+
+**Failure handling:** identical to NOAA. A failed alerts fetch silently hides the alert slides for the session and leaves every other data source untouched. Alerts are never allowed to put the icon into its error state — a warning feed being down is not a weather-fetch failure.
+
+**Strictly passive.** Alerts are surfaced as slides only. No notification, no toast, no sound, no window-raise, no stealing focus — see [`slides.md` § Severe weather](./slides.md#severe-weather-alerts) for the ordering rule that gives a warning prominence without interrupting.
+
 ## Refresh policy
 
 - **Schedule:** clock-aligned to **:05** of each hour.
