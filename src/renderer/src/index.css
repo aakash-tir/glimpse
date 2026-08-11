@@ -1,63 +1,86 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Glimpse renderer styles.
+ *
+ * Every component styles itself with inline style objects — there is
+ * not a single className in the codebase — so Tailwind's utility and
+ * component layers were dead weight and were removed. What Preflight
+ * DID provide is reproduced below explicitly, because the inline
+ * styles were written against it and quietly depend on it:
+ *
+ *   - border-box sizing everywhere (inline styles mix width/height
+ *     with padding and borders and assume the border-box model),
+ *   - the root font stack and line-height:1.5. Only window-view sets a
+ *     font-family of its own, so every other surface — the onboarding
+ *     panel's Skip link included — inherited Preflight's sans stack,
+ *     and Chromium's default is a serif. The 1.5 line-height is what
+ *     the settings rows are sized against; browser-default `normal`
+ *     shortens each row by ~2 px,
+ *   - font inheritance on <button> / <input>, which otherwise fall
+ *     back to the browser's small default UI font,
+ *   - zero default padding/border/background on <button>, which the
+ *     arrow buttons, title-bar controls and settings switches assume,
+ *   - display:block on <svg>, so the moon / wind / eclipse graphics
+ *     don't pick up inline-layout descender gaps,
+ *   - margin-less <p>, used by the callout and slide copy.
+ *
+ * Anything beyond that list was unused: Preflight's form-control,
+ * table and typographic resets have no matching elements here.
+ */
 
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --radius: 0.5rem;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-  }
+html {
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
 }
 
-@layer base {
-  html,
-  body,
-  #root {
-    height: 100%;
-    margin: 0;
-    background: transparent;
-    overflow: hidden;
-  }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+button,
+input,
+optgroup,
+select,
+textarea {
+  font-family: inherit;
+  font-size: 100%;
+  font-weight: inherit;
+  line-height: inherit;
+  color: inherit;
+  margin: 0;
+  padding: 0;
+}
+
+button {
+  background-color: transparent;
+  background-image: none;
+  border: 0;
+}
+
+button,
+[role='button'] {
+  cursor: pointer;
+}
+
+svg {
+  display: block;
+  vertical-align: middle;
+}
+
+p {
+  margin: 0;
+}
+
+/* The app's own root layout. The transparent background is what makes
+   the frameless icon window read as a floating glyph rather than a
+   plate — see plan/icon.md. */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: transparent;
+  overflow: hidden;
 }
 
 /* Loading-skeleton shimmer sweep used by the M6 hourly + 7-day slides

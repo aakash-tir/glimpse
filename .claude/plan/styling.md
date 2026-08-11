@@ -1,6 +1,8 @@
 # Styling
 
-Tailwind + shadcn/ui base. Dark default with subtle glassmorphism. The visual system is intentionally restrained — celebratory motion happens only on the special-event slides.
+Dark default with subtle glassmorphism. The visual system is intentionally restrained — celebratory motion happens only on the special-event slides.
+
+**Styling mechanism: inline style objects.** Every component styles itself with a React `style` prop; there is no CSS framework and not a single `className` in the codebase. Tailwind and shadcn/ui were scaffolded at M0 and removed in M11 having never been used — see [`tech-stack.md`](./tech-stack.md) § Styling. The only global stylesheet is `src/renderer/src/index.css`, which carries the root reset, the transparent-window layout rule, and the skeleton-shimmer keyframes.
 
 ## Color palette
 

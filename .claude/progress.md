@@ -18,8 +18,8 @@
 
 - Vite + React + TS template in `src/renderer/`.
 - Electron main process in `src/main/` with single `BrowserWindow` opening at default size.
-- Tailwind CSS configured.
-- shadcn/ui initialized.
+- Tailwind CSS configured. _(Removed in M11 — never used; see [`plan/tech-stack.md`](./plan/tech-stack.md) § Styling.)_
+- shadcn/ui initialized. _(Removed in M11 — never used.)_
 - Framer Motion, `react-icons/wi`, `lucide-react`, `suncalc` installed.
 - electron-builder config in `package.json` (NSIS target, `Glimpse` product name, `app-icon.png` icon source) — config only, no packaging yet.
 - TypeScript strict mode + ESLint configured.
