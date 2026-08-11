@@ -23,6 +23,8 @@
 // null return so the renderer can show a "couldn't find it" error
 // without distinguishing between the two.
 
+import { fetchWithTimeout } from './http';
+
 const ENDPOINT = 'https://geocoding-api.open-meteo.com/v1/search';
 
 export type GeocodingMatch = {
@@ -42,7 +44,7 @@ export type Fetcher = (url: string) => Promise<{
 }>;
 
 const defaultFetcher: Fetcher = (url) =>
-  fetch(url).then((res) => ({
+  fetchWithTimeout(url).then((res) => ({
     ok: res.ok,
     status: res.status,
     json: () => res.json() as Promise<unknown>,

@@ -27,15 +27,18 @@ export type AuroraSlideProps = {
   event: AuroraEvent;
   timeFormat: TimeFormat;
   lastUpdated: string | null;
+  /** Forecast location's IANA zone — see plan/slides.md § Time rendering. */
+  timeZone: string | null;
 };
 
 export function AuroraSlide({
   event,
   timeFormat,
   lastUpdated,
+  timeZone,
 }: AuroraSlideProps): JSX.Element {
   const lastUpdatedText = lastUpdated
-    ? formatLocalClock(lastUpdated, timeFormat)
+    ? formatLocalClock(lastUpdated, timeFormat, timeZone)
     : null;
   // Round Kp to 1 decimal — matches NOAA's published precision and
   // keeps the slide compact.

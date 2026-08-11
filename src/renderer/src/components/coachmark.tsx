@@ -11,10 +11,12 @@
 // cut-out technique, so the spotlight stays click-through to the mock.
 
 import {
+  useEffect,
   useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from 'react';
 import {
@@ -59,6 +61,7 @@ export function Coachmark({
   children,
 }: CoachmarkProps): JSX.Element {
   const rootRef = useRef<HTMLDivElement>(null);
+  const nextRef = useRef<HTMLButtonElement>(null);
   const [panelHeight, setPanelHeight] = useState(0);
 
   useLayoutEffect(() => {
@@ -72,6 +75,23 @@ export function Coachmark({
     return () => ro.disconnect();
   }, []);
 
+  // Focus Next on mount and on every step change, so Enter/Space walks
+  // the whole tutorial without the mouse — however the step advanced
+  // (gesture, click, or key), focus lands in the same place.
+  // plan/onboarding.md § Keyboard & focus.
+  useEffect(() => {
+    nextRef.current?.focus();
+  }, [stepIndex]);
+
+  // Escape skips. Deliberate exit → same path as the Skip link
+  // (onboardingCompleted = true), not an interrupt. Bound on the
+  // overlay root rather than window so it can't outlive the unmount.
+  const handleKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>): void => {
+    if (e.key !== 'Escape') return;
+    e.stopPropagation();
+    onSkip();
+  };
+
   const placement = calloutPlacement(spotlight, panelHeight);
   const lines = Array.isArray(description) ? description : [description];
 
@@ -80,6 +100,14 @@ export function Coachmark({
       ref={rootRef}
       data-testid="coachmark"
       data-step-index={String(stepIndex)}
+      onKeyDown={handleKeyDown}
+      // Keyboard events only reach a div if it can hold focus; the
+      // overlay is a modal surface, so -1 keeps it out of the tab order
+      // while still letting Escape land when focus is inside it.
+      tabIndex={-1}
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
       style={{ position: 'absolute', inset: 0, zIndex: 50 }}
     >
       {/* Backdrop — swallows every click that isn't on the spotlit
@@ -168,6 +196,7 @@ export function Coachmark({
           }}
         >
           <button
+            ref={nextRef}
             data-testid="coachmark-next"
             onClick={onNext}
             style={{

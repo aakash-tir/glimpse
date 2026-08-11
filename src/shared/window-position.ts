@@ -383,7 +383,11 @@ export function snapWindowToEdge(
   displays: DisplayBounds[],
   radiusPx: number = WINDOW_SNAP_RADIUS_PX,
 ): WindowEdgeSnap | null {
-  let best: { entry: WindowEdgeSnap; dist: number } | null = null;
+  let best: {
+    entry: WindowEdgeSnap;
+    display: DisplayBounds;
+    dist: number;
+  } | null = null;
   for (const display of displays) {
     const edgeTargets: WindowEdgeSnap[] = [
       { edge: 'top', position: { x: topLeft.x, y: display.y } },
@@ -399,14 +403,39 @@ export function snapWindowToEdge(
     ];
     for (const entry of edgeTargets) {
       // Perpendicular distance — only one axis differs for any edge.
+      // Measured BEFORE the clamp below, so whether the snap fires
+      // still depends only on how near the edge the drop was.
       const dx = entry.position.x - topLeft.x;
       const dy = entry.position.y - topLeft.y;
       const dist = Math.abs(dx) + Math.abs(dy);
       if (dist > radiusPx) continue;
-      if (best === null || dist < best.dist) best = { entry, dist };
+      if (best === null || dist < best.dist) best = { entry, display, dist };
     }
   }
-  return best?.entry ?? null;
+  if (best === null) return null;
+  // An edge snap pins ONE axis to the edge and carries the other over
+  // from where the user dropped it. That carried axis must still land
+  // on a display: a drop 200 px left of the screen but within the
+  // top-edge radius would otherwise snap y to the top while keeping the
+  // off-screen x, parking the window partly outside the display. Older
+  // Electron hid this by clamping inside setBounds; 41+ honors the
+  // off-screen value.
+  //
+  // Clamp against the display the drop actually sits on, not the one
+  // that won the edge — with identically-sized monitors both offer the
+  // same edge at the same distance and the first one wins the tie, so
+  // clamping to it would drag a drop on the secondary monitor back
+  // onto the primary. Only the carried axis is clamped; the pinned
+  // axis stays exactly where the snap put it.
+  const host = displayContaining(topLeft, displays) ?? best.display;
+  const clamped = clampWindowToDisplay(best.entry.position, size, host);
+  const pinsY = best.entry.edge === 'top' || best.entry.edge === 'bottom';
+  return {
+    edge: best.entry.edge,
+    position: pinsY
+      ? { x: clamped.x, y: best.entry.position.y }
+      : { x: best.entry.position.x, y: clamped.y },
+  };
 }
 
 // Icon position to use when an in-place collapse follows a window-drag

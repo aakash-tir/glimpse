@@ -110,3 +110,70 @@ describe('Coachmark', () => {
     expect(onMock).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('Coachmark — keyboard & focus', () => {
+  // plan/onboarding.md § Keyboard & focus. The tutorial is the only
+  // modal surface in the app, so it's the one place a keyboard user
+  // could get stranded.
+  it('focuses the Next button on mount', () => {
+    renderCoachmark();
+    expect(document.activeElement).toBe(screen.getByTestId('coachmark-next'));
+  });
+
+  it('re-focuses Next when the step changes', () => {
+    const { rerender } = render(
+      <Coachmark
+        spotlight={SPOT}
+        title="Step one"
+        description="First"
+        stepIndex={0}
+        stepCount={8}
+        onNext={vi.fn()}
+        onSkip={vi.fn()}
+      />,
+    );
+    // Move focus away, as a click on the spotlit mock would.
+    screen.getByTestId('coachmark-skip').focus();
+    expect(document.activeElement).toBe(screen.getByTestId('coachmark-skip'));
+
+    rerender(
+      <Coachmark
+        spotlight={SPOT}
+        title="Step two"
+        description="Second"
+        stepIndex={1}
+        stepCount={8}
+        onNext={vi.fn()}
+        onSkip={vi.fn()}
+      />,
+    );
+    expect(document.activeElement).toBe(screen.getByTestId('coachmark-next'));
+  });
+
+  it('Escape skips the tutorial', () => {
+    const { onSkip, onNext } = renderCoachmark();
+    fireEvent.keyDown(screen.getByTestId('coachmark'), { key: 'Escape' });
+    expect(onSkip).toHaveBeenCalledTimes(1);
+    expect(onNext).not.toHaveBeenCalled();
+  });
+
+  it('ignores other keys', () => {
+    const { onSkip, onNext } = renderCoachmark();
+    const root = screen.getByTestId('coachmark');
+    for (const key of ['a', 'Tab', 'ArrowRight', 'Backspace']) {
+      fireEvent.keyDown(root, { key });
+    }
+    expect(onSkip).not.toHaveBeenCalled();
+    expect(onNext).not.toHaveBeenCalled();
+  });
+
+  it('marks the overlay as a modal dialog labelled by its title', () => {
+    renderCoachmark();
+    const root = screen.getByTestId('coachmark');
+    expect(root.getAttribute('role')).toBe('dialog');
+    expect(root.getAttribute('aria-modal')).toBe('true');
+    expect(root.getAttribute('aria-label')).toBe('Slide navigation');
+    // Modal surface: focusable for key handling, but out of tab order.
+    expect(root.getAttribute('tabindex')).toBe('-1');
+  });
+});

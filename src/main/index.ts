@@ -44,6 +44,7 @@ import {
   type ResizeCorner,
 } from '../shared/window-position';
 import {
+  isLocationOverride,
   removeLocationOverride,
   upsertLocationOverride,
   type BrowserGeolocation,
@@ -68,6 +69,17 @@ let mode: Mode = 'icon';
 // top-right) and the renderer shows the OnboardingController instead of
 // the icon / window view.
 let onboardingActive = false;
+
+// Returns the icon window only when it exists AND hasn't been destroyed.
+// Main-side async callbacks (data-store pushes, nativeTheme updates,
+// display-change re-anchors) can fire during the teardown window after the
+// window is destroyed on quit; calling webContents.send / setBounds on a
+// destroyed window throws "Object has been destroyed". Optional-chaining
+// (`iconWindow?.`) only guards null, not destroyed-but-non-null — this does
+// both.
+function liveWindow(): BrowserWindow | null {
+  return iconWindow && !iconWindow.isDestroyed() ? iconWindow : null;
+}
 
 // Data layer — composed at app.whenReady so the constructors don't
 // run during test imports of this module. The store fans out to the
@@ -159,6 +171,15 @@ function createIconWindow(): void {
     iconWindow?.show();
   });
 
+  // Null the reference and drop any in-flight gesture sessions when the
+  // window goes away, so the liveWindow() guard and the session handlers
+  // can't act on a destroyed window during quit teardown.
+  iconWindow.on('closed', () => {
+    iconWindow = null;
+    dragSession = null;
+    resizeSession = null;
+  });
+
   if (process.env['ELECTRON_RENDERER_URL']) {
     void iconWindow.loadURL(process.env['ELECTRON_RENDERER_URL']);
   } else {
@@ -167,7 +188,8 @@ function createIconWindow(): void {
 }
 
 function snapBackIfOffScreen(): void {
-  if (!iconWindow) return;
+  const win = liveWindow();
+  if (!win) return;
   // While onboarding owns the window bounds, leave them alone.
   if (onboardingActive) return;
   // Display changes only re-anchor the icon; if the user is currently in
@@ -183,7 +205,7 @@ function snapBackIfOffScreen(): void {
     allDisplayBounds(),
   );
   const winPos = windowPositionForIcon(resolvedIcon);
-  iconWindow.setBounds({
+  win.setBounds({
     x: winPos.x,
     y: winPos.y,
     width: ICON_WINDOW_WIDTH,
@@ -529,12 +551,20 @@ function registerIpc(): void {
 
   function broadcastSettings(): void {
     const settings = loadSettings();
-    iconWindow?.webContents.send('settings:changed', settings);
+    liveWindow()?.webContents.send('settings:changed', settings);
   }
 
   ipcMain.handle(
     'location:set-override',
     async (_evt, override: LocationOverride) => {
+      // Revalidate the renderer payload before persisting: the merge-time
+      // guard only runs on file *read*, so a malformed override (e.g. NaN
+      // lat/lon) would otherwise be written and later drive a forecast
+      // fetch with garbage coords.
+      if (!isLocationOverride(override)) {
+        console.error('location:set-override rejected malformed payload');
+        return;
+      }
       const current = loadSettings();
       saveSettings({
         locationOverrides: upsertLocationOverride(
@@ -640,7 +670,7 @@ function registerIpc(): void {
   // Renderer subscribes via the preload's onDataChanged. We forward
   // every snapshot push to whichever window is currently showing.
   dataStore.subscribe((snapshot: DataSnapshot) => {
-    iconWindow?.webContents.send('data:changed', snapshot);
+    liveWindow()?.webContents.send('data:changed', snapshot);
   });
 
   ipcMain.handle('mode:get', () => mode);
@@ -887,8 +917,16 @@ function maybeRegisterAutoLaunch(): void {
   ) {
     return;
   }
-  app.setLoginItemSettings({ openAtLogin: true });
-  saveSettings({ autoLaunchRegistered: true });
+  // A failed OS login-items write must not abort startup. Without this,
+  // the exception would propagate out of the whenReady callback, the
+  // window would never be created, and autoLaunchRegistered would never
+  // persist — so it would retry (and fail) on every subsequent launch.
+  try {
+    app.setLoginItemSettings({ openAtLogin: true });
+    saveSettings({ autoLaunchRegistered: true });
+  } catch (err) {
+    console.error('auto-launch registration failed:', err);
+  }
 }
 
 // Single-instance lock per plan/tech-stack.md.
@@ -909,6 +947,14 @@ if (!gotLock) {
 } else {
   app.on('second-instance', () => {
     if (!iconWindow) return;
+    // During the first-launch tutorial the window IS the onboarding panel.
+    // mode is still 'icon', but expanding would resize away from the panel
+    // and tear the running tutorial — just focus the existing panel.
+    if (onboardingActive) {
+      if (iconWindow.isMinimized()) iconWindow.restore();
+      iconWindow.focus();
+      return;
+    }
     if (mode === 'window') {
       // Restore from minimize if needed and bring to front.
       if (iconWindow.isMinimized()) iconWindow.restore();
@@ -920,39 +966,46 @@ if (!gotLock) {
     expandToWindow();
   });
 
-  void app.whenReady().then(() => {
-    registerIpc();
-    maybeRegisterAutoLaunch();
-    createIconWindow();
+  app
+    .whenReady()
+    .then(() => {
+      registerIpc();
+      maybeRegisterAutoLaunch();
+      createIconWindow();
 
-    screen.on('display-metrics-changed', snapBackIfOffScreen);
-    screen.on('display-removed', snapBackIfOffScreen);
-    screen.on('display-added', snapBackIfOffScreen);
+      screen.on('display-metrics-changed', snapBackIfOffScreen);
+      screen.on('display-removed', snapBackIfOffScreen);
+      screen.on('display-added', snapBackIfOffScreen);
 
-    // Kick off the immediate first fetch and start the :05 cadence.
-    // Per spec: fetch all data immediately on app start (covers the
-    // "fetch on window open" requirement since the icon window is
-    // always present), then refresh on the hourly clock-aligned tick.
-    void dataStore.refresh();
-    dataScheduler.start();
-    // Fire an extra refresh on resume if the system slept past at
-    // least one tick window — see TickScheduler.notifyResume.
-    powerMonitor.on('resume', () => dataScheduler.notifyResume());
+      // Kick off the immediate first fetch and start the :05 cadence.
+      // Per spec: fetch all data immediately on app start (covers the
+      // "fetch on window open" requirement since the icon window is
+      // always present), then refresh on the hourly clock-aligned tick.
+      void dataStore.refresh();
+      dataScheduler.start();
+      // Fire an extra refresh on resume if the system slept past at
+      // least one tick window — see TickScheduler.notifyResume.
+      powerMonitor.on('resume', () => dataScheduler.notifyResume());
 
-    // Live theme switching: push the resolved theme any time the host
-    // OS toggles dark mode (or any other native-theme attribute the
-    // user might bind a system-wide hotkey to). When the user has
-    // themeOverride='auto' this is what keeps the Settings slide in
-    // sync with Windows; when override is locked light/dark the push
-    // still fires but the resolved value won't change.
-    nativeTheme.on('updated', () => {
-      iconWindow?.webContents.send('theme:changed', currentResolvedTheme());
+      // Live theme switching: push the resolved theme any time the host
+      // OS toggles dark mode (or any other native-theme attribute the
+      // user might bind a system-wide hotkey to). When the user has
+      // themeOverride='auto' this is what keeps the Settings slide in
+      // sync with Windows; when override is locked light/dark the push
+      // still fires but the resolved value won't change.
+      nativeTheme.on('updated', () => {
+        liveWindow()?.webContents.send('theme:changed', currentResolvedTheme());
+      });
+
+      app.on('activate', () => {
+        if (BrowserWindow.getAllWindows().length === 0) createIconWindow();
+      });
+    })
+    // A rejection in the startup chain would otherwise be an unhandled
+    // rejection with no window and no diagnostic. Surface it.
+    .catch((err: unknown) => {
+      console.error('startup failed:', err);
     });
-
-    app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) createIconWindow();
-    });
-  });
 
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();

@@ -12,10 +12,17 @@ All four data sources are free and require no API key.
 
 ## Location
 
-- Auto-detect via **IP geolocation** on every launch.
-- Provider: `geojs.io` (keyless, HTTPS). Provider history and rationale for the choice live in the `src/main/data/geolocation.ts` header.
-- ~city-level accuracy.
-- No permission prompt, no Google API key, no Windows Location Services involvement.
+Resolution is a **3-tier priority chain** (see `src/shared/location-resolver.ts`), highest first:
+
+1. **Manual override** — a user-entered city, gated by the Settings → *Advanced location* toggle (`advancedLocationEnabled`) and keyed to the IP-detected city it applies to (`locationOverrides`). Travel away → it goes dormant; travel back → it reactivates. The "look up by name" flow uses Open-Meteo's keyless geocoding API (`src/main/data/geocoding.ts`).
+2. **Browser geolocation** — cached coordinates from `navigator.geolocation` (`browserGeolocation`), higher accuracy than IP. A **one-time permission prompt** is shown on first launch (`location-prompt.tsx`); `locationPermissionAsked` stops it re-appearing, and Settings offers "Re-ask location permission". No Google API key, no Windows Location Services.
+3. **IP geolocation** — the always-available baseline. Auto-detected on every launch via `geojs.io` (keyless, HTTPS, ~city-level). Provider history/rationale live in the `src/main/data/geolocation.ts` header.
+
+### Failure handling (location)
+
+- On a successful IP detection the result is persisted to `cachedLocation`. If a later detection fails (rate limit / transient outage), the **cached location is reused** instead of dropping to the error state (`src/main/data/geolocation-cache.ts`).
+- Only a first-ever launch with no cache surfaces a geolocation failure as the icon error state.
+- All four data clients use a 10 s fetch timeout (`src/main/data/http.ts`) so a hung connection can't stall the refresh loop.
 
 ## Open-Meteo → icon mapping
 
