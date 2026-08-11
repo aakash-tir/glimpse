@@ -163,3 +163,19 @@ Not a hard gate per milestone, but at the end of M10 aim for:
 
 - **Unit + component:** ≥ 80 % line coverage of `src/`.
 - **E2E:** every user-visible flow that has appeared in any milestone's `manual-tests.md` history has at least one E2E covering it (so future regressions catch what we manually verified at the time).
+
+### What the number covers
+
+Until M11 the coverage config excluded `src/main/**`, so the reported figure described the renderer and shared layers only — it read 94.31 % lines while saying "of `src/`". That was wrong in both directions: the four data clients under `src/main/data/` have real unit suites that counted for nothing, and `src/main/index.ts` was credited by nothing because it was measured by nothing.
+
+`src/main/**` is now included and the number is honest. `src/preload/**` stays excluded — it is a `contextBridge` manifest that only executes inside a real Electron preload context, so E2E covers it or nothing does.
+
+**Baseline at M11** (`npm run test:coverage`): 80.56 % lines / 78.88 % statements overall.
+
+| Area | Lines | Note |
+|---|---|---|
+| `shared/` | 96.63 % | Pure logic, well covered. `icon-position.ts` at 68 % is the weak spot. |
+| `main/data/` | 92.05 % | Was invisible before M11. |
+| `renderer/src/` | ~90 % | Components and views. |
+| `main/index.ts` | see below | The remaining gap. |
+| `main/settings.ts` | 0 % | Thin `app.getPath` wrapper; only meaningful inside Electron. |
