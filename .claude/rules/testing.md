@@ -157,6 +157,21 @@ For each milestone below, every bullet is a test (or small group of related test
 - All E2E and unit tests from M0 – M9 pass on the production build (run Playwright against the built `.exe`, not just `npm run dev`).
 - (Manual: install / uninstall flow on a clean profile, auto-launch verification — covered in `manual-tests.md`, not automated.)
 
+## M11 — Cleanup, blind spots & severe weather
+
+- **Unit:** MSC alert URL construction — bbox is the resolved coordinates ± `ALERT_BBOX_HALF_DEG`, keyless, `f=json`.
+- **Unit:** GeoJSON → `WeatherAlert[]` parsing — features missing `alert_name_en` are skipped rather than rendered blank; missing body / risk colour / expiry degrade to sensible defaults; a non-FeatureCollection returns `[]`.
+- **Unit:** severity classification — `warning` / `watch` / `advisory` map through, and **any unrecognized `alert_type` degrades to `statement`** (the least prominent), so an unexpected upstream value can never promote itself to the front of the deck.
+- **Unit:** alert ordering — most urgent first, then alphabetical by title within a severity, stable across refreshes.
+- **Unit:** dedupe — the same bulletin repeated across sub-regions collapses to one slide.
+- **Unit:** expiry — alerts past `expiresAtUtc` are dropped; a null or unparseable expiry keeps the alert (better a stale warning than a silently dropped one).
+- **Unit:** promotion ordering in `computeVisibleSlides` — a `warning` moves the whole alert group ahead of Today; a watch/advisory/statement group sits with the special events; no alerts leaves the M4 order untouched.
+- **Unit:** the M4 current-slide stability rule still holds when the alert group is inserted or removed — `reconcileCurrentSlideIndex` tracks slide *ids*, so re-ordering around the viewer must not move them.
+- **Component:** alert slide renders title, severity label, bulletin text and expiry in the forecast location's timezone; background tint derives from the MSC risk colour; no motion.
+- **Integration:** an alerts fetch failure hides the alert slides **and nothing else** — the icon must not enter its error state, and forecast / NOAA data is unaffected.
+- **Integration:** no usable location for a tick → alerts cleared rather than left stale.
+- **Unit:** `GestureController` — the drag/resize state machine extracted from `main/index.ts`, covering the logic previously reachable only through Playwright.
+
 ## Coverage targets
 
 Not a hard gate per milestone, but at the end of M10 aim for:
@@ -170,12 +185,18 @@ Until M11 the coverage config excluded `src/main/**`, so the reported figure des
 
 `src/main/**` is now included and the number is honest. `src/preload/**` stays excluded — it is a `contextBridge` manifest that only executes inside a real Electron preload context, so E2E covers it or nothing does.
 
-**Baseline at M11** (`npm run test:coverage`): 80.56 % lines / 78.88 % statements overall.
+**Baseline at end of M11** (`npm run test:coverage`): **82.47 % lines / 80.54 % statements** overall (1,840 of 2,231 executable lines).
 
 | Area | Lines | Note |
 |---|---|---|
-| `shared/` | 96.63 % | Pure logic, well covered. `icon-position.ts` at 68 % is the weak spot. |
-| `main/data/` | 92.05 % | Was invisible before M11. |
-| `renderer/src/` | ~90 % | Components and views. |
-| `main/index.ts` | see below | The remaining gap. |
+| `shared/` | 98.42 % | Pure logic, well covered. `icon-position.ts` at 86 % is the weak spot. |
+| `main/data/` | 92.51 % | Was invisible before M11. |
+| `renderer/src/components/` | 94.31 % | |
+| `renderer/src/views/` | 89.51 % | |
+| `main/gesture-session.ts` | 100 % | Extracted from `index.ts` in M11 precisely so it could be measured. |
+| `main/index.ts` | 0 % | The remaining gap — see below. |
 | `main/settings.ts` | 0 % | Thin `app.getPath` wrapper; only meaningful inside Electron. |
+
+`main/index.ts` is 0 % of 273 executable lines and is the single largest drag on the number. It is not untested — the M0/M2/M3/M9 Playwright specs drive it end to end — but Vitest's V8 provider cannot see into the Electron main process, so none of that E2E exercise is credited here. The M11 `GestureController` extraction is the template for closing the gap: move Electron-free decision logic out into a pure module where unit tests can reach it, and leave `index.ts` as the thin Electron-binding shell it should be.
+
+> **Reading the text report.** The `text` reporter omits any file that is at 100 % on all four metrics, so a file vanishing from the table means it is fully covered, not missing. Use `--coverage.reporter=json-summary` for the complete per-file list.
