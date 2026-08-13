@@ -84,34 +84,63 @@ async function clickTitleBarButton(page: Page, testid: string): Promise<void> {
   await page.getByTestId(testid).click();
 }
 
-// Move the window into the middle of the screen so resize tests have
-// room to grow in every direction. The default expand position is
-// top-right, where the bottom-right resize is capped by the screen
-// edge — useless for testing growth.
-//
-// Drag math: the renderer computes new-top-left = cursor + offset,
-// where offset = startPos - startCursor (captured at mousedown). To
-// shift the window's top-left by a delta D, the cursor must move by
-// the same D. We pick start/end cursor coords so the cursor delta
-// matches the desired window-top-left delta from default (~1740, 0)
-// to the middle (~640, 400): (-1100, +400).
-async function dragWindowToMiddle(page: Page): Promise<void> {
+/**
+ * Park the window near the centre of the work area, so resize tests
+ * have room to grow in every direction. The default expand position is
+ * top-right, where a bottom-right resize is capped by the screen edge.
+ *
+ * The renderer computes new-top-left = cursor + offset, where offset is
+ * captured at mousedown — so to shift the window by a delta, the cursor
+ * must shift by the same delta.
+ *
+ * That delta is derived from the actual display rather than hard-coded
+ * screen coordinates. It used to drag from (1500, 100) to (400, 500) —
+ * a fixed -1100 px in x — which centres the window on a wide monitor
+ * but on a narrower one just slams it into the left edge, where
+ * clampWindowForDrag pins it at x = 0. The CI runner's display is
+ * narrower than the machine these tests were written on, so both
+ * callers that assert "not at an edge" failed there while passing
+ * locally.
+ */
+async function dragWindowToMiddle(
+  app: ElectronApplication,
+  page: Page,
+): Promise<void> {
+  const work = await app.evaluate(
+    async ({ screen }) => screen.getPrimaryDisplay().workArea,
+  );
+  const before = await getWindowBounds(app);
+
+  const targetX = Math.round(work.x + (work.width - before.width) / 2);
+  const targetY = Math.round(work.y + (work.height - before.height) / 2);
+
+  // The window follows the cursor 1:1, so shifting the window by
+  // (target - before) means shifting the cursor by the same amount.
+  // Start the cursor at the target centre so both ends of the gesture
+  // stay inside the display no matter which way the window moves.
+  const startCursor = { x: targetX, y: targetY };
+  const endCursor = {
+    x: startCursor.x + (targetX - before.x),
+    y: startCursor.y + (targetY - before.y),
+  };
+
   const panel = page.getByTestId('window-view');
   await panel.dispatchEvent('click');
   await panel.dispatchEvent('click');
   await page.waitForTimeout(50);
   await expect(panel).toHaveAttribute('data-drag-mode', 'on');
-  await panel.dispatchEvent('mousedown', { screenX: 1500, screenY: 100 });
-  await page.evaluate(() => {
-    window.dispatchEvent(
-      new MouseEvent('mousemove', { screenX: 400, screenY: 500 }),
-    );
+  await panel.dispatchEvent('mousedown', {
+    screenX: startCursor.x,
+    screenY: startCursor.y,
   });
-  await page.evaluate(() => {
+  await page.evaluate(({ x, y }) => {
     window.dispatchEvent(
-      new MouseEvent('mouseup', { screenX: 400, screenY: 500 }),
+      new MouseEvent('mousemove', { screenX: x, screenY: y }),
     );
-  });
+  }, endCursor);
+  await page.evaluate(({ x, y }) => {
+    window.dispatchEvent(new MouseEvent('mouseup', { screenX: x, screenY: y }));
+  }, endCursor);
   await page.waitForTimeout(200);
   // Exit drag mode.
   await panel.dispatchEvent('click');
@@ -520,7 +549,7 @@ test('minimize after resize lands icon at the resized window center', async () =
     const page = await app.firstWindow();
     await expandToWindow(page);
     // Move to the middle so the bottom-right resize has room to grow.
-    await dragWindowToMiddle(page);
+    await dragWindowToMiddle(app, page);
 
     // Resize from bottom-right (top-left stays fixed). Use
     // page.mouse for reliable event delivery to the React handler.
@@ -568,7 +597,7 @@ test('resize size persists across minimize → re-expand within session', async 
     const defaultExpanded = await getWindowBounds(app);
     const defaultSize = defaultExpanded.width;
     // Move to the middle so the bottom-right resize has room to grow.
-    await dragWindowToMiddle(page);
+    await dragWindowToMiddle(app, page);
     const afterDrag = await getWindowBounds(app);
     // Sanity: drag actually moved the window away from the default
     // top-right (otherwise the resize will be capped to current size).
@@ -756,7 +785,7 @@ test('B3b: drag-to-edge snap puts icon at that edge midpoint', async () => {
     // the LEFT edge to trip edge snap. Splitting in two keeps each
     // mousemove well within bounds the renderer can resolve via
     // dispatchEvent.
-    await dragWindowToMiddle(page);
+    await dragWindowToMiddle(app, page);
     const middlePos = await getWindowBounds(app);
     expect(middlePos.x).toBeGreaterThan(50); // away from edges.
 
@@ -822,7 +851,7 @@ test('A1: minimize after resize clears in-session size — next expand uses defa
     const defaultSize = defaultExpanded.width;
 
     // Move to middle so the resize has room.
-    await dragWindowToMiddle(page);
+    await dragWindowToMiddle(app, page);
 
     // Resize bigger.
     const handle = page.getByTestId('resize-handle-bottom-right');
