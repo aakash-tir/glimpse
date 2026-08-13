@@ -60,14 +60,18 @@ _Reviewed and found correct (no action): the `eslint-disable` at `slide-deck.tsx
 
 Tracked here so they aren't forgotten (automation can't reach these). How-to is in each milestone's `manual-tests.md` history / the M10 list.
 
-**From M11 (merged 2026-08-12 without a manual pass):**
+**From M11 (merged 2026-08-12).** Signed off the same day:
 
-- **Tailwind-removal visual sweep — the important one.** Removing Tailwind touched the styling of every surface in the app and **no automated test asserts a single visual property**. Arrow through all slides looking for overflow, lost centering, collapsed spacing, wrong font, mis-sized icons. Two Preflight carry-overs are load-bearing and worth checking in DevTools: `getComputedStyle(document.body)` should report the system UI font stack (not `Times New Roman`), `line-height: 1.5`, and `margin: 0px`.
-- **Alert slide against a live warning** — one slide per bulletin (not one per sub-region), correct region name, expiry in the forecast location's zone, no bulletin body, no motion.
-- **Deck opens on the alert** — including the cold-start path where the warning arrives after the window opened, and the opposite case where navigating first must leave you where you are.
+- ✅ **Tailwind-removal visual sweep** — every slide checked by eye for overflow, lost centering, collapsed spacing and wrong font. This was the milestone's real risk: the removal touched the styling of every surface and **no automated test asserts a single visual property**.
+- ✅ **Alert slide against a live Environment Canada warning** — one slide (not one per sub-region), correct region, expiry in the forecast location's zone, no bulletin body.
+- ✅ **Deck opens on the alert** when a warning is active — verified on the path where the data is already in the store.
+- ✅ **CI green on GitHub Actions** — run `31667629524` on `main`, all gates.
+
+Still unverified, none blocking:
+
+- **Cold-start deck-follow** — window opened *before* the first fetch returns, so the warning arrives after mount and the deck must move itself to it. Covered by component tests; the real-timing version has not been watched by eye. Same for the inverse: navigate first, and a later warning must leave you where you are.
 - **Alerts failure isolation** — blackhole `api.weather.gc.ca`; expect no alert slides, icon **not** in error state, other data intact.
-- **Gesture feel after the `GestureController` extraction** — icon drag / corner snap, window drag edge-clamping, square-lock corner resize.
-- **CI green on GitHub Actions** for the merge commit.
+- **Gesture feel after the `GestureController` extraction** — icon drag / corner snap, window drag edge-clamping, square-lock corner resize. Behaviour is covered by E2E; only the feel is unchecked.
 
 - **Auto-start at real login** — Run-key registration verified end-to-end (`electron.app.Glimpse` present + `autoLaunchRegistered: true`); the only untested bit is Windows executing it at next login (OS-guaranteed). Confirm with a sign-out/in, then confirm the Settings → Startup opt-out sticks.
 - **Cached-location fallback under a real outage** — block `get.geojs.io` via hosts and relaunch; expect cached location, no error icon.
