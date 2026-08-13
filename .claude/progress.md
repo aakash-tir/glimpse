@@ -261,4 +261,4 @@ _Scope note (added 2026-08-10): the advanced-location subsystem was built during
 
 **Refs:** [`plan/data-sources.md` § Severe weather alerts](./plan/data-sources.md), [`plan/slides.md` § Severe weather alerts](./plan/slides.md), [`plan/tech-stack.md` § Styling](./plan/tech-stack.md), [`review-findings.md`](./review-findings.md).
 
-**Definition of done.** All findings from the improvement review closed; alerts render for a real Environment Canada warning; lint + typecheck + 999 automated tests green (970 Vitest + 29 Playwright); manual tests signed off.
+**Definition of done.** All findings from the improvement review closed; alerts render for a real Environment Canada warning; lint + typecheck + 1,003 automated tests green (974 Vitest + 29 Playwright); manual tests signed off.

@@ -170,11 +170,15 @@ describe('presentation helpers', () => {
 
 describe('dedupeAlerts — one bulletin, many sub-regions', () => {
   // Environment Canada returns one feature per affected area, so a
-  // single province-wide warning arrives three times with different ids
-  // and slightly different body text. Observed live for Kelowna: three
-  // "air quality warning" features sharing one bulletin id prefix and
-  // one expiry.
-  it('collapses same name + severity + expiry into one slide', () => {
+  // single region-wide warning arrives several times with different ids
+  // and slightly different body text.
+  //
+  // The expiries are NOT shared across the group — each sub-region's
+  // bulletin is issued separately. Observed live for Kelowna: two "air
+  // quality warning" features expiring at 10:17:07Z and 11:28:29Z, an
+  // hour and eleven minutes apart. Keying dedupe on expiry (as it
+  // originally did) therefore let the duplicates straight through.
+  it('collapses same name + severity into one slide', () => {
     const out = dedupeAlerts([
       alert({
         id: 'fea1-2366',
@@ -213,12 +217,75 @@ describe('dedupeAlerts — one bulletin, many sub-regions', () => {
     expect(out).toHaveLength(2);
   });
 
-  it('keeps the same name with different expiries apart', () => {
+  it('collapses the same bulletin even when the expiries differ', () => {
+    // The live Kelowna case: one warning, two sub-regions, expiries an
+    // hour apart. Before the fix this rendered as two identical slides.
+    const out = dedupeAlerts([
+      alert({
+        id: 'fea1-2366',
+        title: 'Air quality warning',
+        severity: 'warning',
+        riskColour: 'orange',
+        expiresAtUtc: '2026-08-13T10:17:07.937Z',
+      }),
+      alert({
+        id: 'fea1-2367',
+        title: 'Air quality warning',
+        severity: 'warning',
+        riskColour: 'yellow',
+        expiresAtUtc: '2026-08-13T11:28:29.207Z',
+      }),
+    ]);
+    expect(out).toHaveLength(1);
+    // First feature's content...
+    expect(out[0]?.id).toBe('fea1-2366');
+    expect(out[0]?.riskColour).toBe('orange');
+    // ...but the group's latest expiry, so the merged alert lives as
+    // long as the longest-running sub-region bulletin.
+    expect(out[0]?.expiresAtUtc).toBe('2026-08-13T11:28:29.207Z');
+  });
+
+  it('takes the latest expiry regardless of feature order', () => {
+    const out = dedupeAlerts([
+      alert({ id: '1', expiresAtUtc: '2026-08-12T06:00:00Z' }),
+      alert({ id: '2', expiresAtUtc: '2026-08-11T06:00:00Z' }),
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0]?.id).toBe('1');
+    expect(out[0]?.expiresAtUtc).toBe('2026-08-12T06:00:00Z');
+  });
+
+  it('treats an open-ended expiry as the latest', () => {
+    // A null expiry means the bulletin has no stated end, so it must
+    // win over any timestamp rather than being sorted below it.
     const out = dedupeAlerts([
       alert({ id: '1', expiresAtUtc: '2026-08-11T06:00:00Z' }),
-      alert({ id: '2', expiresAtUtc: '2026-08-12T06:00:00Z' }),
+      alert({ id: '2', expiresAtUtc: null }),
     ]);
-    expect(out).toHaveLength(2);
+    expect(out).toHaveLength(1);
+    expect(out[0]?.id).toBe('1');
+    expect(out[0]?.expiresAtUtc).toBeNull();
+  });
+
+  it('treats an unparseable expiry as open-ended, like dropExpired does', () => {
+    const out = dedupeAlerts([
+      alert({ id: '1', expiresAtUtc: '2026-08-11T06:00:00Z' }),
+      alert({ id: '2', expiresAtUtc: 'not-a-date' }),
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0]?.expiresAtUtc).toBe('not-a-date');
+  });
+
+  it('preserves first-seen order across distinct bulletins', () => {
+    const out = dedupeAlerts([
+      alert({ id: '1', title: 'Heat warning', severity: 'warning' }),
+      alert({ id: '2', title: 'Air quality warning', severity: 'warning' }),
+      alert({ id: '3', title: 'Heat warning', severity: 'warning' }),
+    ]);
+    expect(out.map((a) => a.title)).toEqual([
+      'Heat warning',
+      'Air quality warning',
+    ]);
   });
 
   it('is case-insensitive on the title', () => {

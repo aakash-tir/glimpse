@@ -74,25 +74,62 @@ export function sortAlerts(alerts: readonly WeatherAlert[]): WeatherAlert[] {
 }
 
 /**
+ * Expiry as a sortable instant, for picking the latest of a group.
+ *
+ * Null and unparseable expiries mean "no known end", which sorts after
+ * every real timestamp — consistent with dropExpired(), which keeps
+ * both rather than dropping an alert it cannot date.
+ */
+function expiryInstant(alert: WeatherAlert): number {
+  if (alert.expiresAtUtc === null) return Infinity;
+  const t = new Date(alert.expiresAtUtc).getTime();
+  return Number.isNaN(t) ? Infinity : t;
+}
+
+/**
  * Collapse the same bulletin repeated across sub-regions.
  *
  * Environment Canada returns one feature per affected area, so a single
- * province-wide alert arrives as several features with the same name,
- * severity and expiry but different ids and slightly different body
- * text. Rendered naively that is three identical-looking slides for one
- * warning. Keyed on name + severity + expiry, keeping the first — which
- * is the one the deck will show first anyway.
+ * region-wide alert arrives as several features with the same name and
+ * severity but different ids and slightly different body text.
+ * Rendered naively that is three identical-looking slides for one
+ * warning.
+ *
+ * Keyed on name + severity, keeping the first feature — which is the
+ * one the deck would show anyway — but carrying the **latest** expiry
+ * in the group, so the merged alert lives as long as the longest-
+ * running sub-region bulletin instead of lapsing with the earliest.
+ *
+ * Expiry is deliberately not part of the key. It was originally, on the
+ * assumption that sub-region bulletins share one expiry. Live data
+ * disproved that — a Kelowna air-quality warning arrived as two
+ * features whose expiries were an hour and eleven minutes apart,
+ * because each sub-region's bulletin is issued separately — so keying
+ * on it let the duplicates through. See plan/data-sources.md
+ * § Severe weather alerts.
  */
 export function dedupeAlerts(alerts: readonly WeatherAlert[]): WeatherAlert[] {
-  const seen = new Set<string>();
-  const out: WeatherAlert[] = [];
+  const byKey = new Map<string, WeatherAlert>();
+  const order: string[] = [];
+
   for (const a of alerts) {
-    const key = `${a.title.toLowerCase()}|${a.severity}|${a.expiresAtUtc ?? ''}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(a);
+    const key = `${a.title.toLowerCase()}|${a.severity}`;
+    const kept = byKey.get(key);
+
+    if (kept === undefined) {
+      byKey.set(key, a);
+      order.push(key);
+      continue;
+    }
+
+    // Same bulletin again: keep the content already chosen, extend the
+    // expiry if this sub-region's runs longer.
+    if (expiryInstant(a) > expiryInstant(kept)) {
+      byKey.set(key, { ...kept, expiresAtUtc: a.expiresAtUtc });
+    }
   }
-  return out;
+
+  return order.map((key) => byKey.get(key) as WeatherAlert);
 }
 
 /** Drop alerts whose expiry has passed. `now` is injectable for tests. */

@@ -163,7 +163,7 @@ For each milestone below, every bullet is a test (or small group of related test
 - **Unit:** GeoJSON → `WeatherAlert[]` parsing — features missing `alert_name_en` are skipped rather than rendered blank; missing body / risk colour / expiry degrade to sensible defaults; a non-FeatureCollection returns `[]`.
 - **Unit:** severity classification — `warning` / `watch` / `advisory` map through, and **any unrecognized `alert_type` degrades to `statement`** (the least prominent), so an unexpected upstream value can never promote itself to the front of the deck.
 - **Unit:** alert ordering — most urgent first, then alphabetical by title within a severity, stable across refreshes.
-- **Unit:** dedupe — the same bulletin repeated across sub-regions collapses to one slide.
+- **Unit:** dedupe — the same bulletin repeated across sub-regions collapses to one slide, keyed on name + severity **only**, carrying the group's latest expiry forward (an open-ended or unparseable expiry counts as the latest). Differing expiries must not defeat the collapse — that is the real-data case the original expiry-keyed version missed.
 - **Unit:** expiry — alerts past `expiresAtUtc` are dropped; a null or unparseable expiry keeps the alert (better a stale warning than a silently dropped one).
 - **Unit:** promotion ordering in `computeVisibleSlides` — a `warning` moves the whole alert group ahead of Today; a watch/advisory/statement group sits with the special events; no alerts leaves the M4 order untouched.
 - **Unit:** the M4 current-slide stability rule still holds when the alert group is inserted or removed — `reconcileCurrentSlideIndex` tracks slide *ids*, so re-ordering around the viewer must not move them.
