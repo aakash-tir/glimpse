@@ -8,10 +8,10 @@
 
 ## Dependencies
 
-- **`tailwindcss`** + **`shadcn/ui`** — UI components and design system.
+- **Styling: inline `style` objects, no CSS framework.** Tailwind and shadcn/ui were scaffolded at M0 and carried unused until M11 — 0 `className` usages against 139 inline `style={{}}` usages, no `components/ui/` directory, and no call sites for `cn()` or `cva()`. Both were removed along with `clsx`, `tailwind-merge`, `class-variance-authority`, `autoprefixer` and `postcss`. `index.css` reproduces the parts of Tailwind's Preflight the inline styles actually depended on (border-box sizing, the root font stack and 1.5 line-height, button/input font inheritance, `svg { display: block }`, margin-less `p`).
 - **`framer-motion`** — cube transitions, scale animations, coachmark spotlights, event-background motion.
 - **`react-icons/wi`** — wraps the `weather-icons` font by Erik Flowers — extensive day/night variants and Open-Meteo-friendly mapping.
-- **`lucide-react`** — bundled with shadcn/ui; used for the title-bar close button (`X`) and other UI icons as needed.
+- **`lucide-react`** — used directly for the title-bar close button (`X`) and other UI icons as needed. (Originally arrived as a shadcn/ui dependency; kept on its own merit when shadcn was removed in M11.)
 - **`suncalc`** — local astronomical calculations: moon phase, illumination, eclipses (no network call).
 
 See [styling.md](./styling.md) for the visual / animation rules and [data-sources.md](./data-sources.md) for the data flow.

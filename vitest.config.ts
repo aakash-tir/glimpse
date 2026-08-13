@@ -23,7 +23,18 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'html'],
       include: ['src/**/*.{ts,tsx}'],
-      exclude: ['src/**/*.d.ts', 'src/main/**', 'src/preload/**'],
+      // src/main/** is deliberately INCLUDED. Excluding it made the
+      // headline number describe only the renderer + shared layers,
+      // which cut both ways: the four data clients under src/main/data
+      // have real unit suites that counted for nothing, while
+      // src/main/index.ts — the largest file in the project — was
+      // credited by nothing because it was measured by nothing. The
+      // testing.md target is "line coverage of src/", so measure src/.
+      //
+      // src/preload stays out: it is a contextBridge manifest that
+      // only executes inside a real Electron preload context, so it is
+      // covered by E2E or not at all.
+      exclude: ['src/**/*.d.ts', 'src/preload/**'],
     },
   },
 });

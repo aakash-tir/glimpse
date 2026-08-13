@@ -13,13 +13,12 @@ import { withLocationCache } from './data/geolocation-cache';
 import { geocodeByName, type GeocodingMatch } from './data/geocoding';
 import { fetchForecast } from './data/open-meteo';
 import { fetchKp } from './data/noaa-swpc';
+import { fetchAlerts } from './data/msc-alerts';
 import { DataStore } from './data/store';
 import { TickScheduler } from '../shared/scheduler';
 import type { DataSnapshot } from '../shared/data-snapshot';
 import {
-  clampIconForDrag,
   defaultIconPosition,
-  displayForPoint,
   ICON_OFFSET_X,
   ICON_OFFSET_Y,
   ICON_SIZE,
@@ -29,20 +28,13 @@ import {
   WINDOW_WIDTH as ICON_WINDOW_WIDTH,
   type DisplayBounds,
 } from '../shared/icon-position';
-import { computeIconPosFromCursor, type ScreenPoint } from '../shared/drag';
-import { snapToCorner } from '../shared/snap';
+import type { ScreenPoint } from '../shared/drag';
 import {
-  clampWindowForDrag,
   iconForCollapsedWindow,
-  maxSizeForResize,
-  maxWindowSize,
   resolveWindowBoundsForExpand,
-  snapWindowToCorner,
-  snapWindowToEdge,
-  squareResize,
-  WINDOW_MIN_SIZE_PX,
   type ResizeCorner,
 } from '../shared/window-position';
+import { GestureController } from './gesture-session';
 import {
   isLocationOverride,
   removeLocationOverride,
@@ -99,6 +91,7 @@ const dataStore = new DataStore({
   }),
   fetchForecast,
   fetchKp,
+  fetchAlerts,
   // The resolver picks final coords from (override → browser → IP).
   // Reads current settings each call so changes from the Settings
   // slide take effect on the very next refresh — no store restart.
@@ -118,6 +111,12 @@ const dataScheduler = new TickScheduler(async () => {
 
 function primaryBounds(): DisplayBounds {
   return screen.getPrimaryDisplay().workArea;
+}
+
+// Display layout handed to GestureController on every gesture tick, so
+// the controller itself never imports Electron's screen module.
+function geometry(): { allDisplays: DisplayBounds[]; primary: DisplayBounds } {
+  return { allDisplays: allDisplayBounds(), primary: primaryBounds() };
 }
 
 function allDisplayBounds(): DisplayBounds[] {
@@ -176,8 +175,7 @@ function createIconWindow(): void {
   // can't act on a destroyed window during quit teardown.
   iconWindow.on('closed', () => {
     iconWindow = null;
-    dragSession = null;
-    resizeSession = null;
+    gestures.reset();
   });
 
   if (process.env['ELECTRON_RENDERER_URL']) {
@@ -232,35 +230,11 @@ function snapBackIfOffScreen(): void {
 // into a visible expansion over the course of a long drag — Issue 4
 // in the manual-tests-review.md write-up. Snapshotting once removes
 // the round-trip entirely.
-type DragSession =
-  | {
-      subject: 'icon';
-      startCursor: ScreenPoint;
-      startPos: { x: number; y: number };
-    }
-  | {
-      subject: 'window';
-      startCursor: ScreenPoint;
-      startPos: { x: number; y: number };
-      startSize: { width: number; height: number };
-      // Where the window's top-left actually landed after the most
-      // recent drag tick. clampWindowForDrag uses this to decide which
-      // display the window is currently anchored to when the cursor
-      // crosses a multi-monitor seam — so we don't need to call
-      // getBounds() each tick (which would re-introduce the DWM frame
-      // drift that fix 4 just removed).
-      lastAppliedPos: { x: number; y: number };
-    };
-
-let dragSession: DragSession | null = null;
-
-type ResizeSession = {
-  corner: ResizeCorner;
-  startCursor: ScreenPoint;
-  origin: WindowBounds;
-};
-
-let resizeSession: ResizeSession | null = null;
+// Drag / resize gesture state lives in GestureController (see
+// main/gesture-session.ts). It is Electron-free and unit-tested; this
+// module keeps the side effects — setBounds, saveSettings and the
+// lastWindowBounds bookkeeping.
+const gestures = new GestureController();
 
 // In-session window size. Updated when the user resizes; consumed on
 // the next expand to reuse the size at the icon's location even when
@@ -690,65 +664,33 @@ function registerIpc(): void {
     'resize:start',
     (_evt, payload: { corner: ResizeCorner; cursor: ScreenPoint }) => {
       if (!iconWindow || mode !== 'window') return;
-      resizeSession = {
-        corner: payload.corner,
-        startCursor: payload.cursor,
-        origin: iconWindow.getContentBounds(),
-      };
+      gestures.startResize(
+        payload.corner,
+        payload.cursor,
+        iconWindow.getContentBounds(),
+      );
     },
   );
 
-  function applyResize(cursor: ScreenPoint): WindowBounds | null {
-    if (!resizeSession || !iconWindow) return null;
-    // Cap the new size so the bounds stay on the display containing
-    // the diagonal-fixed corner (the corner that doesn't move during
-    // this resize). maxWindowSize is the absolute cap (1/6 display
-    // floor); maxSizeForResize is the per-corner per-display cap that
-    // prevents spillover off the screen edge.
-    const originCenter = {
-      x: resizeSession.origin.x + resizeSession.origin.width / 2,
-      y: resizeSession.origin.y + resizeSession.origin.height / 2,
-    };
-    const display = displayForPoint(
-      originCenter,
-      allDisplayBounds(),
-      primaryBounds(),
-    );
-    const dispMax = maxSizeForResize({
-      corner: resizeSession.corner,
-      origin: resizeSession.origin,
-      display,
-    });
-    const next = squareResize({
-      origin: resizeSession.origin,
-      corner: resizeSession.corner,
-      cursorDx: cursor.x - resizeSession.startCursor.x,
-      cursorDy: cursor.y - resizeSession.startCursor.y,
-      minSize: WINDOW_MIN_SIZE_PX,
-      maxSize: Math.max(
-        WINDOW_MIN_SIZE_PX,
-        Math.min(maxWindowSize(primaryBounds()), dispMax),
-      ),
-    });
-    iconWindow.setBounds(next);
+  function commitResize(next: WindowBounds | null): WindowBounds | null {
+    const win = liveWindow();
+    if (!next || !win) return null;
+    win.setBounds(next);
     lastWindowBounds = next;
     return next;
   }
 
   ipcMain.on('resize:move', (_evt, cursor: ScreenPoint) => {
-    applyResize(cursor);
+    commitResize(gestures.applyResize(cursor, geometry()));
   });
 
   ipcMain.on('resize:end', (_evt, cursor: ScreenPoint) => {
-    const final = applyResize(cursor);
-    resizeSession = null;
+    const final = commitResize(gestures.endResize(cursor, geometry()));
     if (!final) return;
-    // Carry the new size in-memory so the next collapse → expand cycle
-    // reuses it (option (b) from the manual-tests-review writeup).
-    // Disk persistence still requires trackWindowPosition.
+    // Carry the new size in-memory so the next collapse -> expand cycle
+    // reuses it. Disk persistence still requires trackWindowPosition.
     lastWindowSize = final.width;
-    const settings = loadSettings();
-    if (settings.trackWindowPosition) {
+    if (loadSettings().trackWindowPosition) {
       saveSettings({ windowBounds: final });
     }
   });
@@ -756,148 +698,43 @@ function registerIpc(): void {
   ipcMain.on('drag:start', (_evt, cursor: ScreenPoint) => {
     if (!iconWindow) return;
     if (mode === 'window') {
-      const b = iconWindow.getContentBounds();
-      dragSession = {
-        subject: 'window',
-        startCursor: cursor,
-        startPos: { x: b.x, y: b.y },
-        // Capture size ONCE here. drag:move / drag:end reuse this
-        // value rather than calling getBounds() again — see the
-        // DragSession type comment for the DWM-drift rationale.
-        startSize: { width: b.width, height: b.height },
-        // Seed the multi-monitor anchor at the start position; updated
-        // after each successful move below.
-        lastAppliedPos: { x: b.x, y: b.y },
-      };
+      gestures.startWindowDrag(cursor, iconWindow.getContentBounds());
     } else {
-      dragSession = {
-        subject: 'icon',
-        startCursor: cursor,
-        startPos: currentIconPosition(),
-      };
+      gestures.startIconDrag(cursor, currentIconPosition());
     }
   });
 
   ipcMain.on('drag:move', (_evt, cursor: ScreenPoint) => {
-    if (!dragSession || !iconWindow) return;
-    const next = computeIconPosFromCursor(
-      dragSession.startCursor,
-      dragSession.startPos,
-      cursor,
-    );
-    if (dragSession.subject === 'window') {
-      // Constrain the window to fit fully on the cursor's display.
-      // Cross-monitor: hugs the source display's edge until the cursor
-      // has moved far enough into the destination that the whole
-      // window fits there. Mirrors the icon's drag clamp.
-      const final = clampWindowForDrag({
-        candidate: next,
-        size: dragSession.startSize,
-        cursor,
-        prevPos: dragSession.lastAppliedPos,
-        allDisplays: allDisplayBounds(),
-      });
-      const moved: WindowBounds = {
-        x: final.x,
-        y: final.y,
-        width: dragSession.startSize.width,
-        height: dragSession.startSize.height,
-      };
-      iconWindow.setBounds(moved);
-      lastWindowBounds = moved;
-      dragSession.lastAppliedPos = final;
+    const win = liveWindow();
+    if (!win) return;
+    const move = gestures.moveDrag(cursor, geometry(), currentIconPosition());
+    if (!move) return;
+    if (move.subject === 'window') {
+      win.setBounds(move.bounds);
+      lastWindowBounds = move.bounds;
     } else {
-      const clamped = clampIconForDrag({
-        candidate: next,
-        cursor,
-        prevPos: currentIconPosition(),
-        allDisplays: allDisplayBounds(),
-      });
-      applyIconPosition(clamped);
+      applyIconPosition(move.position);
     }
   });
 
   ipcMain.on('drag:end', (_evt, cursor: ScreenPoint) => {
-    if (!dragSession || !iconWindow) return;
-    const dropped = computeIconPosFromCursor(
-      dragSession.startCursor,
-      dragSession.startPos,
-      cursor,
-    );
-    const session = dragSession;
-    dragSession = null;
-
-    if (session.subject === 'window') {
-      // A real window-drag gesture has now completed — flag it so
-      // the next collapse uses iconForCollapsedWindow (B3) rather
-      // than the expand-time position (B1).
+    const win = liveWindow();
+    if (!win) return;
+    const end = gestures.endDrag(cursor, geometry(), currentIconPosition());
+    if (!end) return;
+    if (end.subject === 'window') {
+      // A real window-drag completed — flag it so the next collapse
+      // uses iconForCollapsedWindow (B3) not the expand-time spot (B1).
       windowDragged = true;
-      // Snap considers the corners + edges of EVERY connected
-      // display, so a release near the secondary monitor's bottom-
-      // right snaps there. Corner takes priority over edge because
-      // a corner is two-edges-flush — the more specific match.
-      // The unsnapped path uses the drag clamp so a release near a
-      // screen edge keeps the window where the user actually saw it.
-      const cornerSnap = snapWindowToCorner(
-        dropped,
-        { width: session.startSize.width, height: session.startSize.height },
-        allDisplayBounds(),
-      );
-      const edgeSnap = cornerSnap
-        ? null
-        : snapWindowToEdge(
-            dropped,
-            {
-              width: session.startSize.width,
-              height: session.startSize.height,
-            },
-            allDisplayBounds(),
-          );
-      const final =
-        cornerSnap?.position ??
-        edgeSnap?.position ??
-        clampWindowForDrag({
-          candidate: dropped,
-          size: session.startSize,
-          cursor,
-          prevPos: session.lastAppliedPos,
-          allDisplays: allDisplayBounds(),
-        });
-      const newBounds: WindowBounds = {
-        x: final.x,
-        y: final.y,
-        width: session.startSize.width,
-        height: session.startSize.height,
-      };
-      iconWindow.setBounds(newBounds);
-      lastWindowBounds = newBounds;
-      // Window position persistence is opt-in; only save when the
-      // user has enabled it. Sub-feature 9 wires the setting UI; until
-      // then, the toggle is set via settings.json directly for testing.
-      // (Drag doesn't change size, so lastWindowSize doesn't need an
-      // update here — the collapse target is now derived from window
-      // bounds via iconForCollapsedWindow.)
-      const settings = loadSettings();
-      if (settings.trackWindowPosition) {
-        saveSettings({ windowBounds: newBounds });
+      win.setBounds(end.bounds);
+      lastWindowBounds = end.bounds;
+      // Window position persistence is opt-in.
+      if (loadSettings().trackWindowPosition) {
+        saveSettings({ windowBounds: end.bounds });
       }
     } else {
-      // Snap considers each display's 4 corners; release near the
-      // secondary monitor's bottom-left snaps to that corner with the
-      // same 16 px padding rule. The unsnapped path uses the cross-
-      // display drag clamp so a release near a monitor seam stays
-      // where the user actually sees the icon.
-      const snapped = snapToCorner(dropped, allDisplayBounds());
-      const final =
-        snapped?.position ??
-        clampIconForDrag({
-          candidate: dropped,
-          cursor,
-          prevPos: currentIconPosition(),
-          allDisplays: allDisplayBounds(),
-        });
-      applyIconPosition(final);
-      saveSettings({ iconPosition: final });
+      applyIconPosition(end.position);
+      saveSettings({ iconPosition: end.position });
     }
   });
 }
@@ -962,7 +799,7 @@ if (!gotLock) {
       return;
     }
     // mode === 'icon'. Clear any in-flight drag, then expand.
-    dragSession = null;
+    gestures.reset();
     expandToWindow();
   });
 

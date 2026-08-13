@@ -1,0 +1,72 @@
+# Gates from .claude/rules/milestone-workflow.md, run on every push and
+# pull request instead of only when someone types them locally.
+#
+# Runs on windows-latest because Glimpse is a Windows-only app and the
+# E2E specs drive a real Electron window — the usual "run it on Linux
+# under xvfb" shortcut would be testing a platform the app does not
+# target.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+# A new push to the same branch makes the in-flight run obsolete.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Electron 43 and its build toolchain declare node >= 22.12.
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # Steps 1-3 of the end-of-milestone checks, in the documented
+      # order. Each runs even if an earlier one failed, so a single
+      # push reports every problem at once rather than one per round.
+      - name: Lint
+        if: '!cancelled()'
+        run: npm run lint
+
+      - name: Format
+        if: '!cancelled()'
+        run: npm run format:check
+
+      - name: Typecheck
+        if: '!cancelled()'
+        run: npm run typecheck
+
+      - name: Unit / component / integration / build tests
+        if: '!cancelled()'
+        run: npx vitest run --passWithNoTests test/unit test/component test/integration test/build
+
+      # Drives the built Electron binary, so it needs the build first —
+      # which `npm run test:e2e` does itself.
+      - name: E2E
+        if: '!cancelled()'
+        run: npm run test:e2e
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore

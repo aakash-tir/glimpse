@@ -329,3 +329,113 @@ describe('DataStore — concurrent refresh coalescing', () => {
     expect(deps.fetchForecast).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('DataStore — severe weather alerts', () => {
+  const ALERT = {
+    id: 'a1',
+    severity: 'warning' as const,
+    title: 'Severe thunderstorm warning',
+    areas: ['Central Okanagan'],
+    riskColour: 'orange',
+    expiresAtUtc: '2099-01-01T00:00:00Z',
+  };
+
+  it('snapshots alerts on a successful fetch', async () => {
+    const deps = makeDeps();
+    const store = new DataStore({
+      ...deps,
+      fetchAlerts: () => Promise.resolve([ALERT]),
+    });
+    const result = await store.refresh();
+    expect(result.alertsOk).toBe(true);
+    expect(store.getSnapshot().alerts).toHaveLength(1);
+  });
+
+  it('queries alerts with the resolved coordinates, not the detected ones', async () => {
+    const deps = makeDeps();
+    const fetchAlerts = vi.fn(() => Promise.resolve([]));
+    const store = new DataStore({
+      ...deps,
+      fetchAlerts,
+      resolveCoords: () => ({
+        latitude: 49.88,
+        longitude: -119.5,
+        displayCity: 'Kelowna',
+        source: 'override',
+      }),
+    });
+    await store.refresh();
+    expect(fetchAlerts).toHaveBeenCalledWith({
+      latitude: 49.88,
+      longitude: -119.5,
+    });
+  });
+
+  it('sorts and drops expired alerts before they reach the renderer', async () => {
+    const deps = makeDeps();
+    const store = new DataStore({
+      ...deps,
+      now: () => new Date('2026-08-11T00:00:00Z'),
+      fetchAlerts: () =>
+        Promise.resolve([
+          { ...ALERT, id: 'expired', expiresAtUtc: '2026-08-10T00:00:00Z' },
+          { ...ALERT, id: 'watch', severity: 'watch' as const },
+          { ...ALERT, id: 'warn' },
+        ]),
+    });
+    await store.refresh();
+    const alerts = store.getSnapshot().alerts;
+    expect(alerts.map((a) => a.id)).toEqual(['warn', 'watch']);
+  });
+
+  it('an alerts failure hides the slides WITHOUT touching the icon error state', async () => {
+    // A warning feed being down is not a weather-fetch failure.
+    const deps = makeDeps();
+    const store = new DataStore({
+      ...deps,
+      fetchAlerts: () => Promise.reject(new Error('msc down')),
+    });
+    const result = await store.refresh();
+    expect(result.alertsOk).toBe(false);
+    expect(result.weatherOk).toBe(true);
+    const snap = store.getSnapshot();
+    expect(snap.alerts).toEqual([]);
+    expect(snap.errorState).toBe('ok');
+    expect(snap.forecast).not.toBeNull();
+  });
+
+  it('drops stale alerts on failure rather than showing an unconfirmable warning', async () => {
+    let fail = false;
+    const deps = makeDeps();
+    const store = new DataStore({
+      ...deps,
+      fetchAlerts: () =>
+        fail ? Promise.reject(new Error('msc down')) : Promise.resolve([ALERT]),
+    });
+    await store.refresh();
+    expect(store.getSnapshot().alerts).toHaveLength(1);
+    fail = true;
+    await store.refresh();
+    expect(store.getSnapshot().alerts).toEqual([]);
+  });
+
+  it('is inert when no alerts client is configured', async () => {
+    // The non-Canadian / not-wired case must not break anything.
+    const deps = makeDeps();
+    const store = new DataStore(deps);
+    const result = await store.refresh();
+    expect(result.alertsOk).toBe(true);
+    expect(store.getSnapshot().alerts).toEqual([]);
+  });
+
+  it('does not query alerts when there is no usable location', async () => {
+    const fetchAlerts = vi.fn(() => Promise.resolve([ALERT]));
+    const deps = makeDeps({
+      geoImpl: () => Promise.reject(new Error('geo down')),
+    });
+    const store = new DataStore({ ...deps, fetchAlerts });
+    await store.refresh();
+    expect(fetchAlerts).not.toHaveBeenCalled();
+    expect(store.getSnapshot().alerts).toEqual([]);
+  });
+});

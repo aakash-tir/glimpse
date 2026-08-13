@@ -235,6 +235,7 @@ export function WindowView({
       <SlideDeck
         moonEnabled={moonEnabled}
         events={events}
+        alerts={snapshot?.alerts ?? []}
         forecast={forecast}
         timeFormat={timeFormat}
         units={units}

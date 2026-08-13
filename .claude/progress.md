@@ -18,8 +18,8 @@
 
 - Vite + React + TS template in `src/renderer/`.
 - Electron main process in `src/main/` with single `BrowserWindow` opening at default size.
-- Tailwind CSS configured.
-- shadcn/ui initialized.
+- Tailwind CSS configured. _(Removed in M11 — never used; see [`plan/tech-stack.md`](./plan/tech-stack.md) § Styling.)_
+- shadcn/ui initialized. _(Removed in M11 — never used.)_
 - Framer Motion, `react-icons/wi`, `lucide-react`, `suncalc` installed.
 - electron-builder config in `package.json` (NSIS target, `Glimpse` product name, `app-icon.png` icon source) — config only, no packaging yet.
 - TypeScript strict mode + ESLint configured.
@@ -244,3 +244,23 @@ _Scope note (added 2026-08-10): the advanced-location subsystem was built during
 **Refs:** [`plan/packaging.md`](./plan/packaging.md), [`plan/tech-stack.md`](./plan/tech-stack.md). **Tests:** [`rules/testing.md` § M10](./rules/testing.md#m10--polish--packaging).
 
 **Definition of done.** Installer installs cleanly, app auto-launches at next login, all M1 – M9 behaviors work in the installed build, uninstall is clean.
+
+---
+
+## M11 — Cleanup, blind spots & severe weather
+
+**Status:** Done (2026-08-12)
+
+**Scope.** Post-M10.1 follow-up from the improvement review, plus the first new feature since M10.
+
+- **Removed the unused Tailwind + shadcn/ui stack.** 0 `className` usages against 139 inline `style={{}}` usages; no `components/ui/`, no `cn()`/`cva()` call sites. Dropped 7 packages and their configs. `index.css` reproduces the parts of Preflight the inline styles actually depended on — including the root font stack and `line-height: 1.5`, both of which turned out to be load-bearing. Verified by before/after screenshots of every slide, since no automated test covers CSS.
+- **Coverage now measures `src/main`.** The old exclude made the headline number describe only the renderer + shared layers. Honest baseline **82.47 % lines / 80.54 % statements**.
+- **CI** (`.github/workflows/ci.yml`) — lint, format, typecheck, Vitest and E2E on `windows-latest` on every push.
+- **Extracted `GestureController`** from `main/index.ts` (1,013 → 848 lines). Electron-free, 100 % covered, 23 unit tests for logic that was previously reachable only through Playwright.
+- **Severe weather alerts.** Environment Canada (MSC GeoMet) client, alert model, per-alert slide, and the promotion rule: a `warning` moves the alert group ahead of Today. Strictly passive — no notification, and promotion never moves the viewer off the slide they're on. Canada-only by deliberate choice. The slide states **what · where · until when** only; MSC's bulletin body runs to thousands of characters and has no place on a glance surface. The deck **opens on the alert** when a warning is active and on Today otherwise — including when the alert arrives after the window opened, which index-0 promotion alone did not cover on a cold start.
+
+**Refs:** [`plan/data-sources.md` § Severe weather alerts](./plan/data-sources.md), [`plan/slides.md` § Severe weather alerts](./plan/slides.md), [`plan/tech-stack.md` § Styling](./plan/tech-stack.md), [`review-findings.md`](./review-findings.md).
+
+**Definition of done.** All findings from the improvement review closed; alerts render for a real Environment Canada warning; lint + typecheck + 1,031 automated tests green (1,002 Vitest + 29 Playwright); manual tests signed off.
+
+_Closed 2026-08-12 on the user's instruction to merge. Every automated gate passed on the branch and again on `main` post-merge, and the alert feature was verified end to end against a live Environment Canada warning. The **manual pass was not run** — the Tailwind-removal visual sweep in particular has no automated coverage of any kind. Those checks are carried into [`review-findings.md` § Manual checks still outstanding](./review-findings.md) rather than being lost when `manual-tests.md` is cleared._
