@@ -335,7 +335,7 @@ describe('DataStore — severe weather alerts', () => {
     id: 'a1',
     severity: 'warning' as const,
     title: 'Severe thunderstorm warning',
-    description: 'Damaging winds possible.',
+    areas: ['Central Okanagan'],
     riskColour: 'orange',
     expiresAtUtc: '2099-01-01T00:00:00Z',
   };

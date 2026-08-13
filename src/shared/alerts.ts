@@ -17,13 +17,32 @@ export type WeatherAlert = {
   severity: AlertSeverity;
   /** e.g. "Severe thunderstorm watch". */
   title: string;
-  /** Body copy from the bulletin. */
-  description: string;
+  /**
+   * Affected regions from `feature_name_en` (e.g. ["Central Okanagan"]),
+   * unioned across a deduped group. The bulletin body is deliberately
+   * absent from this model — see plan/slides.md § Severe weather alerts.
+   */
+  areas: string[];
   /** MSC risk colour ("yellow", "orange", …) or null when absent. */
   riskColour: string | null;
   /** ISO instant the alert lapses, or null when open-ended. */
   expiresAtUtc: string | null;
 };
+
+/** How many regions to name before collapsing the rest into "+N more". */
+const MAX_AREAS_SHOWN = 3;
+
+/**
+ * Affected regions as one glanceable line. A province-wide bulletin can
+ * cover a dozen regions, which would overrun the slide, so the tail
+ * collapses to a count.
+ */
+export function formatAlertAreas(areas: readonly string[]): string {
+  if (areas.length === 0) return '';
+  if (areas.length <= MAX_AREAS_SHOWN) return areas.join(', ');
+  const shown = areas.slice(0, MAX_AREAS_SHOWN).join(', ');
+  return `${shown} +${String(areas.length - MAX_AREAS_SHOWN)} more`;
+}
 
 export type AlertSlideId = `alert:${string}`;
 
@@ -100,6 +119,11 @@ function expiryInstant(alert: WeatherAlert): number {
  * in the group, so the merged alert lives as long as the longest-
  * running sub-region bulletin instead of lapsing with the earliest.
  *
+ * Affected regions are unioned rather than taken from the first
+ * feature: those features are genuinely different areas (a live case
+ * collapsed "North Okanagan" and "Central Okanagan"), so keeping only
+ * one would name the wrong place on the slide.
+ *
  * Expiry is deliberately not part of the key. It was originally, on the
  * assumption that sub-region bulletins share one expiry. Live data
  * disproved that — a Kelowna air-quality warning arrived as two
@@ -122,11 +146,21 @@ export function dedupeAlerts(alerts: readonly WeatherAlert[]): WeatherAlert[] {
       continue;
     }
 
-    // Same bulletin again: keep the content already chosen, extend the
-    // expiry if this sub-region's runs longer.
-    if (expiryInstant(a) > expiryInstant(kept)) {
-      byKey.set(key, { ...kept, expiresAtUtc: a.expiresAtUtc });
+    // Same bulletin again: keep the content already chosen, union this
+    // feature's regions, and extend the expiry if its own runs longer.
+    const areas = [...kept.areas];
+    for (const area of a.areas) {
+      if (!areas.includes(area)) areas.push(area);
     }
+
+    byKey.set(key, {
+      ...kept,
+      areas,
+      expiresAtUtc:
+        expiryInstant(a) > expiryInstant(kept)
+          ? a.expiresAtUtc
+          : kept.expiresAtUtc,
+    });
   }
 
   return order.map((key) => byKey.get(key) as WeatherAlert);

@@ -8,9 +8,13 @@
 // carry the bulletin:
 //   { alert_type: "warning" | "watch" | ...,
 //     alert_name_en: "Severe thunderstorm watch",
-//     alert_text_en: "Conditions this evening will be favourable...",
+//     feature_name_en: "Central Okanagan",
+//     status_en: "issued" | "continued" | "ended",
 //     risk_colour_en: "yellow" | "orange" | ...,
 //     expiration_datetime: "2026-08-11T05:59:58.878Z", ... }
+//
+// alert_text_en (the bulletin body) is deliberately not consumed — see
+// plan/slides.md § Severe weather alerts.
 //
 // Canada only — see plan/data-sources.md § Severe weather alerts for
 // why that limitation is deliberate. Outside Canada the bbox simply
@@ -72,6 +76,12 @@ function str(v: unknown): string | null {
  * GeoJSON FeatureCollection → WeatherAlert[]. Features missing a usable
  * title are skipped rather than rendered as a blank slide; everything
  * else degrades to a sensible default.
+ *
+ * `status_en: "ended"` features are dropped here. An ended bulletin is
+ * over, but its expiration_datetime can still be hours in the future
+ * (observed live: an ended alert expiring 17 hours out), so dropExpired
+ * does not catch it. About one live feature in six nationwide is
+ * ended — without this the deck shows finished warnings.
  */
 export function parseAlerts(raw: unknown): WeatherAlert[] {
   if (!isPlainObject(raw)) return [];
@@ -87,6 +97,8 @@ export function parseAlerts(raw: unknown): WeatherAlert[] {
     const title = str(props['alert_name_en']);
     if (title === null) return;
 
+    if (str(props['status_en'])?.toLowerCase() === 'ended') return;
+
     // MSC has no stable per-alert id field across responses, so key on
     // the bulletin identity we do have. Falls back to the index so two
     // same-named alerts can't collapse onto one slide.
@@ -94,11 +106,13 @@ export function parseAlerts(raw: unknown): WeatherAlert[] {
       str(feature['id']) ??
       `${title.toLowerCase().replace(/\s+/g, '-')}-${String(i)}`;
 
+    const area = str(props['feature_name_en']);
+
     out.push({
       id,
       severity: classifyAlertSeverity(props['alert_type']),
       title: sentenceCase(title),
-      description: str(props['alert_text_en']) ?? '',
+      areas: area === null ? [] : [area],
       riskColour: str(props['risk_colour_en']),
       expiresAtUtc: str(props['expiration_datetime']),
     });

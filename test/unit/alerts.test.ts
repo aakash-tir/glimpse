@@ -5,6 +5,7 @@ import {
   alertSlideId,
   classifyAlertSeverity,
   dropExpired,
+  formatAlertAreas,
   hasWarning,
   severityLabel,
   sortAlerts,
@@ -16,7 +17,7 @@ function alert(over: Partial<WeatherAlert> = {}): WeatherAlert {
     id: 'a1',
     severity: 'watch',
     title: 'Severe thunderstorm watch',
-    description: 'Conditions favourable for severe thunderstorms.',
+    areas: ['Central Okanagan'],
     riskColour: 'yellow',
     expiresAtUtc: '2026-08-11T05:59:58.878Z',
     ...over,
@@ -168,6 +169,26 @@ describe('presentation helpers', () => {
   });
 });
 
+describe('formatAlertAreas', () => {
+  it('names a single region plainly', () => {
+    expect(formatAlertAreas(['Central Okanagan'])).toBe('Central Okanagan');
+  });
+
+  it('joins a handful with commas', () => {
+    expect(formatAlertAreas(['North Okanagan', 'Central Okanagan'])).toBe(
+      'North Okanagan, Central Okanagan',
+    );
+  });
+
+  it('collapses the tail so a province-wide bulletin cannot overrun the slide', () => {
+    expect(formatAlertAreas(['A', 'B', 'C', 'D', 'E'])).toBe('A, B, C +2 more');
+  });
+
+  it('is empty when the feed named no region', () => {
+    expect(formatAlertAreas([])).toBe('');
+  });
+});
+
 describe('dedupeAlerts — one bulletin, many sub-regions', () => {
   // Environment Canada returns one feature per affected area, so a
   // single region-wide warning arrives several times with different ids
@@ -226,6 +247,7 @@ describe('dedupeAlerts — one bulletin, many sub-regions', () => {
         title: 'Air quality warning',
         severity: 'warning',
         riskColour: 'orange',
+        areas: ['North Okanagan'],
         expiresAtUtc: '2026-08-13T10:17:07.937Z',
       }),
       alert({
@@ -233,6 +255,7 @@ describe('dedupeAlerts — one bulletin, many sub-regions', () => {
         title: 'Air quality warning',
         severity: 'warning',
         riskColour: 'yellow',
+        areas: ['Central Okanagan'],
         expiresAtUtc: '2026-08-13T11:28:29.207Z',
       }),
     ]);
@@ -243,6 +266,17 @@ describe('dedupeAlerts — one bulletin, many sub-regions', () => {
     // ...but the group's latest expiry, so the merged alert lives as
     // long as the longest-running sub-region bulletin.
     expect(out[0]?.expiresAtUtc).toBe('2026-08-13T11:28:29.207Z');
+    // ...and every affected region, since these are genuinely
+    // different areas — keeping one would name the wrong place.
+    expect(out[0]?.areas).toEqual(['North Okanagan', 'Central Okanagan']);
+  });
+
+  it('does not repeat a region shared across the group', () => {
+    const out = dedupeAlerts([
+      alert({ id: '1', areas: ['Central Okanagan'] }),
+      alert({ id: '2', areas: ['Central Okanagan', 'North Okanagan'] }),
+    ]);
+    expect(out[0]?.areas).toEqual(['Central Okanagan', 'North Okanagan']);
   });
 
   it('takes the latest expiry regardless of feature order', () => {

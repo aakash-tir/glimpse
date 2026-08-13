@@ -116,7 +116,11 @@ Only shown when ≥ 1 event is active today or calendar-tomorrow (system local t
 
 Environment Canada alerts for the resolved location — see [`data-sources.md` § Severe weather alerts](./data-sources.md#severe-weather-alerts-environment-canada). One slide per active alert. Absent entirely when there are none, when the fetch failed, or when the location is outside Canada.
 
-- **Content:** alert name as the title (e.g. "Severe thunderstorm watch") · the alert body text · severity label · expiry time (in the forecast location's zone, per § Time rendering).
+- **Content:** alert name as the title (e.g. "Severe thunderstorm watch") · severity label · **affected region** · expiry time (in the forecast location's zone, per § Time rendering).
+
+  **The bulletin body is deliberately not shown.** Glimpse is a corner-glance app; the MSC `alert_text_en` for a single air-quality warning runs well over 2,000 characters of health advice and phone numbers, which filled the entire slide and buried the three facts that matter. The slide answers only *what*, *where* and *until when* — enough to know something is happening and to go read the full bulletin elsewhere. Anything longer is a document, not a glance.
+
+  The region comes from `feature_name_en` (e.g. "Central Okanagan"), not the user's own city, because that is the area Environment Canada actually issued the bulletin for. When a deduped group covers several regions they are listed comma-separated, capped at three with a `+N more` suffix so a province-wide bulletin cannot overrun the slide.
 - **Background:** derived from `risk_colour_en` — a dark tint in the alert's own risk colour rather than an invented palette. Stays dark in both themes, like the event slides.
 - **Motion:** none. These slides are read, not admired; a pulsing severe-weather warning would read as an alarm, and the app is passive.
 

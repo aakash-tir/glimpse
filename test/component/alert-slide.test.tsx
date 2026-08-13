@@ -10,7 +10,7 @@ function alert(over: Partial<WeatherAlert> = {}): WeatherAlert {
     id: 'a1',
     severity: 'warning',
     title: 'Severe thunderstorm warning',
-    description: 'Damaging winds and large hail are possible.',
+    areas: ['Central Okanagan'],
     riskColour: 'orange',
     expiresAtUtc: '2026-08-11T05:30:00Z',
     ...over,
@@ -39,22 +39,44 @@ describe('AlertSlide — content', () => {
     expect(screen.getByTestId('alert-severity').textContent).toBe('Watch');
   });
 
-  it('renders the bulletin body', () => {
+  it('names the affected region', () => {
     render(<AlertSlide alert={alert()} timeFormat="24h" timeZone="UTC" />);
-    expect(screen.getByTestId('alert-description').textContent).toContain(
-      'Damaging winds',
+    expect(screen.getByTestId('alert-areas').textContent).toBe(
+      'Central Okanagan',
     );
   });
 
-  it('omits the body row entirely when the bulletin has no text', () => {
+  it('lists every region of a deduped group', () => {
     render(
       <AlertSlide
-        alert={alert({ description: '' })}
+        alert={alert({ areas: ['North Okanagan', 'Central Okanagan'] })}
         timeFormat="24h"
         timeZone="UTC"
       />,
     );
+    expect(screen.getByTestId('alert-areas').textContent).toBe(
+      'North Okanagan, Central Okanagan',
+    );
+  });
+
+  it('omits the region row when the feed named no region', () => {
+    render(
+      <AlertSlide
+        alert={alert({ areas: [] })}
+        timeFormat="24h"
+        timeZone="UTC"
+      />,
+    );
+    expect(screen.queryByTestId('alert-areas')).toBeNull();
+  });
+
+  it('never renders the bulletin body, however long the feed makes it', () => {
+    // The whole point of the slide redesign: what / where / until when.
+    render(<AlertSlide alert={alert()} timeFormat="24h" timeZone="UTC" />);
     expect(screen.queryByTestId('alert-description')).toBeNull();
+    expect(
+      screen.getByTestId('alert-content').textContent?.length ?? 0,
+    ).toBeLessThan(120);
   });
 
   it('exposes the severity for the deck to key off', () => {

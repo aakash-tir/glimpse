@@ -65,13 +65,19 @@ Visibility text on the slide is user-aware:
 
 **Coverage is Canada only.** This is a deliberate limitation, not an oversight. Open-Meteo publishes no alerts product, and the free per-country feeds (MSC here, NWS for the US, MeteoAlarm for Europe) have unrelated shapes — supporting all three would roughly triple the work for places this app is not used from. Outside Canada the query simply returns nothing and the alert slides do not appear, which is the same behavior the special-event slides already have when there is no event.
 
-**Fields consumed:** `alert_type` (drives severity), `alert_name_en` (title), `alert_text_en` (body), `risk_colour_en` (background tint), `expiration_datetime` (drop expired alerts).
+**Fields consumed:** `alert_type` (drives severity), `alert_name_en` (title), `feature_name_en` (affected region), `risk_colour_en` (background tint), `expiration_datetime` (drop expired alerts), `status_en` (drop ended alerts).
+
+`alert_text_en` is deliberately **not** consumed — see [`slides.md` § Severe weather alerts](./slides.md#severe-weather-alerts-conditional) for why the bulletin body has no place on a glance slide.
+
+**Ended alerts are dropped at parse time.** `status_en` takes one of three values — `issued`, `continued`, `ended` (verified against all 179 live features nationwide). An `ended` bulletin is over, but its `expiration_datetime` can still be hours in the future, so the expiry filter alone does not catch it: a live Kelowna example had `status_en: "ended"` with an expiry 17 hours out. Roughly one in six live features nationwide is `ended`, so without this filter the deck shows warnings that have already finished.
 
 **Severity** maps from `alert_type`: `warning` › `watch` › `advisory` › `statement`. Any unrecognized value degrades to `statement` — the least prominent — so an unexpected upstream type can never promote itself to the front of the deck.
 
 **Deduplication.** MSC returns one feature per affected sub-region, so a single region-wide bulletin arrives several times: same name and severity, different ids, slightly different body text, and — observed live — **expiry timestamps up to an hour apart**, because each sub-region's bulletin is issued separately.
 
 Duplicates collapse on **name + severity**, keeping the first feature's content and the **latest expiry** in the group, so the merged alert lives as long as the longest-running sub-region bulletin rather than vanishing when the earliest one lapses. A null or unparseable expiry counts as open-ended, and therefore as the latest.
+
+The affected regions are **unioned** across the group rather than taking the first, since those features are genuinely different areas (a live case collapsed "North Okanagan" and "Central Okanagan") and dropping all but one would name the wrong place on the slide.
 
 Expiry is deliberately **not** part of the key. It was originally, on the assumption that sub-region bulletins share one expiry; live data disproved that, and the result was one warning rendering as several near-identical slides — exactly what the dedupe exists to prevent.
 

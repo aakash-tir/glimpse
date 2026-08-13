@@ -257,8 +257,8 @@ _Scope note (added 2026-08-10): the advanced-location subsystem was built during
 - **Coverage now measures `src/main`.** The old exclude made the headline number describe only the renderer + shared layers. Honest baseline **82.47 % lines / 80.54 % statements**.
 - **CI** (`.github/workflows/ci.yml`) — lint, format, typecheck, Vitest and E2E on `windows-latest` on every push.
 - **Extracted `GestureController`** from `main/index.ts` (1,013 → 848 lines). Electron-free, 100 % covered, 23 unit tests for logic that was previously reachable only through Playwright.
-- **Severe weather alerts.** Environment Canada (MSC GeoMet) client, alert model, per-alert slide, and the promotion rule: a `warning` moves the alert group ahead of Today. Strictly passive — no notification, and promotion never moves the viewer off the slide they're on. Canada-only by deliberate choice.
+- **Severe weather alerts.** Environment Canada (MSC GeoMet) client, alert model, per-alert slide, and the promotion rule: a `warning` moves the alert group ahead of Today. Strictly passive — no notification, and promotion never moves the viewer off the slide they're on. Canada-only by deliberate choice. The slide states **what · where · until when** only; MSC's bulletin body runs to thousands of characters and has no place on a glance surface.
 
 **Refs:** [`plan/data-sources.md` § Severe weather alerts](./plan/data-sources.md), [`plan/slides.md` § Severe weather alerts](./plan/slides.md), [`plan/tech-stack.md` § Styling](./plan/tech-stack.md), [`review-findings.md`](./review-findings.md).
 
-**Definition of done.** All findings from the improvement review closed; alerts render for a real Environment Canada warning; lint + typecheck + 1,003 automated tests green (974 Vitest + 29 Playwright); manual tests signed off.
+**Definition of done.** All findings from the improvement review closed; alerts render for a real Environment Canada warning; lint + typecheck + 1,014 automated tests green (985 Vitest + 29 Playwright); manual tests signed off.

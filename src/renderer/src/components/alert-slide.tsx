@@ -1,7 +1,13 @@
 // Severe-weather alert slide. Plan/slides.md § Severe weather alerts.
 //
-//   Content:    alert name as the title · severity label · bulletin
-//               text · expiry time in the forecast location's zone.
+//   Content:    alert name as the title · severity label · affected
+//               region · expiry in the forecast location's zone.
+//
+//               The bulletin body is deliberately NOT shown. MSC's
+//               alert_text_en runs to thousands of characters of health
+//               advice and phone numbers; on a corner-glance slide it
+//               buried the three facts that matter. What / where /
+//               until when, then go read the full bulletin elsewhere.
 //   Background: a dark tint derived from Environment Canada's own
 //               risk colour, rather than a severity palette we invent.
 //   Motion:     none, deliberately. These slides are read, not
@@ -14,6 +20,7 @@
 
 import {
   alertBackground,
+  formatAlertAreas,
   severityLabel,
   type WeatherAlert,
 } from '../../../shared/alerts';
@@ -36,6 +43,7 @@ export function AlertSlide({
   const expires = alert.expiresAtUtc
     ? formatLocalClock(alert.expiresAtUtc, timeFormat, timeZone)
     : null;
+  const areas = formatAlertAreas(alert.areas);
 
   return (
     <EventSlideShell
@@ -85,32 +93,37 @@ export function AlertSlide({
           {severityLabel(alert.severity)}
         </div>
 
-        {alert.description ? (
-          <div
-            data-testid="alert-description"
-            style={{
-              fontSize: 11,
-              lineHeight: 1.45,
-              opacity: 0.88,
-              // The bulletins run long; let the body scroll rather
-              // than pushing the expiry line off the slide.
-              overflowY: 'auto',
-              flex: '1 1 auto',
-              minHeight: 0,
-            }}
-          >
-            {alert.description}
-          </div>
-        ) : null}
+        {/* Region and expiry sit together in the middle of the slide —
+            the two facts that qualify the title. */}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 4,
+            flex: '1 1 auto',
+            minHeight: 0,
+          }}
+        >
+          {areas ? (
+            <div
+              data-testid="alert-areas"
+              style={{ fontSize: 13, fontWeight: 500, opacity: 0.95 }}
+            >
+              {areas}
+            </div>
+          ) : null}
 
-        {expires ? (
-          <div
-            data-testid="alert-expires"
-            style={{ fontSize: 11, opacity: 0.7, flex: '0 0 auto' }}
-          >
-            Until {expires}
-          </div>
-        ) : null}
+          {expires ? (
+            <div
+              data-testid="alert-expires"
+              style={{ fontSize: 11, opacity: 0.7 }}
+            >
+              Until {expires}
+            </div>
+          ) : null}
+        </div>
       </div>
     </EventSlideShell>
   );
