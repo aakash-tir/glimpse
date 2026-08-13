@@ -194,7 +194,7 @@ Until M11 the coverage config excluded `src/main/**`, so the reported figure des
 
 `src/main/**` is now included and the number is honest. `src/preload/**` stays excluded — it is a `contextBridge` manifest that only executes inside a real Electron preload context, so E2E covers it or nothing does.
 
-**Baseline at end of M11** (`npm run test:coverage`): **82.47 % lines / 80.54 % statements** overall (1,840 of 2,231 executable lines).
+**Baseline at end of M11** (`npm run test:coverage`, measured on `main` post-merge): **82.89 % lines / 81.13 % statements** overall (1,870 of 2,256 executable lines).
 
 | Area | Lines | Note |
 |---|---|---|
