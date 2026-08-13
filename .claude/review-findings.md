@@ -60,6 +60,15 @@ _Reviewed and found correct (no action): the `eslint-disable` at `slide-deck.tsx
 
 Tracked here so they aren't forgotten (automation can't reach these). How-to is in each milestone's `manual-tests.md` history / the M10 list.
 
+**From M11 (merged 2026-08-12 without a manual pass):**
+
+- **Tailwind-removal visual sweep — the important one.** Removing Tailwind touched the styling of every surface in the app and **no automated test asserts a single visual property**. Arrow through all slides looking for overflow, lost centering, collapsed spacing, wrong font, mis-sized icons. Two Preflight carry-overs are load-bearing and worth checking in DevTools: `getComputedStyle(document.body)` should report the system UI font stack (not `Times New Roman`), `line-height: 1.5`, and `margin: 0px`.
+- **Alert slide against a live warning** — one slide per bulletin (not one per sub-region), correct region name, expiry in the forecast location's zone, no bulletin body, no motion.
+- **Deck opens on the alert** — including the cold-start path where the warning arrives after the window opened, and the opposite case where navigating first must leave you where you are.
+- **Alerts failure isolation** — blackhole `api.weather.gc.ca`; expect no alert slides, icon **not** in error state, other data intact.
+- **Gesture feel after the `GestureController` extraction** — icon drag / corner snap, window drag edge-clamping, square-lock corner resize.
+- **CI green on GitHub Actions** for the merge commit.
+
 - **Auto-start at real login** — Run-key registration verified end-to-end (`electron.app.Glimpse` present + `autoLaunchRegistered: true`); the only untested bit is Windows executing it at next login (OS-guaranteed). Confirm with a sign-out/in, then confirm the Settings → Startup opt-out sticks.
 - **Cached-location fallback under a real outage** — block `get.geojs.io` via hosts and relaunch; expect cached location, no error icon.
 - **Theme auto-switch** with Windows Light/Dark toggle (≈200 ms cross-fade).

@@ -249,7 +249,7 @@ _Scope note (added 2026-08-10): the advanced-location subsystem was built during
 
 ## M11 — Cleanup, blind spots & severe weather
 
-**Status:** In progress (branch `M11-cleanup`)
+**Status:** Done (2026-08-12)
 
 **Scope.** Post-M10.1 follow-up from the improvement review, plus the first new feature since M10.
 
@@ -262,3 +262,5 @@ _Scope note (added 2026-08-10): the advanced-location subsystem was built during
 **Refs:** [`plan/data-sources.md` § Severe weather alerts](./plan/data-sources.md), [`plan/slides.md` § Severe weather alerts](./plan/slides.md), [`plan/tech-stack.md` § Styling](./plan/tech-stack.md), [`review-findings.md`](./review-findings.md).
 
 **Definition of done.** All findings from the improvement review closed; alerts render for a real Environment Canada warning; lint + typecheck + 1,031 automated tests green (1,002 Vitest + 29 Playwright); manual tests signed off.
+
+_Closed 2026-08-12 on the user's instruction to merge. Every automated gate passed on the branch and again on `main` post-merge, and the alert feature was verified end to end against a live Environment Canada warning. The **manual pass was not run** — the Tailwind-removal visual sweep in particular has no automated coverage of any kind. Those checks are carried into [`review-findings.md` § Manual checks still outstanding](./review-findings.md) rather than being lost when `manual-tests.md` is cleared._
