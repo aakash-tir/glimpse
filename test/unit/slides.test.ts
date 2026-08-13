@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   computeVisibleSlides,
+  isAlertSlideId,
   isStaticSlideId,
   reconcileCurrentSlideIndex,
+  resolveDeckIndex,
   wrapStep,
   type EventSlideId,
   type SlideId,
@@ -320,5 +322,131 @@ describe('promotion does not move the user (plan/slides.md § Severe weather)', 
     const next = reconcileCurrentSlideIndex(withAlert, 0, cleared);
     expect(next).toBe(0);
     expect(cleared[next]).toBe('today');
+  });
+});
+
+describe('no alerts — the group leaves no trace', () => {
+  const BASE = { moonEnabled: false, eventSlideIds: [] };
+
+  it('renders no alert slide when the list is empty', () => {
+    const slides = computeVisibleSlides({ ...BASE, alertSlideIds: [] });
+    expect(slides.some(isAlertSlideId)).toBe(false);
+    expect(slides[0]).toBe('today');
+  });
+
+  it('renders no alert slide when the field is absent entirely', () => {
+    // The store omits it outside Canada and after a failed fetch.
+    const slides = computeVisibleSlides(BASE);
+    expect(slides.some(isAlertSlideId)).toBe(false);
+  });
+
+  it('ignores the promotion flag when there is nothing to promote', () => {
+    // A stale alertsPromoted=true with an empty list must not shift
+    // the deck or leave a gap at the front.
+    const slides = computeVisibleSlides({
+      ...BASE,
+      alertSlideIds: [],
+      alertsPromoted: true,
+    });
+    expect(slides[0]).toBe('today');
+    expect(slides).toEqual(computeVisibleSlides(BASE));
+  });
+
+  it('drops the alert slide once the alert clears', () => {
+    const withAlert = computeVisibleSlides({
+      ...BASE,
+      alertSlideIds: ['alert:aq'],
+      alertsPromoted: true,
+    });
+    const cleared = computeVisibleSlides({ ...BASE, alertSlideIds: [] });
+    expect(withAlert.some(isAlertSlideId)).toBe(true);
+    expect(cleared.some(isAlertSlideId)).toBe(false);
+    expect(cleared).toHaveLength(withAlert.length - 1);
+  });
+});
+
+describe('resolveDeckIndex — which slide the deck opens on', () => {
+  const promoted = computeVisibleSlides({
+    moonEnabled: false,
+    eventSlideIds: [],
+    alertSlideIds: ['alert:aq'],
+    alertsPromoted: true,
+  });
+  const plain = computeVisibleSlides({
+    moonEnabled: false,
+    eventSlideIds: [],
+  });
+
+  it('follows a warning to the front when the user has not navigated', () => {
+    // The cold-start case: window opens on Today, alerts land a moment
+    // later. Reconcile alone would keep the user on Today with the
+    // warning hidden one slide behind them.
+    const reconciled = reconcileCurrentSlideIndex(plain, 0, promoted);
+    expect(reconciled).toBe(1); // 'today' moved down one
+    expect(
+      resolveDeckIndex({
+        visibleSlides: promoted,
+        reconciledIndex: reconciled,
+        alertsPromoted: true,
+        hasNavigated: false,
+      }),
+    ).toBe(0);
+    expect(promoted[0]).toBe('alert:aq');
+  });
+
+  it('leaves a user who has navigated exactly where they are', () => {
+    const reconciled = reconcileCurrentSlideIndex(plain, 1, promoted);
+    expect(
+      resolveDeckIndex({
+        visibleSlides: promoted,
+        reconciledIndex: reconciled,
+        alertsPromoted: true,
+        hasNavigated: true,
+      }),
+    ).toBe(reconciled);
+    expect(promoted[reconciled]).toBe('seven-day');
+  });
+
+  it('opens on Today when there is no warning at all', () => {
+    expect(
+      resolveDeckIndex({
+        visibleSlides: plain,
+        reconciledIndex: 0,
+        alertsPromoted: false,
+        hasNavigated: false,
+      }),
+    ).toBe(0);
+    expect(plain[0]).toBe('today');
+  });
+
+  it('does not open on an un-promoted watch or advisory', () => {
+    // Those ride with the special events near the end of the deck;
+    // only a full warning changes where the deck opens.
+    const unpromoted = computeVisibleSlides({
+      moonEnabled: false,
+      eventSlideIds: [],
+      alertSlideIds: ['alert:watch'],
+      alertsPromoted: false,
+    });
+    expect(unpromoted[0]).toBe('today');
+    expect(
+      resolveDeckIndex({
+        visibleSlides: unpromoted,
+        reconciledIndex: 0,
+        alertsPromoted: false,
+        hasNavigated: false,
+      }),
+    ).toBe(0);
+  });
+
+  it('never returns a stale index when the alert group empties', () => {
+    expect(
+      resolveDeckIndex({
+        visibleSlides: plain,
+        reconciledIndex: 0,
+        alertsPromoted: true,
+        hasNavigated: false,
+      }),
+    ).toBe(0);
   });
 });

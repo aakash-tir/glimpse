@@ -96,6 +96,41 @@ export function computeVisibleSlides(flags: VisibilityFlags): SlideId[] {
   return out;
 }
 
+/**
+ * Where the deck should sit after the visible-slide list changes.
+ *
+ * Normally the reconciled index — the rule that the viewed slide does
+ * not shift when others appear or disappear.
+ *
+ * The exception is a promoted warning arriving before the user has
+ * navigated. Opening at index 0 already lands on the alert when the
+ * data is in the store, but on a cold start the window opens first and
+ * the alerts arrive moments later; reconcile would then keep the user
+ * on Today and quietly insert the warning behind them. "Don't move the
+ * viewer" exists so we never interrupt someone who is reading, and
+ * someone who has not touched the arrows since the window opened is
+ * not reading anything yet — so the deck follows the alert forward.
+ *
+ * Once they navigate, nothing moves them again. See plan/slides.md
+ * § Opening slide.
+ */
+export function resolveDeckIndex(input: {
+  visibleSlides: readonly SlideId[];
+  reconciledIndex: number;
+  alertsPromoted: boolean;
+  hasNavigated: boolean;
+}): number {
+  const { visibleSlides, reconciledIndex, alertsPromoted, hasNavigated } =
+    input;
+  if (hasNavigated || !alertsPromoted) return reconciledIndex;
+
+  const first = visibleSlides[0];
+  // Only a promoted group sits at index 0. A watch or advisory rides
+  // with the events and must not change where the deck opens.
+  if (first !== undefined && isAlertSlideId(first)) return 0;
+  return reconciledIndex;
+}
+
 export type WrapDirection = 'next' | 'prev';
 
 export function wrapStep(

@@ -21,6 +21,7 @@ import {
   isAlertSlideId,
   isStaticSlideId,
   reconcileCurrentSlideIndex,
+  resolveDeckIndex,
   wrapStep,
   type EventSlideId,
   type SlideId,
@@ -287,26 +288,40 @@ export function SlideDeck({
   const prevVisibleRef = useRef(visibleSlides);
   const prevIndexRef = useRef(0);
   const [direction, setDirection] = useState<WrapDirection>('next');
+  // A promoted warning pulls the deck to the front until the user
+  // first navigates (plan/slides.md § Opening slide). The onboarding
+  // handoff counts as navigation: it is explicit intent about where to
+  // land, which a warning must not override.
+  const hasNavigatedRef = useRef(initialSlideId !== undefined);
 
   const reconciled = reconcileCurrentSlideIndex(
     prevVisibleRef.current,
     prevIndexRef.current,
     visibleSlides,
   );
+  const targetIndex = resolveDeckIndex({
+    visibleSlides,
+    reconciledIndex: reconciled,
+    alertsPromoted,
+    hasNavigated: hasNavigatedRef.current,
+  });
   // Track index in a ref + a mirror state so the render uses the
-  // reconciled index immediately on prop change without a stale
+  // resolved index immediately on prop change without a stale
   // double-render. `initialSlideId` (onboarding completion handoff)
   // overrides the starting index on first mount only.
   const [currentIndex, setCurrentIndex] = useState(() =>
     initialSlideId
       ? Math.max(0, visibleSlides.indexOf(initialSlideId))
-      : reconciled,
+      : targetIndex,
   );
 
-  if (prevVisibleRef.current !== visibleSlides && reconciled !== currentIndex) {
-    // Sync state to the reconciled index when the visibility list
-    // changes mid-life. React 18 batches this so it does not loop.
-    setCurrentIndex(reconciled);
+  if (
+    prevVisibleRef.current !== visibleSlides &&
+    targetIndex !== currentIndex
+  ) {
+    // Sync state when the visibility list changes mid-life. React 18
+    // batches this so it does not loop.
+    setCurrentIndex(targetIndex);
   }
   prevVisibleRef.current = visibleSlides;
   prevIndexRef.current = currentIndex;
@@ -374,6 +389,9 @@ export function SlideDeck({
     (dir: WrapDirection) => {
       const fromSlideId = visibleSlides[safeIndex] ?? 'today';
       const token = ++animTokenRef.current;
+      // From here on the user is reading something of their own
+      // choosing; a later warning must not pull them off it.
+      hasNavigatedRef.current = true;
       setDirection(dir);
       setCurrentIndex((idx) => wrapStep(idx, visibleSlides.length, dir));
       setTransition({ fromSlideId, direction: dir });

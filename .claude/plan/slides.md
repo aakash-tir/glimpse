@@ -131,9 +131,21 @@ Environment Canada alerts for the resolved location — see [`data-sources.md` �
 This is deliberately the only thing in the app that changes slide order. Two consequences worth stating:
 
 - **It never interrupts.** Promotion changes where the slide *sits*, not what the user is *looking at*. Nothing raises the window, steals focus, or jumps the viewer to the alert. A user reading the 7-day forecast when a warning arrives stays on the 7-day forecast.
+
+  The one exception is the opening slide, below — which is not an interruption, because a user who has not navigated yet is not reading anything yet.
 - **It does not conflict with § Dynamic slide count.** That rule ("the currently-viewed slide does not shift") is implemented by `reconcileCurrentSlideIndex`, which tracks the slide's **id**, not its index. Inserting a slide at position 0 changes every index underneath it and changes nothing the user sees. The rule holds unchanged; it was always about the viewed slide, never about the numbering.
 
 The promotion is what the user sees **next time they open the window**, since the deck opens on the first slide. That is the intended prominence: unmissable when you next look, invisible until then.
+
+### Opening slide
+
+**With a promoted warning the deck opens on the alert. Otherwise it opens on Today.**
+
+Opening at index 0 gets this right on its own *when the alert data is already in the store* — which is the common case, since the main process keeps the last snapshot across collapse / expand. It is wrong on a cold start: the window opens before the first fetch returns, the deck lands on Today, and when the alerts arrive moments later the id-tracking reconcile faithfully keeps the user on Today while inserting the alert invisibly ahead of it. The warning is then one slide *behind* the opening position, which is the opposite of the intended prominence.
+
+So the deck follows a promoted alert group to the front **until the user first navigates**. After that the "never interrupts" rule above takes over unconditionally and nothing moves them again for the life of the window. The onboarding completion handoff (`initialSlideId`) counts as having navigated — it is explicit intent about where to land, and a warning must not override it.
+
+Only a **promoted** group opens the deck. A watch, advisory or statement sits with the special events and never changes the opening slide.
 
 ## Slide 6 — Settings
 

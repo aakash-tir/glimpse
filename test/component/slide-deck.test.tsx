@@ -5,6 +5,7 @@ import {
   SLIDE_TRANSITION_DURATION_S,
 } from '../../src/renderer/src/components/slide-deck';
 import type { SpecialEvent } from '../../src/shared/special-events';
+import type { WeatherAlert } from '../../src/shared/alerts';
 
 afterEach(cleanup);
 
@@ -245,5 +246,74 @@ describe('SlideDeck — currently-viewed slide does not shift on visibility chan
     expect(getDeck().getAttribute('data-current-slide-id')).toBe('today');
     expect(getDeck().getAttribute('data-current-slide-index')).toBe('0');
     expect(getDeck().getAttribute('data-visible-slide-count')).toBe('4');
+  });
+});
+
+describe('SlideDeck — which slide the deck opens on', () => {
+  // plan/slides.md § Opening slide.
+  const WARNING: WeatherAlert = {
+    id: 'aq',
+    severity: 'warning',
+    title: 'Air quality warning',
+    areas: ['Central Okanagan'],
+    riskColour: 'orange',
+    expiresAtUtc: '2099-01-01T00:00:00Z',
+  };
+  const WATCH: WeatherAlert = { ...WARNING, id: 'ts', severity: 'watch' };
+
+  it('opens on the alert when a warning is already loaded', () => {
+    render(<SlideDeck alerts={[WARNING]} />);
+    expect(getDeck().getAttribute('data-current-slide-id')).toBe('alert:aq');
+  });
+
+  it('opens on today when there are no alerts', () => {
+    render(<SlideDeck alerts={[]} />);
+    expect(getDeck().getAttribute('data-current-slide-id')).toBe('today');
+  });
+
+  it('follows a warning that arrives after the window opened', () => {
+    // The cold-start case: the deck mounts before the first fetch
+    // returns. Without this the warning is inserted silently *behind*
+    // the user, one slide back from where they are looking.
+    const { rerender } = render(<SlideDeck alerts={[]} />);
+    expect(getDeck().getAttribute('data-current-slide-id')).toBe('today');
+
+    rerender(<SlideDeck alerts={[WARNING]} />);
+    expect(getDeck().getAttribute('data-current-slide-id')).toBe('alert:aq');
+  });
+
+  it('does not move a user who has already navigated', () => {
+    const { rerender } = render(<SlideDeck alerts={[]} />);
+    fireEvent.click(screen.getByTestId('slide-deck-arrow-next'));
+    expect(getDeck().getAttribute('data-current-slide-id')).toBe('seven-day');
+
+    rerender(<SlideDeck alerts={[WARNING]} />);
+    expect(getDeck().getAttribute('data-current-slide-id')).toBe('seven-day');
+  });
+
+  it('does not open on an un-promoted watch', () => {
+    render(<SlideDeck alerts={[WATCH]} />);
+    expect(getDeck().getAttribute('data-current-slide-id')).toBe('today');
+  });
+
+  it('renders no alert slide at all when the list is empty', () => {
+    render(<SlideDeck alerts={[]} />);
+    expect(screen.queryByTestId('slide-alert:aq')).toBeNull();
+    expect(document.querySelector('[data-testid^="slide-alert"]')).toBeNull();
+  });
+
+  it('drops the alert slide when the warning clears', () => {
+    const { rerender } = render(<SlideDeck alerts={[WARNING]} />);
+    expect(getDeck().getAttribute('data-current-slide-id')).toBe('alert:aq');
+
+    rerender(<SlideDeck alerts={[]} />);
+    expect(document.querySelector('[data-testid^="slide-alert"]')).toBeNull();
+    expect(getDeck().getAttribute('data-current-slide-id')).toBe('today');
+  });
+
+  it('lets the onboarding handoff win over a warning', () => {
+    // initialSlideId is explicit intent about where to land.
+    render(<SlideDeck alerts={[WARNING]} initialSlideId="settings" />);
+    expect(getDeck().getAttribute('data-current-slide-id')).toBe('settings');
   });
 });

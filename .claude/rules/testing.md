@@ -172,6 +172,10 @@ For each milestone below, every bullet is a test (or small group of related test
 - **Unit:** expiry — alerts past `expiresAtUtc` are dropped; a null or unparseable expiry keeps the alert (better a stale warning than a silently dropped one).
 - **Unit:** promotion ordering in `computeVisibleSlides` — a `warning` moves the whole alert group ahead of Today; a watch/advisory/statement group sits with the special events; no alerts leaves the M4 order untouched.
 - **Unit:** the M4 current-slide stability rule still holds when the alert group is inserted or removed — `reconcileCurrentSlideIndex` tracks slide *ids*, so re-ordering around the viewer must not move them.
+- **Unit:** `resolveDeckIndex` — a promoted warning pulls the deck to index 0 while the user has not navigated; once they have, the reconciled index wins unchanged; no warning, an un-promoted watch, or an empty alert group all leave the deck on Today.
+- **Unit:** an empty or absent alert list produces **no** alert slide, and a stale `alertsPromoted: true` with nothing to promote must not shift the deck or leave a gap at the front.
+- **Component:** the deck opens on the alert when a warning is already loaded, opens on Today when there is none, **follows a warning that arrives after mount** (the cold-start case), and does **not** move a user who has already navigated. `initialSlideId` (onboarding handoff) outranks a warning.
+- **Component:** no alert slide renders at all for an empty list, and the slide disappears when the warning clears.
 - **Component:** alert slide renders title, severity label, bulletin text and expiry in the forecast location's timezone; background tint derives from the MSC risk colour; no motion.
 - **Integration:** an alerts fetch failure hides the alert slides **and nothing else** — the icon must not enter its error state, and forecast / NOAA data is unaffected.
 - **Integration:** no usable location for a tick → alerts cleared rather than left stale.
