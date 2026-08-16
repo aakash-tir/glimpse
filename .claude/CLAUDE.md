@@ -9,6 +9,7 @@
 3. [`open-questions.md`](./open-questions.md) — unresolved decisions, if any.
 4. [`rules/`](./rules/) — milestone workflow + per-milestone test inventory. Read before starting any implementation work.
 5. [`plan/`](./plan/) — detailed specs by topic (load on demand based on what you're working on).
+6. [`issues-history.md`](./issues-history.md) — optional: retrospective of every issue hit during M0–M11 and how it was overcome. Check it before re-fighting a Windows DWM quirk, a data-provider problem, or anything that feels like it may have happened before.
 
 ## Plan files (load only what's relevant)
 

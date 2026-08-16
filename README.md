@@ -76,6 +76,8 @@ Location resolution sends one request to an IP-geolocation service unless you se
 
 The full design history lives in [`.claude/`](./.claude/): [`project-context.md`](./.claude/project-context.md) (what and why), [`progress.md`](./.claude/progress.md) (milestones M0–M11), [`plan/`](./.claude/plan/) (per-topic specs), and [`rules/`](./.claude/rules/) (workflow + per-milestone test inventory). The plan files are the source of truth for behavior.
 
+For the war stories, see [`issues-history.md`](./.claude/issues-history.md) — a retrospective of every real problem hit while building this (Windows DWM quirks, live APIs disproving fixtures, a probabilistic three-`requestAnimationFrame` fix) and how each was overcome.
+
 ## Status & support
 
 This is a personal project built for one desk. The source is public so you can use it, learn from it, or try to break it — issues and PRs are welcome but responses are best-effort with no guarantees.
