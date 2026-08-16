@@ -10,8 +10,8 @@ Quick weather glance from anywhere on the desktop, without dedicating taskbar re
 
 ## Target user / platform
 
-- **One user** (the developer). Personal use only.
-- **Windows 11.** No cross-platform support, no installer signing, no public distribution channel.
+- **One user** (the developer) is the design center. The source is public on GitHub (MIT) for anyone who wants to build or tinker with it, but no packaged binaries are distributed.
+- **Windows 11.** No cross-platform support, no installer signing.
 - **Online by default.** IP-based geolocation, free public APIs (Open-Meteo, NOAA SWPC). Offline behavior is graceful (sad-cloud + retry) but not the design center.
 
 ## Design philosophy
@@ -27,7 +27,7 @@ Quick weather glance from anywhere on the desktop, without dedicating taskbar re
 - Personal use → no telemetry, no analytics, no auto-update infrastructure, no code signing.
 - Single Electron binary, single settings file (`%APPDATA%/Glimpse/settings.json`), no backend, no caching layer.
 - Windows 11 only.
-- This sub-app's `.claude/` config is intentionally **isolated** from the parent One-Piece project. Future Nova integration is out of scope.
+- Public source, not a public product → the repo is open for cloning and building, but there is no binary distribution, support commitment, or release channel.
 
 ## Glossary
 

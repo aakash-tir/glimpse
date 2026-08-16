@@ -1,6 +1,6 @@
 # Glimpse — Project Instructions for Claude
 
-**Glimpse** is a lightweight desktop weather app for Windows 11. Personal use only — not distributed beyond the user's own machine.
+**Glimpse** is a lightweight desktop weather app for Windows 11. Personal-use app — the source is public on GitHub (MIT), but no packaged binaries are distributed.
 
 ## Read order for new sessions
 
@@ -40,4 +40,3 @@
 - **Follow [`rules/milestone-workflow.md`](./rules/milestone-workflow.md) for every milestone.** Branch per milestone, per-feature commits, end-of-milestone lint + typecheck + automated tests, manual-test sign-off, merge with `--no-ff`, push both branches, re-run tests on `main`. Never delete a milestone branch.
 - **Every milestone must ship the automated tests in [`rules/testing.md`](./rules/testing.md)** for that milestone. Tests carry forward — no regressions allowed.
 - **Update `progress.md` on milestone completion.** When a milestone's "Definition of done" is met, mark it done with the date.
-- **Isolated `.claude/` config.** This sub-app's instructions are deliberately independent of the parent One-Piece project's `.claude/`. Do not import One-Piece rules here.
