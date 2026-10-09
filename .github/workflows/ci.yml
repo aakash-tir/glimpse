@@ -1,19 +1,36 @@
-# Gates from .claude/rules/milestone-workflow.md, run on every push and
-# pull request instead of only when someone types them locally.
+# CI: the gates from .claude/rules/milestone-workflow.md (lint, format, typecheck,
+# unit/component/integration/build tests, E2E).
+#
+# Kept lean on Actions minutes: pull requests only (the merge to main re-runs nothing,
+# the PR already tested it), and only when a file this check depends on changed.
+# Docs-only changes (docs/, logs/, graphify-out/, *.md) run no CI at all. Run it by
+# hand from the Actions tab (workflow_dispatch) when needed — e.g. on a milestone
+# branch that is merged locally rather than through a PR:
+# `gh workflow run ci.yml --ref <branch>`.
 #
 # Runs on windows-latest because Glimpse is a Windows-only app and the
 # E2E specs drive a real Electron window — the usual "run it on Linux
 # under xvfb" shortcut would be testing a platform the app does not
-# target.
+# target. One workflow, not one per area: the E2E step needs the same
+# Windows runner and `npm ci`, so splitting it out would pay for both twice.
 name: CI
 
 on:
-  push:
-    branches: ['**']
   pull_request:
+    paths:
+      - 'src/**'
+      - 'test/**'
+      - 'fixtures/**'
+      - '**/*.json'
+      - 'electron.vite.config.ts'
+      - 'vitest.config.ts'
+      - 'playwright*.config.ts'
+      - 'eslint.config.js'
+      - '.prettierignore'
+      - 'app-icon.*'
+      - '.github/workflows/**'
   workflow_dispatch:
 
-# A new push to the same branch makes the in-flight run obsolete.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
