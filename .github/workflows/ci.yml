@@ -3,10 +3,9 @@
 #
 # Kept lean on Actions minutes: pull requests only (the merge to main re-runs nothing,
 # the PR already tested it), and only when a file this check depends on changed.
-# Docs-only changes (docs/, logs/, graphify-out/, *.md) run no CI at all. Run it by
-# hand from the Actions tab (workflow_dispatch) when needed — e.g. on a milestone
-# branch that is merged locally rather than through a PR:
-# `gh workflow run ci.yml --ref <branch>`.
+# Docs-only changes (docs/, logs/, graphify-out/, *.md) run no CI at all. Milestones
+# reach main through a PR (.claude/rules/milestone-workflow.md), which is what runs
+# this. Run it by hand from the Actions tab (workflow_dispatch) when needed.
 #
 # Runs on windows-latest because Glimpse is a Windows-only app and the
 # E2E specs drive a real Electron window — the usual "run it on Linux
