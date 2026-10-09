@@ -95,12 +95,12 @@ If a milestone has no manual verification needed (purely structural or fully cov
 After the user has signed off on **both** the automated tests and the manual tests:
 
 1. **Confirm with the user before the merge.** Merging is non-trivial; do not run it without explicit go-ahead, even with prior sign-off on the tests.
-2. `git checkout main`
-3. `git pull --ff-only origin main` — make sure local `main` is current.
-4. `git merge --no-ff M<N>-<name>` — `--no-ff` keeps the per-feature commits grouped under a single milestone merge commit on `main`.
-5. `git push origin main`
-6. `git push origin M<N>-<name>` — push the milestone branch too so remote has the per-feature history.
-7. **Re-run the automated test suite on `main` post-merge** (`git checkout main && npm test`) — confirm nothing broke during the merge.
+2. `git push -u origin M<N>-<name>` — the milestone branch goes to `origin` (it keeps the per-feature history).
+3. **Open a PR into `main`:** `gh pr create --base main --head M<N>-<name>`. Milestones reach `main` only through a PR, never a local merge + push: CI runs on pull requests only (nothing runs on a push to `main`), so a local merge would get no CI at all.
+4. **Wait for CI:** `gh pr checks <pr> --watch`. Every check that started must be green. A docs-only PR starts none and may merge.
+5. `gh pr merge <pr> --merge` — a merge commit, like `--no-ff`, so the per-feature commits stay grouped under one milestone merge on `main`. **No `--delete-branch`**: milestone branches are never deleted.
+6. `git checkout main && git pull --ff-only origin main` — bring local `main` up to date.
+7. **Re-run the automated test suite on `main` post-merge** (`npm test`) — confirm nothing broke during the merge.
 
 **Local and remote must match at the end of every milestone.** Both `main` and the milestone branch are pushed to `origin`. Verify:
 
@@ -124,4 +124,4 @@ If anything fails during end-of-milestone checks:
 - **Lint / typecheck failure:** fix on the milestone branch with a new commit. Do not skip with `--no-verify` or by silencing rules. Re-run from step 1.
 - **Test failure:** fix on the milestone branch (either the test or the code, depending on which is wrong). New commit. Re-run from step 3.
 - **Manual test rejection by user:** treat as a bug. Fix on the milestone branch with a new commit, regenerate `manual-tests.md`, re-request sign-off.
-- **Post-merge test failure on `main`:** investigate the merge — likely a conflict resolved incorrectly or a missed dependency between milestones. Fix on `main` with a new commit (do not revert the merge unless absolutely necessary; it loses the per-feature history). Push the fix.
+- **Post-merge test failure on `main`:** investigate the merge — likely a conflict resolved incorrectly or a missed dependency between milestones. Fix it on a new branch and land it through a PR like any other change (do not revert the merge unless absolutely necessary; it loses the per-feature history).

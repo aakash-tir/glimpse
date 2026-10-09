@@ -38,6 +38,6 @@
 - **Target platform: Windows 11 only.** Cross-platform is not a goal.
 - **`plan/` is the source of truth.** When implementation diverges from a plan file, update the plan first, then write the code.
 - **Open questions live in `open-questions.md` only.** Do not sprinkle TBD / TODO comments into `plan/` files.
-- **Follow [`rules/milestone-workflow.md`](./rules/milestone-workflow.md) for every milestone.** Branch per milestone, per-feature commits, end-of-milestone lint + typecheck + automated tests, manual-test sign-off, merge with `--no-ff`, push both branches, re-run tests on `main`. Never delete a milestone branch.
+- **Follow [`rules/milestone-workflow.md`](./rules/milestone-workflow.md) for every milestone.** Branch per milestone, per-feature commits, end-of-milestone lint + typecheck + automated tests, manual-test sign-off, merge **through a PR** (CI runs on PRs only) with a merge commit, re-run tests on `main`. Never delete a milestone branch.
 - **Every milestone must ship the automated tests in [`rules/testing.md`](./rules/testing.md)** for that milestone. Tests carry forward — no regressions allowed.
 - **Update `progress.md` on milestone completion.** When a milestone's "Definition of done" is met, mark it done with the date.
